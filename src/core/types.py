@@ -15,10 +15,8 @@ class StepResult(Generic[ObsT]):
         observation: The environment's observation after the action.
         reward: Scalar reward for this step (optional).
         done: Whether the episode is finished.
-        info: Additional metadata (e.g. debug info, latency, etc.).
     """
 
     observation: ObsT
     reward: Optional[float] = None
     done: bool = False
-    info: Optional[dict[str, Any]] = None
