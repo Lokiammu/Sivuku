@@ -4,91 +4,42 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-"""
-EnvTorch: Agentic Execution Environments
+"""EnvTorch: Standardized agentic execution environments."""
 
-A unified framework for CodeAct environments that supports both agent execution
-and RL training through transforms, built on Gym/Gymnasium APIs.
-"""
-
-# Core types
-from .types import (
-    Action,
-    CodeAction,
-    CodeObservation,
-    CodeState,
-    ExecutionResult,
-    Observation,
-    Scalar,
-    State,
+# Core interfaces and types
+from .core.env import (
+    Environment, Transform, Tool, ToolRegistry,
+    Action, CodeAction, Observation, CodeObservation,
+    State, CodeState, ExecutionResult,
+    CompositeTransform, NullTransform,
+    CodeExecutionEnvironment
 )
 
-# Core interfaces
-from .interfaces import (
-    Environment,
-    Tool,
-    ToolRegistry,
-    Transform,
-)
+# Docker execution
+from .core.docker import DockerExecutor
 
-# Environment implementation
-from .environment import (
-    CodeActEnvironment,
-    PythonExecutor,
-    create_codeact_env,
-)
-
-# Transform implementations
-from .transforms import (
-    CodeQualityTransform,
-    CodeSafetyTransform,
-    CompositeTransform,
-    MathProblemTransform,
-    TaskCompletionTransform,
-    create_math_env_transform,
-    create_safe_env_transform,
-)
-
-# MCP integration
-from .mcp import (
-    MCPClient,
-    create_mcp_environment,
-)
+# Environment implementations
+from .envs import CodingEnv
 
 __version__ = "0.1.0"
 
 __all__ = [
+    # Core interfaces
+    "Environment", "Transform", "Tool", "ToolRegistry",
+
     # Types
-    "Action",
-    "CodeAction",
-    "CodeObservation",
-    "CodeState",
-    "ExecutionResult",
-    "Observation",
-    "Scalar",
-    "State",
+    "Action", "CodeAction", "Observation", "CodeObservation",
+    "State", "CodeState", "ExecutionResult",
 
-    # Interfaces
-    "Environment",
-    "Tool",
-    "ToolRegistry",
-    "Transform",
+    # Base transforms
+    "CompositeTransform", "NullTransform",
 
-    # Core environment
-    "CodeActEnvironment",
-    "PythonExecutor",
-    "create_codeact_env",
+    # Base environment implementation
+    "CodeExecutionEnvironment",
 
-    # Transforms
-    "CodeQualityTransform",
-    "CodeSafetyTransform",
-    "CompositeTransform",
-    "MathProblemTransform",
-    "TaskCompletionTransform",
-    "create_math_env_transform",
-    "create_safe_env_transform",
+    # Execution engines
+    "DockerExecutor",
 
-    # MCP
-    "MCPClient",
-    "create_mcp_environment",
+    # Concrete environment implementations
+    "CodingEnv",
 ]
