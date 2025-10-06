@@ -52,7 +52,6 @@ coverage.xml
 # Virtual environments
 .env
 .venv
-env/
 venv/
 ENV/
 env.bak/
@@ -66,21 +65,33 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# IDE
-.vscode/
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be added to the global gitignore or merged into this project gitignore.  For a PyCharm
+#  project, it is recommended to ignore the whole idea folder.
 .idea/
-*.swp
-*.swo
-*~
 
-# OS
+# VS Code
+.vscode/
+
+# macOS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
 
-# Logs
-*.log
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Docker
+.dockerignore
+
+# Exclude anything containing "claude" (case-insensitive)
+*claude*
+*Claude*
+*CLAUDE*
