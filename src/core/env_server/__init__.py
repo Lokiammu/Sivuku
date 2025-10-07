@@ -8,15 +8,7 @@
 
 from .base_transforms import CompositeTransform, NullTransform
 from .interfaces import Environment, Transform
-from .types import (
-    Action,
-    CodeAction,
-    CodeObservation,
-    CodeState,
-    ExecutionResult,
-    Observation,
-    State,
-)
+from .types import Action, Observation, State
 
 __all__ = [
     # Core interfaces
@@ -24,12 +16,8 @@ __all__ = [
     "Transform",
     # Types
     "Action",
-    "CodeAction",
     "Observation",
-    "CodeObservation",
     "State",
-    "CodeState",
-    "ExecutionResult",
     # Base transforms
     "CompositeTransform",
     "NullTransform",
