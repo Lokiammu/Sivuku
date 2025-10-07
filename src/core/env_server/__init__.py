@@ -7,7 +7,6 @@
 """Core environment interfaces and types."""
 
 from .base_transforms import CompositeTransform, NullTransform
-from .code_execution_environment import CodeExecutionEnvironment
 from .interfaces import Environment, Transform
 from .types import (
     Action,
@@ -34,6 +33,4 @@ __all__ = [
     # Base transforms
     "CompositeTransform",
     "NullTransform",
-    # Base environment implementation
-    "CodeExecutionEnvironment",
 ]
