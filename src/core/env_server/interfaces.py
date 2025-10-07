@@ -32,7 +32,7 @@ class Transform(ABC):
 
 
 class Environment(ABC):
-    """Base class for all environments following Gym/Gymnasium API.
+    """Base class for all environment servers following Gym/Gymnasium API.
 
     Args:
         transform: Optional transform to apply to observations
@@ -62,35 +62,3 @@ class Environment(ABC):
         if self.transform is not None:
             return self.transform(observation)
         return observation
-
-
-class Tool(ABC):
-    """Base class for tools that can be used in code execution."""
-
-    @abstractmethod
-    def __call__(self, *args, **kwargs) -> Any:
-        """Execute the tool."""
-        pass
-
-
-class ToolRegistry:
-    """Registry for managing tools available to code execution."""
-
-    def __init__(self):
-        self._tools: dict[str, Any] = {}
-
-    def register(self, name: str, tool: Any):
-        """Register a tool with a name."""
-        self._tools[name] = tool
-
-    def get(self, name: str) -> Any | None:
-        """Get a tool by name."""
-        return self._tools.get(name)
-
-    def get_all(self) -> dict[str, Any]:
-        """Get all registered tools."""
-        return self._tools.copy()
-
-    def get_names(self) -> list[str]:
-        """Get all tool names."""
-        return list(self._tools.keys())

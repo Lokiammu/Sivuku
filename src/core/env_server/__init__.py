@@ -6,25 +6,34 @@
 
 """Core environment interfaces and types."""
 
-from .interfaces import Environment, Transform, Tool, ToolRegistry
-from .types import (
-    Action, CodeAction, Observation, CodeObservation,
-    State, CodeState, ExecutionResult
-)
 from .base_transforms import CompositeTransform, NullTransform
 from .code_execution_environment import CodeExecutionEnvironment
+from .interfaces import Environment, Transform
+from .types import (
+    Action,
+    CodeAction,
+    CodeObservation,
+    CodeState,
+    ExecutionResult,
+    Observation,
+    State,
+)
 
 __all__ = [
     # Core interfaces
-    "Environment", "Transform", "Tool", "ToolRegistry",
-
+    "Environment",
+    "Transform",
     # Types
-    "Action", "CodeAction", "Observation", "CodeObservation",
-    "State", "CodeState", "ExecutionResult",
-
+    "Action",
+    "CodeAction",
+    "Observation",
+    "CodeObservation",
+    "State",
+    "CodeState",
+    "ExecutionResult",
     # Base transforms
-    "CompositeTransform", "NullTransform",
-
+    "CompositeTransform",
+    "NullTransform",
     # Base environment implementation
-    "CodeExecutionEnvironment"
+    "CodeExecutionEnvironment",
 ]
