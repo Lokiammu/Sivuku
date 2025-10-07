@@ -7,7 +7,7 @@
 """Core components for agentic environments."""
 
 # Re-export main components from submodules for convenience
-from .env import *
+from .env_server import *
 from .docker import *
 
 # Note: MCP module doesn't export anything yet
