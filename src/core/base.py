@@ -43,3 +43,7 @@ class BaseEnv(ABC, Generic[ActT, ObsT]):
             StepResult[ObsT]: The resulting observation, reward, done flag, and info.
         """
         raise NotImplementedError
+
+    def close(self) -> None:
+        """Release resources (containers, sessions, etc.)."""
+        pass
