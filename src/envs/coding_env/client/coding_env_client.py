@@ -18,7 +18,7 @@ from typing import Optional
 from core.base_env_client import HTTPEnvClient
 from core.types import StepResult
 
-from .models import CodeAction, CodeObservation
+from ..models import CodeAction, CodeObservation
 
 
 class CodingEnv(HTTPEnvClient[CodeAction, CodeObservation]):

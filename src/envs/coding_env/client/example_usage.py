@@ -1,5 +1,6 @@
-from envs.coding_env.env import CodingEnv
 from envs.coding_env.models import CodeAction
+
+from .coding_env_client import CodingEnv
 
 env = CodingEnv(base_url="http://localhost:8080")
 obs0 = env.reset()

@@ -6,12 +6,14 @@
 
 """Transforms specific to coding environments."""
 
-import re
 import ast
+import re
 
-from ...core.env.interfaces import Transform
-from ...core.env.base_transforms import CompositeTransform
-from ...core.env.types import CodeObservation, Observation
+from core.env_server.base_transforms import CompositeTransform
+
+from core.env_server.interfaces import Transform
+from core.env_server.types import Observation
+from models import CodeObservation
 
 
 class CodeSafetyTransform(Transform):
@@ -20,24 +22,24 @@ class CodeSafetyTransform(Transform):
     def __init__(self, penalty: float = -1.0):
         self.penalty = penalty
         self.dangerous_patterns = [
-            r'import\s+os',
-            r'import\s+subprocess',
-            r'eval\(',
-            r'exec\(',
-            r'__import__',
-            r'open\(',
+            r"import\s+os",
+            r"import\s+subprocess",
+            r"eval\(",
+            r"exec\(",
+            r"__import__",
+            r"open\(",
         ]
 
     def __call__(self, observation: Observation) -> Observation:
         if not isinstance(observation, CodeObservation):
             return observation
 
-        if 'last_code' in observation.metadata:
-            code = observation.metadata['last_code']
+        if "last_code" in observation.metadata:
+            code = observation.metadata["last_code"]
             for pattern in self.dangerous_patterns:
                 if re.search(pattern, code):
                     observation.reward = self.penalty
-                    observation.metadata['safety_violation'] = pattern
+                    observation.metadata["safety_violation"] = pattern
                     break
             else:
                 if observation.reward is None:
@@ -49,10 +51,12 @@ class CodeSafetyTransform(Transform):
 class CodeQualityTransform(Transform):
     """Evaluates and rewards code quality metrics."""
 
-    def __init__(self,
-                 concise_bonus: float = 0.1,
-                 max_length_threshold: int = 100,
-                 syntax_penalty: float = -0.2):
+    def __init__(
+        self,
+        concise_bonus: float = 0.1,
+        max_length_threshold: int = 100,
+        syntax_penalty: float = -0.2,
+    ):
         self.concise_bonus = concise_bonus
         self.max_length_threshold = max_length_threshold
         self.syntax_penalty = syntax_penalty
@@ -63,8 +67,8 @@ class CodeQualityTransform(Transform):
 
         quality_score = 0.0
 
-        if 'last_code' in observation.metadata:
-            code = observation.metadata['last_code']
+        if "last_code" in observation.metadata:
+            code = observation.metadata["last_code"]
 
             # Reward concise code
             if len(code.strip()) <= self.max_length_threshold:
@@ -87,7 +91,4 @@ class CodeQualityTransform(Transform):
 
 def create_safe_coding_transform() -> CompositeTransform:
     """Create a transform focused on safe coding practices and quality."""
-    return CompositeTransform([
-        CodeSafetyTransform(),
-        CodeQualityTransform()
-    ])
+    return CompositeTransform([CodeSafetyTransform(), CodeQualityTransform()])

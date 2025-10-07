@@ -9,9 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from core.env_server import Action, Observation, State
+
 
 @dataclass
-class CodeAction:
+class CodeAction(Action):
     """
     Represents a single code execution request.
     """
@@ -21,7 +23,7 @@ class CodeAction:
 
 
 @dataclass
-class CodeObservation:
+class CodeObservation(Observation):
     """
     Result of executing code in the environment.
     """
@@ -29,3 +31,10 @@ class CodeObservation:
     stdout: str = ""
     stderr: str = ""
     exit_code: int = 0
+
+
+@dataclass
+class CodeState(State):
+    """State for CodeAct environment with persistent execution context."""
+
+    pass
