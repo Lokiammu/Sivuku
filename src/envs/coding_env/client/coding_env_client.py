@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from core.base_env_client import HTTPEnvClient
+from core.http_env_client import HTTPEnvClient
 from core.types import StepResult
 
 from ..models import CodeAction, CodeObservation
