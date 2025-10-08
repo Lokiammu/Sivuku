@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple test showing how users will use EchoEnvClient.from_docker_image().
+Simple test showing how users will use EchoEnv.from_docker_image().
 
 This is the simplest possible usage
 """
@@ -11,23 +11,23 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from envs.echo_env import EchoAction, EchoEnvClient
+from envs.echo_env import EchoAction, EchoEnv
 
 
 def main():
-    """Test EchoEnvClient.from_docker_image()."""
+    """Test EchoEnv.from_docker_image()."""
     print("=" * 60)
-    print("EchoEnvClient.from_docker_image() Test")
+    print("EchoEnv.from_docker_image() Test")
     print("=" * 60)
     print()
 
     try:
         # This is what users will do - just one line!
         print("Creating client from Docker image...")
-        print("  EchoEnvClient.from_docker_image('echo-env:latest')")
+        print("  EchoEnv.from_docker_image('echo-env:latest')")
         print()
 
-        client = EchoEnvClient.from_docker_image("echo-env:latest")
+        client = EchoEnv.from_docker_image("echo-env:latest")
 
         print("✓ Client created and container started!\n")
 
@@ -62,17 +62,14 @@ def main():
         print("\n✓ All operations successful!")
         print()
 
+        print("Cleaning up...")
+        client.close()
+        print("✓ Container stopped and removed")
+        print()
+
         print("=" * 60)
         print("Test completed successfully! 🎉")
         print("=" * 60)
-        print()
-
-        print("Note: Container is still running. To stop it:")
-        print("  docker ps  # Find the container")
-        print("  docker stop <container-name>")
-        print("  docker rm <container-name>")
-        print()
-        print("TODO: Add client.close() method for automatic cleanup")
 
         return True
 

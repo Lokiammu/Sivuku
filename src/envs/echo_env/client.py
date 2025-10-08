@@ -19,7 +19,7 @@ from core.types import StepResult
 from .models import EchoAction, EchoObservation
 
 
-class EchoEnvClient(HTTPEnvClient[EchoAction, EchoObservation]):
+class EchoEnv(HTTPEnvClient[EchoAction, EchoObservation]):
     """
     HTTP client for the Echo Environment.
 
@@ -28,7 +28,7 @@ class EchoEnvClient(HTTPEnvClient[EchoAction, EchoObservation]):
 
     Example:
         >>> # Connect to a running server
-        >>> client = EchoEnvClient(base_url="http://localhost:8000")
+        >>> client = EchoEnv(base_url="http://localhost:8000")
         >>> result = client.reset()
         >>> print(result.observation.echoed_message)
         >>>
@@ -39,7 +39,7 @@ class EchoEnvClient(HTTPEnvClient[EchoAction, EchoObservation]):
 
     Example with Docker:
         >>> # Automatically start container and connect
-        >>> client = EchoEnvClient.from_docker_image("echo-env:latest")
+        >>> client = EchoEnv.from_docker_image("echo-env:latest")
         >>> result = client.reset()
         >>> result = client.step(EchoAction(message="Test"))
     """
