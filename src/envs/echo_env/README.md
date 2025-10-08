@@ -1,4 +1,4 @@
-# Echo Environment HTTP Server
+# Echo Environment
 
 A simple test environment that echoes back messages. Perfect for testing the HTTP server infrastructure.
 
