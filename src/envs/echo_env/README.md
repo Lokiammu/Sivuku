@@ -57,7 +57,58 @@ The server will be available at `http://localhost:8000`
 - `GET /state` - Get current environment state
 - `GET /health` - Health check
 
+## Running with Docker
+
+### Prerequisites
+
+First, build the base image (do this once):
+
+```bash
+# From project root
+cd /path/to/envtorch
+docker build -t envtorch-base:latest -f src/core/docker/base/Dockerfile .
+```
+
+### Build the Echo Environment Image
+
+```bash
+# From project root
+docker build -t echo-env:latest -f src/envs/echo_env/server/Dockerfile .
+```
+
+### Run the Container
+
+```bash
+# Run in foreground
+docker run -p 8000:8000 echo-env:latest
+
+# Or run in background (detached)
+docker run -d -p 8000:8000 --name echo-server echo-env:latest
+```
+
+### Manage the Container
+
+```bash
+# View running containers
+docker ps
+
+# View logs
+docker logs echo-server
+docker logs -f echo-server  # Follow logs
+
+# Stop the container
+docker stop echo-server
+
+# Remove the container
+docker rm echo-server
+
+# Restart
+docker restart echo-server
+```
+
 ## Test with curl
+
+Once the server is running (either directly or via Docker):
 
 ```bash
 # Health check
@@ -79,6 +130,37 @@ curl -X POST http://localhost:8000/step \
 
 # Get state
 curl http://localhost:8000/state
+```
+
+### Expected Responses
+
+**Health Check:**
+```json
+{"status": "healthy"}
+```
+
+**Reset:**
+```json
+{
+  "observation": {
+    "echoed_message": "Echo environment ready!",
+    "message_length": 0
+  },
+  "reward": 0.0,
+  "done": false
+}
+```
+
+**Step:**
+```json
+{
+  "observation": {
+    "echoed_message": "Hello, Echo!",
+    "message_length": 12
+  },
+  "reward": 1.2,
+  "done": false
+}
 ```
 
 ## Environment Details
