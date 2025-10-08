@@ -32,11 +32,13 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         base_url: str,
         request_timeout_s: float = 15.0,
         default_headers: Optional[Dict[str, str]] = None,
+        provider: Optional["ContainerProvider"] = None,
     ):
         self._base = base_url.rstrip("/")
         self._timeout = float(request_timeout_s)
         self._http = requests.Session()
         self._headers = default_headers or {}
+        self._provider = provider
 
     @classmethod
     def from_docker_image(
@@ -90,8 +92,8 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         # 2. Wait for server to be ready
         provider.wait_for_ready(base_url)
 
-        # 3. Create and return client instance
-        return cls(base_url=base_url)
+        # 3. Create and return client instance with provider reference
+        return cls(base_url=base_url, provider=provider)
 
     @abstractmethod
     def _step_payload(self, action: ActT) -> dict:
@@ -136,5 +138,11 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         return self._parse_result(r.json())
 
     def close(self) -> None:
-        # nothing to close; higher-level libraries own lifecycles of the endpoints
-        pass
+        """
+        Close the environment and clean up resources.
+
+        If this client was created via from_docker_image(), this will stop
+        and remove the associated container.
+        """
+        if self._provider is not None:
+            self._provider.stop_container()
