@@ -32,6 +32,17 @@ finally:
     client.close()
 ```
 
+That's it! The `EchoEnv.from_docker_image()` method handles:
+- Starting the Docker container
+- Waiting for the server to be ready
+- Connecting to the environment
+- Container cleanup when you call `close()`
+
+## Building the Docker Image
+
+Before using the environment, you need to build the Docker image:
+
+```bash
 # From project root
 docker build -t echo-env:latest -f src/envs/echo_env/server/Dockerfile .
 ```
