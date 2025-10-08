@@ -59,16 +59,6 @@ The server will be available at `http://localhost:8000`
 
 ## Running with Docker
 
-### Prerequisites
-
-First, build the base image (do this once):
-
-```bash
-# From project root
-cd /path/to/envtorch
-docker build -t envtorch-base:latest -f src/core/docker/base/Dockerfile .
-```
-
 ### Build the Echo Environment Image
 
 ```bash

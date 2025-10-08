@@ -10,7 +10,7 @@
 # This is the standard base image for all EnvTorch environment servers.
 # It includes the minimal dependencies needed to run HTTP environment servers.
 #
-# Build: docker build -t envtorch-base:latest -f src/core/docker/base/Dockerfile .
+# Build: docker build -t envtorch-base:latest -f src/core/containers/images/Dockerfile .
 # Tag:   docker tag envtorch-base:latest envtorch-base:0.1.0
 #
 

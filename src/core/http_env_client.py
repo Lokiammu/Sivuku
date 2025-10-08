@@ -12,11 +12,14 @@ Future hooks (commented below) for:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generic, Optional, Type, TypeVar
-
+from typing import TYPE_CHECKING, Any, Dict, Generic, Optional, Type, TypeVar
+from .containers.runtime import LocalDockerProvider
 import requests
-from . import local_docker
+
 from .types import StepResult
+
+if TYPE_CHECKING:
+    from .containers.runtime import ContainerProvider
 
 ActT = TypeVar("ActT")
 ObsT = TypeVar("ObsT")
@@ -36,7 +39,11 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         self._headers = default_headers or {}
 
     @classmethod
-    def from_docker_image(cls: Type[EnvClientT], image: str) -> EnvClientT:
+    def from_docker_image(
+        cls: Type[EnvClientT],
+        image: str,
+        provider: Optional["ContainerProvider"] = None,
+    ) -> EnvClientT:
         """
         Create an environment client by spinning up a Docker container locally.
 
@@ -49,7 +56,8 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         orchestration. The container will keep running until manually stopped.
 
         Args:
-            image: Docker image name to run (e.g., "coding-env:latest")
+            image: Docker image name to run (e.g., "echo-env:latest")
+            provider: Container provider to use (defaults to LocalDockerProvider)
 
         Returns:
             An instance of the client class connected to the running container
@@ -72,21 +80,17 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
             >>> env.close()
         """
 
+        # Use default provider if none provided
+        if provider is None:
+            provider = LocalDockerProvider()
 
-        # 1. Find available port
-        port = local_docker._find_available_port()
+        # 1. Start container
+        base_url = provider.start_container(image)
 
-        # 2. Generate unique container name
-        container_name = local_docker._generate_container_name(image)
+        # 2. Wait for server to be ready
+        provider.wait_for_ready(base_url)
 
-        # 3. Start Docker container
-        # container = local_docker._start_container(image=image, name=container_name, port=port)
-
-        # 4. Wait for server to be ready
-        # local_docker._wait_for_server_ready(f"http://localhost:{port}")
-
-        # 5. Create and return client instance
-        base_url = f"http://localhost:{port}"
+        # 3. Create and return client instance
         return cls(base_url=base_url)
 
     @abstractmethod

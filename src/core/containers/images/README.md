@@ -1,6 +1,6 @@
-# EnvTorch Base Docker Images
+# EnvTorch Base Container Images
 
-This directory contains base Docker images used by all EnvTorch environment servers.
+This directory contains base container image Dockerfiles used by all EnvTorch environment servers.
 
 ## Why Base Images?
 
@@ -37,7 +37,7 @@ Total: 465 MB (base shared, minimal duplication)
 
 ```bash
 # From project root
-docker build -t envtorch-base:latest -f src/core/docker/base/Dockerfile .
+docker build -t envtorch-base:latest -f src/core/containers/images/Dockerfile .
 ```
 
 ## Usage in Environment Dockerfiles
@@ -67,11 +67,27 @@ CMD ["uvicorn", "envs.my_env.server.app:app", "--host", "0.0.0.0", "--port", "80
 
 ```bash
 # Step 1: Build base image (do this once)
-docker build -t envtorch-base:latest -f src/core/docker/base/Dockerfile .
+docker build -t envtorch-base:latest -f src/core/containers/images/Dockerfile .
 
 # Step 2: Build echo environment (uses base)
 docker build -t echo-env:latest -f src/envs/echo_env/server/Dockerfile .
 
 # Step 3: Run echo environment
 docker run -p 8000:8000 echo-env:latest
+```
+
+## Updating the Base
+
+When dependencies need updating:
+
+1. Update `src/core/containers/images/Dockerfile`
+2. Rebuild base image
+3. Rebuild all environment images (they'll use new base)
+
+```bash
+# Update base
+docker build -t envtorch-base:latest -f src/core/containers/images/Dockerfile .
+
+# Rebuild environments (they automatically use new base)
+docker build -t echo-env:latest -f src/envs/echo_env/server/Dockerfile .
 ```
