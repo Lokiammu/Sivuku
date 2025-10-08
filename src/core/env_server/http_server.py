@@ -18,7 +18,7 @@ from typing import Any, Dict, Type
 
 from .interfaces import Environment
 from .types import Action, Observation
-
+from fastapi import Body, FastAPI
 
 class HTTPEnvServer:
     """
@@ -69,12 +69,6 @@ class HTTPEnvServer:
         Args:
             app: FastAPI application instance
         """
-        try:
-            from fastapi import Body, FastAPI
-        except ImportError:
-            raise ImportError(
-                "FastAPI is required for HTTP server. Install with: pip install fastapi uvicorn"
-            )
 
         if not isinstance(app, FastAPI):
             raise TypeError("app must be a FastAPI instance")

@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 # Use the standard envtorch base image
-# Built from: docker build -t envtorch-base:latest -f src/core/docker/base/Dockerfile .
+# Built from: docker build -t envtorch-base:latest -f src/core/containers/images/Dockerfile .
 FROM envtorch-base:latest
 
 # Copy only what's needed for this environment
