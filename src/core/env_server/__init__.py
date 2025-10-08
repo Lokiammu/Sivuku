@@ -7,6 +7,7 @@
 """Core environment interfaces and types."""
 
 from .base_transforms import CompositeTransform, NullTransform
+from .http_server import HTTPEnvServer, create_fastapi_app
 from .interfaces import Environment, Transform
 from .types import Action, Observation, State
 
@@ -21,4 +22,7 @@ __all__ = [
     # Base transforms
     "CompositeTransform",
     "NullTransform",
+    # HTTP Server
+    "HTTPEnvServer",
+    "create_fastapi_app",
 ]
