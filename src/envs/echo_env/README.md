@@ -11,17 +11,17 @@ from envs.echo_env import EchoAction, EchoEnv
 
 try:
     # Create environment from Docker image
-    client = EchoEnv.from_docker_image("echo-env:latest")
+    echo_env = EchoEnv.from_docker_image("echo-env:latest")
 
     # Reset
-    result = client.reset()
+    result = echo_env.reset()
     print(f"Reset: {result.observation.echoed_message}")
 
     # Send multiple messages
     messages = ["Hello, World!", "Testing echo", "Final message"]
 
     for msg in messages:
-        result = client.step(EchoAction(message=msg))
+        result = echo_env.step(EchoAction(message=msg))
         print(f"Sent: '{msg}'")
         print(f"  → Echoed: '{result.observation.echoed_message}'")
         print(f"  → Length: {result.observation.message_length}")
@@ -29,7 +29,7 @@ try:
 
 finally:
     # Always clean up
-    client.close()
+    echo_env.close()
 ```
 
 That's it! The `EchoEnv.from_docker_image()` method handles:
@@ -77,14 +77,14 @@ If you already have an Echo environment server running, you can connect directly
 from envs.echo_env import EchoEnv
 
 # Connect to existing server
-client = EchoEnv(base_url="<ENV_HTTP_URL_HERE>")
+echo_env = EchoEnv(base_url="<ENV_HTTP_URL_HERE>")
 
 # Use as normal
-result = client.reset()
-result = client.step(EchoAction(message="Hello!"))
+result = echo_env.reset()
+result = echo_env.step(EchoAction(message="Hello!"))
 ```
 
-Note: When connecting to an existing server, `client.close()` will NOT stop the server.
+Note: When connecting to an existing server, `echo_env.close()` will NOT stop the server.
 
 ## Development & Testing
 
