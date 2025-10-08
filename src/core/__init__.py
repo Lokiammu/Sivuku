@@ -8,6 +8,12 @@
 
 # Re-export main components from submodules for convenience
 from .env_server import *
-from .docker import *
+from .http_env_client import HTTPEnvClient
+from .types import StepResult
 
 # Note: MCP module doesn't export anything yet
+
+__all__ = [
+    "HTTPEnvClient",
+    "StepResult",
+]

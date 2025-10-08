@@ -1,0 +1,136 @@
+"""
+core/runner_env.py
+Minimal HTTP-based environment client.
+- Talks to a single env worker exposing: POST /reset, POST /step
+
+Future hooks (commented below) for:
+- episode_id, seed on reset
+- request_id on step
+- custom headers (auth/trace)
+"""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Generic, Optional, Type, TypeVar
+
+import requests
+from . import local_docker
+from .types import StepResult
+
+ActT = TypeVar("ActT")
+ObsT = TypeVar("ObsT")
+EnvClientT = TypeVar("EnvClientT", bound="HTTPEnvClient")
+
+
+class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
+    def __init__(
+        self,
+        base_url: str,
+        request_timeout_s: float = 15.0,
+        default_headers: Optional[Dict[str, str]] = None,
+    ):
+        self._base = base_url.rstrip("/")
+        self._timeout = float(request_timeout_s)
+        self._http = requests.Session()
+        self._headers = default_headers or {}
+
+    @classmethod
+    def from_docker_image(cls: Type[EnvClientT], image: str) -> EnvClientT:
+        """
+        Create an environment client by spinning up a Docker container locally.
+
+        This is a development utility that:
+        1. Starts a Docker container from the specified image
+        2. Waits for the server to be ready
+        3. Creates and returns a client instance connected to the container
+
+        Note: The container lifecycle management is left to the user or higher-level
+        orchestration. The container will keep running until manually stopped.
+
+        Args:
+            image: Docker image name to run (e.g., "coding-env:latest")
+
+        Returns:
+            An instance of the client class connected to the running container
+
+        Example:
+            >>> from envs.coding_env.client import CodingEnv
+            >>> from envs.coding_env.models import CodeAction
+            >>>
+            >>> # Create environment from image
+            >>> env = CodingEnv.from_docker_image("coding-env:latest")
+            >>>
+            >>> # Use the environment
+            >>> result = env.reset()
+            >>> print(result.observation)
+            >>>
+            >>> step_result = env.step(CodeAction(code="print('hello')"))
+            >>> print(step_result.observation.stdout)
+            >>>
+            >>> # Cleanup (optional)
+            >>> env.close()
+        """
+
+
+        # 1. Find available port
+        port = local_docker._find_available_port()
+
+        # 2. Generate unique container name
+        container_name = local_docker._generate_container_name(image)
+
+        # 3. Start Docker container
+        # container = local_docker._start_container(image=image, name=container_name, port=port)
+
+        # 4. Wait for server to be ready
+        # local_docker._wait_for_server_ready(f"http://localhost:{port}")
+
+        # 5. Create and return client instance
+        base_url = f"http://localhost:{port}"
+        return cls(base_url=base_url)
+
+    @abstractmethod
+    def _step_payload(self, action: ActT) -> dict:
+        """Convert an Action object to the JSON body expected by the env server."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _parse_result(self, payload: dict) -> StepResult[ObsT]:
+        """Convert a JSON response from the env server to StepResult[ObsT]."""
+        raise NotImplementedError
+
+    # ---------- Environment Server Interface Methods ----------
+    def reset(self) -> StepResult[ObsT]:
+        body: Dict[str, Any] = {}
+        # TODO: later:
+        # body["seed"] = seed
+        # body["episode_id"] = episode_id
+        r = self._http.post(
+            f"{self._base}/reset",
+            json=body,
+            headers=self._headers,
+            timeout=self._timeout,
+        )
+        r.raise_for_status()
+        return self._parse_result(r.json())
+
+    def step(self, action: ActT) -> StepResult[ObsT]:
+        body: Dict[str, Any] = {
+            "action": self._step_payload(action),
+            "timeout_s": int(self._timeout),
+        }
+        # TODO: later:
+        # body["request_id"] = str(uuid.uuid4())
+        # body["episode_id"] = current_episode_id
+        r = self._http.post(
+            f"{self._base}/step",
+            json=body,
+            headers=self._headers,
+            timeout=self._timeout,
+        )
+        r.raise_for_status()
+        return self._parse_result(r.json())
+
+    def close(self) -> None:
+        # nothing to close; higher-level libraries own lifecycles of the endpoints
+        pass
