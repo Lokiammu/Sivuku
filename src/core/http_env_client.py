@@ -105,6 +105,11 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         """Convert a JSON response from the env server to StepResult[ObsT]."""
         raise NotImplementedError
 
+    @abstractmethod
+    def _parse_state(self, payload: dict) -> Any:
+        """Convert a JSON response from the state endpoint to a State object."""
+        raise NotImplementedError
+
     # ---------- Environment Server Interface Methods ----------
     def reset(self) -> StepResult[ObsT]:
         body: Dict[str, Any] = {}
@@ -136,6 +141,28 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         )
         r.raise_for_status()
         return self._parse_result(r.json())
+
+    def state(self) -> Any:
+        """
+        Get the current environment state from the server.
+
+        Returns:
+            State object with environment state information (e.g., episode_id, step_count)
+
+        Example:
+            >>> client = EchoEnv.from_docker_image("echo-env:latest")
+            >>> result = client.reset()
+            >>> state = client.state()
+            >>> print(state.episode_id)
+            >>> print(state.step_count)
+        """
+        r = self._http.get(
+            f"{self._base}/state",
+            headers=self._headers,
+            timeout=self._timeout,
+        )
+        r.raise_for_status()
+        return self._parse_state(r.json())
 
     def close(self) -> None:
         """

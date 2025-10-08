@@ -99,10 +99,7 @@ class HTTPEnvServer:
         async def get_state() -> Dict[str, Any]:
             """State endpoint - returns current environment state."""
             state = self.env.state
-            return {
-                "episode_id": state.episode_id,
-                "step_count": state.step_count,
-            }
+            return asdict(state)
 
         @app.get("/health")
         async def health() -> Dict[str, str]:
