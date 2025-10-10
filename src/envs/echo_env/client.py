@@ -11,8 +11,9 @@ This module provides the client for connecting to an Echo Environment server
 over HTTP.
 """
 
-from typing import Dict
+from typing import Any, Dict
 
+from core.env_server.types import State
 from core.http_env_client import HTTPEnvClient
 from core.types import StepResult
 
@@ -81,4 +82,19 @@ class EchoEnv(HTTPEnvClient[EchoAction, EchoObservation]):
             observation=observation,
             reward=payload.get("reward"),
             done=payload.get("done", False),
+        )
+
+    def _parse_state(self, payload: Dict) -> State:
+        """
+        Parse server response into State object.
+
+        Args:
+            payload: JSON response from /state endpoint
+
+        Returns:
+            State object with episode_id and step_count
+        """
+        return State(
+            episode_id=payload.get("episode_id"),
+            step_count=payload.get("step_count", 0),
         )

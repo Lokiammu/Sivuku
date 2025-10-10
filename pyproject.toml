@@ -12,6 +12,7 @@ dependencies = [
     "requests>=2.25.0",
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
+    "smolagents>=1.22.0,<2"
 ]
 
 [tool.setuptools]

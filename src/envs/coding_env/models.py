@@ -37,4 +37,4 @@ class CodeObservation(Observation):
 class CodeState(State):
     """State for CodeAct environment with persistent execution context."""
 
-    pass
+    last_exit_code: int = 0

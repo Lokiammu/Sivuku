@@ -34,3 +34,12 @@ class State:
 
     episode_id: Optional[str] = None
     step_count: int = 0
+
+
+@dataclass
+class CodeExecResult:
+    """Result of code execution containing stdout, stderr, and exit code."""
+
+    stdout: str
+    stderr: str
+    exit_code: int

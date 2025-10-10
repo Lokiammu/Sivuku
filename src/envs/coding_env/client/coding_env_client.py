@@ -13,25 +13,18 @@ Talks HTTP to a single base_url exposing: /reset and /step.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from core.http_env_client import HTTPEnvClient
 from core.types import StepResult
 
-from ..models import CodeAction, CodeObservation
+from ..models import CodeAction, CodeObservation, CodeState
+
+if TYPE_CHECKING:
+    from core.containers.runtime import ContainerProvider
 
 
 class CodingEnv(HTTPEnvClient[CodeAction, CodeObservation]):
-    def __init__(
-        self,
-        base_url: str,
-        request_timeout_s: float = 15.0,
-    ):
-        super().__init__(
-            base_url=base_url,
-            request_timeout_s=request_timeout_s,
-        )
-
     # --- HTTPEnvClient abstract hooks ---
 
     def _step_payload(self, action: CodeAction) -> dict:
@@ -47,4 +40,20 @@ class CodingEnv(HTTPEnvClient[CodeAction, CodeObservation]):
             observation=obs,
             reward=payload.get("reward"),
             done=bool(payload.get("done", False)),
+        )
+
+    def _parse_state(self, payload: dict) -> CodeState:
+        """
+        Parse server response into CodeState object.
+
+        Args:
+            payload: JSON response from /state endpoint
+
+        Returns:
+            CodeState object with episode_id, step_count, and last_exit_code
+        """
+        return CodeState(
+            episode_id=payload.get("episode_id"),
+            step_count=payload.get("step_count", 0),
+            last_exit_code=payload.get("last_exit_code", 0),
         )
