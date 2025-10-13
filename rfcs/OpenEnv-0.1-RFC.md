@@ -1,0 +1,190 @@
+# RFC: EnvTorch Framework for agent execution environments
+
+**Status**: Request for Comments(RFC)
+**Created**: October 2025
+**Authors**: EnvTorch Contributors
+
+## Summary
+
+An e2e framework for creating, deploying and using isolated execution environments for agentic RL training, built using Gymnasium style APIs.It provides a clean client-server architecture where environments run as FastAPI servers in Docker containers, and clients interact with them via type-safe HTTP APIs.
+
+## Motivation
+
+### Problem Statement
+
+Building execution environments for AI agents, code execution, or computational tasks typically involves:
+- Complex setup and dependency management
+- Security concerns with code execution
+- Difficulty in scaling and deploying environments
+- Lack of standardized interfaces between environments and clients of environments
+
+### Goals
+
+1. **Simplicity**: Simple APIs to interact with the environment from RL training code
+2. **Type Safety**: Strongly-typed actions, observations, and state
+3. **Isolation**: Each environment runs in its own Docker container
+4. **Observability**: Leverage side-car container pattern to observe actions, observation tuples for an RL training eposide.
+
+
+## Design
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│             RL code(Client Application)                 │
+│             RL code(Client Application)                 │
+│  ┌────────────────┐              ┌──────────────────┐   │
+│  │  Environment   │              │  Environment     │   │
+│  │  Client        │              │  Client          │   │
+│  │ (HTTPEnvClient)│              │ (HTTPEnvClient)  │   │
+│  └────────┬───────┘              └────────┬─────────┘   │
+└───────────┼───────────────────────────────┼─────────────┘
+            │ HTTP (reset, step, state)     │ HTTP
+            │                               │
+┌───────────▼───────────────────────────────▼─────────────┐
+│              Docker Containers (Isolated)               │
+│  ┌──────────────────────┐    ┌──────────────────────┐   │
+│  │ FastAPI Server       │    │ FastAPI Server       │   │
+│  │   Environment        │    │   Environment        │   │
+│  │   Logic              │    │   Logic              │   │
+│  └──────────────────────┘    └──────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Core Abstractions(Already available on the master)
+
+#### 1. Environment (Server-Side)
+
+```python
+class Environment(ABC):
+    """Base class for all environments."""
+
+    @abstractmethod
+    def reset(self) -> Observation:
+        """Initialize new episode."""
+
+    @abstractmethod
+    def step(self, action: Action) -> Observation:
+        """Execute action and return observation."""
+
+    @property
+    @abstractmethod
+    def state(self) -> State:
+        """Get current episode state."""
+```
+
+**Design Rationale**:
+- Familiar interface for RL/environment practitioners
+- Clear separation between action execution (step) and state management
+- Abstract base class enforces contract across all environments
+
+#### 2. HTTPEnvClient (Client-Side)
+
+```python
+class HTTPEnvClient(Generic[ActT, ObsT]):
+    """Base class for HTTP environment clients."""
+
+    def reset(self) -> StepResult[ObsT]:
+        """Reset environment."""
+
+    def step(self, action: ActT) -> StepResult[ObsT]:
+        """Execute action."""
+
+    def state(self) -> State:
+        """Get current state."""
+
+    def close(self) -> None:
+        """Cleanup resources by signaling to the provider."""
+```
+
+**Design Rationale**:
+
+The HTTPEnvClient serves as the primary interface for users to interact with environments, designed with several key principles:
+
+- This base class handles all HTTP communication(resp, req) with the environment
+- This base class handles all HTTP communication(resp, req) with the environment
+- Generic types (`Generic[ActT, ObsT]`) provide compile-time type safety
+- Each environment's concrete client class implements parsing step, observation, and state responses from the server into corresponding data models for the respective response.
+- Each environment's concrete client class implements parsing step, observation, and state responses from the server into corresponding data models for the respective response.
+- Example: `CodingEnv(HTTPEnvClient[CodeAction, CodeObservation])`
+- `state()` method provides visibility into episode metadata
+- Explicit `close()` ensures proper resource cleanup
+
+#### 3. Container Providers
+
+```python
+class ContainerProvider(ABC):
+    """Abstract base for container orchestration."""
+
+    @abstractmethod
+    def start_container(self, image: str, ...) -> str:
+        """Start container and return base URL."""
+
+    @abstractmethod
+    def stop_container(self) -> None:
+        """Stop and remove container."""
+
+    @abstractmethod
+    def wait_for_ready(self, base_url: str, timeout_s: float) -> None:
+        """Wait for container to be ready."""
+```
+
+**Design Rationale**:
+- Pluggable architecture supports multiple platforms (local Docker, K8s, other orchestration providers)
+- Provider abstraction decouples client from deployment details and management with easy integration with existing orchestration solutions
+- Provider abstraction decouples client from deployment details and management with easy integration with existing orchestration solutions
+- Consistent interface across all providers
+- Higher level RL frameworks can implement their own container providers to integrate with their existing orchestration solutions.
+- Higher level RL frameworks can implement their own container providers to integrate with their existing orchestration solutions.
+
+### Key Design Decisions
+
+#### Decision 1: HTTP-Based Communication
+
+**Chosen Approach**: Use HTTP/REST for client-server communication
+
+**Rationale**:
+- HTTP based RPC is universal and well-understood than other alternatives like grpc or thrift
+- Easy to debug with standard tools (curl, Postman)
+- Supports language-agnostic clients
+- FastAPI provides excellent developer experience
+
+#### Decision 2: Docker-Based runtime isolation and packaging
+
+**Chosen Approach**: Each environment runs in its own Docker container
+
+**Rationale**:
+- Strong isolation boundaries compared to process-based isolation
+- Reproducible environments with packaged dependencies
+- Easy dependency management via Dockerfile
+- Industry-standard tooling
+
+#### Decision 3: Type-Safe Models
+
+**Chosen Approach**: Use Python dataclasses with explicit types for actions, observations, and state
+
+**Rationale**:
+- Native Python support (no extra dependencies)
+- Clear contracts between client and server
+- IDE support for autocomplete and type checking
+- Easy serialization to/from JSON
+
+
+### Example Environments
+
+**Purpose**: Test infrastructure, demonstrate patterns, verify deployments
+
+#### Coding Environment
+
+Executes Python code in a sandboxed environment:
+
+```python
+from envs.coding_env import CodeAction, CodingEnv
+
+client = CodingEnv.from_docker_image("coding-env:latest")
+result = client.step(CodeAction(code="print('Hello, World!')"))
+print(result.observation.stdout)     # "Hello, World!\n"
+print(result.observation.exit_code)  # 0
+client.close()
+```
