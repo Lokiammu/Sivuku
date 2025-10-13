@@ -5,9 +5,63 @@
 # LICENSE file in the root directory of this source tree.
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Protocol, TypedDict
 
 from .types import Action, Observation, State
+
+
+class Message(TypedDict):
+    """A message in a conversation.
+
+    Compatible with Huggingface chat template format.
+    """
+
+    role: str
+    content: str
+
+
+class ModelTokenizer(Protocol):
+    """Protocol for tokenizers that support chat templates.
+
+    This protocol defines the interface that tokenizers must implement
+    to work with chat-based environments. It's compatible with
+    Huggingface transformers tokenizers.
+    """
+
+    def apply_chat_template(
+        self,
+        conversation: list[Message],
+        tokenize: bool = True,
+        return_tensors: str | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Apply a chat template to format and optionally tokenize a conversation.
+
+        Args:
+            conversation: List of message dictionaries with 'role' and 'content'
+            tokenize: Whether to tokenize the output
+            return_tensors: Format for returned tensors ('pt' for PyTorch)
+            **kwargs: Additional arguments
+
+        Returns:
+            Formatted and optionally tokenized conversation
+        """
+        ...
+
+    def decode(
+        self, token_ids: Any, skip_special_tokens: bool = False, **kwargs: Any
+    ) -> str:
+        """Decode token IDs back to text.
+
+        Args:
+            token_ids: Token IDs to decode
+            skip_special_tokens: Whether to skip special tokens in output
+            **kwargs: Additional arguments
+
+        Returns:
+            Decoded text string
+        """
+        ...
 
 
 class Transform(ABC):

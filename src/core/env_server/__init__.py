@@ -8,13 +8,15 @@
 
 from .base_transforms import CompositeTransform, NullTransform
 from .http_server import HTTPEnvServer, create_fastapi_app
-from .interfaces import Environment, Transform
+from .interfaces import Environment, Message, ModelTokenizer, Transform
 from .types import Action, Observation, State
 
 __all__ = [
     # Core interfaces
     "Environment",
     "Transform",
+    "Message",
+    "ModelTokenizer",
     # Types
     "Action",
     "Observation",
