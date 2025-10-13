@@ -20,8 +20,8 @@ In addition to making it easier for researchers and RL framework writers, we als
 │  │ (HTTPEnvClient)│              │  (HTTPEnvClient) │   │
 │  └────────┬───────┘              └────────┬─────────┘   │
 └───────────┼───────────────────────────────┼─────────────┘
-            │ HTTP                           │ HTTP
-            │ (reset, step, state)           │
+            │ HTTP                          │ HTTP
+            │ (reset, step, state)          │
 ┌───────────▼───────────────────────────────▼─────────────┐
 │              Docker Containers (Isolated)               │
 │  ┌──────────────────────┐    ┌──────────────────────┐   │
