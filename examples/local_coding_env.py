@@ -64,8 +64,29 @@ def main():
             if result.observation.stderr:
                 print(f"      → stderr: {result.observation.stderr}")
 
+        # Test error scenarios
+        print("\n3. Test error scenarios:")
+
+        error_samples = [
+            ("Division by zero", "x = 1 / 0\nprint('Should not reach here')"),
+            ("Undefined variable", "print(undefined_variable)"),
+            ("Syntax error", "print('Hello'"),
+        ]
+
+        for i, (description, code) in enumerate(error_samples, 1):
+            result = client.step(CodeAction(code=code))
+            print(f"   {i}. {description}")
+            print(f"      Code: {code.replace(chr(10), '\\n')[:40]}...")
+            print(f"      → exit_code: {result.observation.exit_code}")
+            if result.observation.stderr:
+                # Truncate long error messages
+                error_msg = result.observation.stderr[:100]
+                if len(result.observation.stderr) > 100:
+                    error_msg += "..."
+                print(f"      → stderr: {error_msg}")
+
         # Check final state
-        print("\n3. Check final state:")
+        print("\n4. Check final state:")
         state = client.state()
         print(f"   episode_id: {state.episode_id}")
         print(f"   step_count: {state.step_count}")
