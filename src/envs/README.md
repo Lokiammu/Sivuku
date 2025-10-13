@@ -6,10 +6,10 @@ This guide shows you how to create a custom environment using the EnvTorch frame
 
 Creating an environment involves five main steps:
 1. Define your models (Action, Observation, State)
-2. Implement the environment logic
+2. Implement the environment APIs: step, reset, state
 3. Create the FastAPI server
-4. Build a Docker image
-5. Implement the client
+4. Build a Docker image and push it to a public docker repo for community to access it
+5. Subclass HTTPEnvclient and implement the parsing methods for result and state.
 
 ## Step-by-Step Guide
 
@@ -238,8 +238,6 @@ Track all relevant episode state:
 ```python
 @dataclass
 class MyState(State):
-    episode_id: str = ""
-    step_count: int = 0
     # Add custom fields
     accumulated_reward: float = 0.0
     last_action: str = ""
@@ -262,16 +260,16 @@ from envs.my_env.models import MyAction
 
 def test_environment():
     env = MyEnvironment()
-    
+
     # Test reset
     obs = env.reset()
     assert obs.success
-    
+
     # Test step
     action = MyAction(command="test", parameters={})
     obs = env.step(action)
     assert obs.success
-    
+
     # Test state
     assert env.state.step_count == 1
 ```
@@ -293,20 +291,6 @@ class MyTransform(Transform):
 env = MyEnvironment(transform=MyTransform())
 ```
 
-### Resource Management
-Implement proper cleanup:
-
-```python
-class MyEnvironment(Environment):
-    def __init__(self):
-        super().__init__()
-        self._resource = self._create_resource()
-    
-    def close(self):
-        """Clean up resources."""
-        self._resource.cleanup()
-```
-
 ### Additional Dependencies
 Install environment-specific packages in Dockerfile:
 
@@ -319,26 +303,3 @@ RUN pip install --no-cache-dir \
     pandas==2.0.0 \
     your-custom-package==1.0.0
 ```
-
-## Troubleshooting
-
-### Container Won't Start
-- Check Docker logs: `docker logs <container-id>`
-- Verify dependencies are installed
-- Ensure health check endpoint works
-
-### Import Errors
-- Verify PYTHONPATH includes `/app/src`
-- Check file structure matches imports
-- Ensure `__init__.py` files are present
-
-### Type Errors
-- Ensure action/observation match server expectations
-- Check JSON serialization works for all fields
-- Verify dataclass fields have proper types
-
-## Getting Help
-
-- Check example environments for reference
-- Review core framework documentation
-- Ask questions via GitHub Issues
