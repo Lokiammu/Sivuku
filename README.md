@@ -1,4 +1,4 @@
-# EnvTorch: Agentic Execution Environments
+# <img width="35" height="35" alt="image" src="https://github.com/user-attachments/assets/2700a971-e5d6-4036-b03f-2f89c9791609" /> EnvTorch: Agentic Execution Environments
 
 An e2e framework for creating, deploying and using isolated execution environments for agentic RL training, built using Gymnasium style simple APIs.
 
