@@ -17,7 +17,7 @@ In addition to making it easier for researchers and RL framework writers, we als
 │                    Client Application                   │
 │  ┌────────────────┐              ┌──────────────────┐   │
 │  │  EchoEnv       │              │  CodingEnv       │   │
-│  │  (HTTPEnvClient)│              │  (HTTPEnvClient) │  │
+│  │ (HTTPEnvClient)│              │  (HTTPEnvClient) │   │
 │  └────────┬───────┘              └────────┬─────────┘   │
 └───────────┼───────────────────────────────┼─────────────┘
             │ HTTP                           │ HTTP
