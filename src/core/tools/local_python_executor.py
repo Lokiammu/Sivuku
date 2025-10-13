@@ -54,6 +54,8 @@ class PyExecutor:
         self._executor = LocalPythonExecutor(
             additional_authorized_imports=additional_imports
         )
+        # Initialize tools to make BASE_PYTHON_TOOLS available (including print)
+        self._executor.send_tools({})
 
     def run(self, code: str) -> CodeExecResult:
         """
@@ -70,19 +72,34 @@ class PyExecutor:
             >>> result = executor.run("x = 5 + 3\\nprint(x)")
             >>> print(result.stdout)  # "8\n"
             >>> print(result.exit_code)  # 0
+            >>>
+            >>> # Error handling
+            >>> result = executor.run("1 / 0")
+            >>> print(result.exit_code)  # 1
+            >>> print(result.stderr)  # Contains error message
         """
-        # Execute the code using LocalPythonExecutor
-        # LocalPythonExecutor returns a CodeOutput object with output, logs, is_final_answer
-        exec_result = self._executor(code)
+        try:
+            # Execute the code using LocalPythonExecutor
+            # LocalPythonExecutor returns a CodeOutput object with output, logs, is_final_answer
+            exec_result = self._executor(code)
 
-        # Extract the logs (which contain print outputs) as stdout
-        # The output field contains the return value of the code
-        stdout = exec_result.logs
-        stderr = ""  # LocalPythonExecutor doesn't separate stderr
-        exit_code = 0  # Success if no exception was raised
+            # Extract the logs (which contain print outputs) as stdout
+            # The output field contains the return value of the code
+            stdout = exec_result.logs
+            stderr = ""
+            exit_code = 0  # Success
 
-        return CodeExecResult(
-            stdout=stdout,
-            stderr=stderr,
-            exit_code=exit_code,
-        )
+            return CodeExecResult(
+                stdout=stdout,
+                stderr=stderr,
+                exit_code=exit_code,
+            )
+
+        except Exception as e:
+            # LocalPythonExecutor raises InterpreterError for various issues
+            # (syntax errors, forbidden operations, runtime errors, etc.)
+            return CodeExecResult(
+                stdout="",
+                stderr=str(e),
+                exit_code=1,  # Non-zero indicates error
+            )
