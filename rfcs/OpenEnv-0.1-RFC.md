@@ -1,8 +1,8 @@
-# RFC: EnvTorch Framework for agent execution environments
+# RFC: OpenEnv Framework for agent execution environments
 
 **Status**: Request for Comments(RFC)
 **Created**: October 2025
-**Authors**: EnvTorch Contributors
+**Authors**: OpenEnv Contributors
 
 ## Summary
 
