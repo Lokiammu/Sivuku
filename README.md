@@ -8,6 +8,13 @@ EnvTorch provides a standard for interacting with agentic execution environments
 
 In addition to making it easier for researchers and RL framework writers, we also provide tools for environment creators making it easier for them to create richer environments and make them available over familar protocols like HTTP and packaged using canonical technologies like docker. Environment creators can use the EnvTorch framework to create environments that are isolated, secure, and easy to deploy and use.
 
+> ⚠️ **Early Development Warning** EnvTorch is currently in an experimental
+> stage. You should expect bugs, incomplete features, and APIs that may change
+> in future versions. The project welcomes bugfixes, but to make sure things are
+> well coordinated you should discuss any significant change before starting the
+> work. It's recommended that you signal your intention to contribute in the
+> issue tracker, either by filing a new issue or by claiming an existing one.
+
 ## Architecture
 
 ### Component Overview
