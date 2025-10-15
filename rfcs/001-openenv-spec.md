@@ -156,7 +156,36 @@ These three APIs establish the minimum viable interface for environment interact
 
 **Scope**: This RFC focuses exclusively on these baseline APIs. Additional APIs (e.g., `render()`, `seed()`, `close()`, `tools()` and  environment-specific utilities) will be explored in follow-up RFCs.
 
-#### Decision 2: HTTP-Based Communication
+#### Decision 2: Environment-Computed Rewards
+
+**Chosen Approach**: Rewards are computed inside the environment and returned as part of the observation.
+
+**Rationale**:
+- **Encapsulation**: Reward logic stays with the environment where domain knowledge resides
+- **Consistency**: Ensures reward computation is deterministic and reproducible across different client implementations
+- **Flexibility**: Environments can use internal state and context not visible to clients for reward computation
+- **Standard Pattern**: Aligns with Gymnasium/Gym conventions where rewards are returned from `step()`
+
+The `Observation` base class includes a `reward` field that environments populate:
+
+```python
+@dataclass(kw_only=True)
+class Observation:
+    """Base class for all environment observations."""
+    done: bool = False
+    reward: Union[bool, int, float, None] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+```
+
+This design enables environments to compute rewards based on:
+- Action outcomes (e.g., exit codes, success/failure)
+- Internal state transitions
+- Multi-step trajectories
+- Domain-specific metrics
+
+Clients receive fully-formed observations with rewards already computed, simplifying the client-side RL loop.
+
+#### Decision 3: HTTP-Based Communication
 
 **Chosen Approach**: Use HTTP/REST for client-server communication
 
@@ -166,7 +195,7 @@ These three APIs establish the minimum viable interface for environment interact
 - Supports language-agnostic clients
 - FastAPI provides excellent developer experience
 
-#### Decision 3: Docker-Based runtime isolation and packaging
+#### Decision 4: Docker-Based runtime isolation and packaging
 
 **Chosen Approach**: Each environment runs in its own Docker container
 
