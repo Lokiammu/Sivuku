@@ -65,6 +65,36 @@ Type-safe data structures:
 - `State`: Episode state tracking
 - `StepResult`: Combines observation, reward, done flag
 
+## Project Structure
+
+### For Environment Creators
+
+When building a new environment, create the following structure:
+
+```
+src/envs/your_env/
+├── __init__.py           # Export YourAction, YourObservation, YourEnv
+├── models.py             # Define Action, Observation, State dataclasses
+├── client.py             # Implement YourEnv(HTTPEnvClient)
+├── README.md             # Document your environment
+└── server/
+    ├── your_environment.py  # Implement YourEnvironment(Environment)
+    ├── app.py               # Create FastAPI app
+    └── Dockerfile           # Define container image
+```
+
+See [`src/envs/README.md`](src/envs/README.md) for a complete guide on building environments.
+
+### For Environment Users
+
+To use an environment:
+1. Import from `envs.your_env`: `from envs.echo_env import EchoAction, EchoEnv`
+2. Create client: `client = EchoEnv.from_docker_image("echo-env:latest")`
+3. Interact: `client.reset()`, `client.step(action)`, `client.state()`
+4. Cleanup: `client.close()`
+
+See example scripts in `examples/` directory.
+
 ## Design Principles
 
 1. **Separation of Concerns**: Clear client-server boundaries
