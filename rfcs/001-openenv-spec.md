@@ -1,8 +1,9 @@
-# RFC: OpenEnv Framework for agent execution environments
+# RFC: OpenEnv Framework Spec for agent execution environments
 
-**Status**: Request for Comments(RFC)
-**Created**: October 2025
-**Authors**: OpenEnv Contributors
+**Status**: In Review
+**Created**: 10/14/2025
+**Authors**: @Darktex, @pankit-eng
+**RFC ID:** 001
 
 ## Summary
 
@@ -140,7 +141,22 @@ class ContainerProvider(ABC):
 
 ### Key Design Decisions
 
-#### Decision 1: HTTP-Based Communication
+In this RFC, we want to align on four decisions that will shape the overall design of the framework.
+
+#### Decision 1: Baseline API Set
+
+**Chosen Approach**: Define three core APIs as the baseline interface for this framework: `step`, `reset`, and `state`.
+
+**Rationale**:
+- **`reset()`**: Initializes a new episode and returns initial observation, providing a clean starting point for agent interactions
+- **`step(action)`**: Executes an action and returns an observation, forming the core interaction loop
+- **`state()`**: Provides visibility into the current episode state and metadata
+
+These three APIs establish the minimum viable interface for environment interaction and are sufficient for basic RL training workflows. They align with established patterns from Gymnasium and similar frameworks, making them immediately familiar to practitioners.
+
+**Scope**: This RFC focuses exclusively on these baseline APIs. Additional APIs (e.g., `render()`, `seed()`, `close()`, `tools()` and  environment-specific utilities) will be explored in follow-up RFCs.
+
+#### Decision 2: HTTP-Based Communication
 
 **Chosen Approach**: Use HTTP/REST for client-server communication
 
@@ -150,7 +166,7 @@ class ContainerProvider(ABC):
 - Supports language-agnostic clients
 - FastAPI provides excellent developer experience
 
-#### Decision 2: Docker-Based runtime isolation and packaging
+#### Decision 3: Docker-Based runtime isolation and packaging
 
 **Chosen Approach**: Each environment runs in its own Docker container
 
@@ -159,16 +175,6 @@ class ContainerProvider(ABC):
 - Reproducible environments with packaged dependencies
 - Easy dependency management via Dockerfile
 - Industry-standard tooling
-
-#### Decision 3: Type-Safe Models
-
-**Chosen Approach**: Use Python dataclasses with explicit types for actions, observations, and state
-
-**Rationale**:
-- Native Python support (no extra dependencies)
-- Clear contracts between client and server
-- IDE support for autocomplete and type checking
-- Easy serialization to/from JSON
 
 
 ### Example Environments
