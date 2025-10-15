@@ -19,7 +19,7 @@ In addition to making it easier for researchers and RL framework writers, we als
 
 Below is a list of active and historical RFCs for OpenEnv. RFCs are proposals for major changes or features. Please review and contribute!
 
-- [RFC 001: Add OpenEnv 0.1 RFC for execution environment](https://github.com/meta-pytorch/OpenEnv/pull/26)
+- [RFC 001: Baseline API and Interface Specifications](https://github.com/meta-pytorch/OpenEnv/pull/26)
 
 ## Architecture
 
