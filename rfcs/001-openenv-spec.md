@@ -2,7 +2,7 @@
 
 **Status**: In Review
 **Created**: 10/14/2025
-**Authors**: @Darktex, @pankit-eng
+**Authors**: @Darktex, @pankit-eng, @jspisak, @zkwentz
 **RFC ID:** 001
 
 ## Summary
