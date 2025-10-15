@@ -15,6 +15,12 @@ In addition to making it easier for researchers and RL framework writers, we als
 > work. It's recommended that you signal your intention to contribute in the
 > issue tracker, either by filing a new issue or by claiming an existing one.
 
+### RFCs
+
+Below is a list of active and historical RFCs for OpenEnv. RFCs are proposals for major changes or features. Please review and contribute!
+
+- [RFC 001: Add OpenEnv 0.1 RFC for execution environment](https://github.com/meta-pytorch/OpenEnv/pull/26)
+
 ## Architecture
 
 ### Component Overview
