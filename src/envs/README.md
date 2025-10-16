@@ -86,10 +86,12 @@ app = create_fastapi_app(env, MyAction, MyObservation)
 
 ### 4. Create Dockerfile
 
-Build your Docker image from the envtorch-base:
+Build your Docker image from the openenv-base. Place this at `src/envs/my_env/server/Dockerfile`:
 
 ```dockerfile
-FROM envtorch-base:latest
+# Accept base image as build argument for CI/CD flexibility
+ARG BASE_IMAGE=openenv-base:latest
+FROM ${BASE_IMAGE}
 
 # Install any additional dependencies
 RUN pip install --no-cache-dir your-dependencies
@@ -106,7 +108,31 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 CMD ["uvicorn", "envs.my_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-### 5. Implement Client
+### 5. Update GitHub Actions Workflow
+
+**Important**: To enable automatic Docker image builds on GitHub, add your environment to the workflow matrix.
+
+Edit `.github/workflows/docker-build.yml` and add your environment to the matrix:
+
+```yaml
+strategy:
+  matrix:
+    image:
+      - name: echo-env
+        dockerfile: src/envs/echo_env/server/Dockerfile
+      - name: chat-env
+        dockerfile: src/envs/chat_env/server/Dockerfile
+      - name: coding-env
+        dockerfile: src/envs/coding_env/server/Dockerfile
+      - name: my-env  # Add your environment here
+        dockerfile: src/envs/my_env/server/Dockerfile
+```
+
+Once added, every push to `main` will automatically:
+- Build your Docker image
+- Push it to GitHub Container Registry as `ghcr.io/YOUR_USERNAME/openenv-my-env:latest`
+
+### 6. Implement Client
 
 Create a client that extends `HTTPEnvClient`:
 
@@ -138,7 +164,7 @@ class MyEnv(HTTPEnvClient[MyAction, MyObservation]):
 
 ```bash
 # First, build the base image (if not already built)
-docker build -t envtorch-base:latest -f src/core/containers/images/Dockerfile .
+docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
 
 # Then build your environment image
 docker build -t my-env:latest -f src/envs/my_env/server/Dockerfile .
@@ -295,7 +321,7 @@ env = MyEnvironment(transform=MyTransform())
 Install environment-specific packages in Dockerfile:
 
 ```dockerfile
-FROM envtorch-base:latest
+FROM openenv-base:latest
 
 # Install specific versions
 RUN pip install --no-cache-dir \

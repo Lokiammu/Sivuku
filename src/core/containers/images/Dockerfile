@@ -5,20 +5,20 @@
 # LICENSE file in the root directory of this source tree.
 
 #
-# EnvTorch Base Image
+# OpenEnv Base Image
 #
-# This is the standard base image for all EnvTorch environment servers.
+# This is the standard base image for all OpenEnv environment servers.
 # It includes the minimal dependencies needed to run HTTP environment servers.
 #
-# Build: docker build -t envtorch-base:latest -f src/core/containers/images/Dockerfile .
-# Tag:   docker tag envtorch-base:latest envtorch-base:0.1.0
+# Build: docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+# Tag:   docker tag openenv-base:latest openenv-base:0.1.0
 #
 
 FROM python:3.11-slim
 
 # Set metadata
-LABEL maintainer="EnvTorch Team"
-LABEL description="Base image for EnvTorch environment servers"
+LABEL maintainer="OpenEnv Team"
+LABEL description="Base image for OpenEnv based environment servers"
 LABEL version="0.1.0"
 
 # Install system dependencies

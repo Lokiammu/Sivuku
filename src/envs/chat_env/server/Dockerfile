@@ -4,9 +4,11 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-# Use the standard envtorch base image
-# Built from: docker build -t envtorch-base:latest -f src/core/containers/images/Dockerfile .
-FROM envtorch-base:latest
+# Use the standard openenv base image
+# Built from: docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+# In GitHub Actions, this is overridden to use the GHCR base image
+ARG BASE_IMAGE=openenv-base:latest
+FROM ${BASE_IMAGE}
 
 # Install additional dependencies for ChatEnvironment
 RUN pip install torch transformers
