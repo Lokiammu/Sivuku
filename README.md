@@ -159,7 +159,10 @@ Executes arbitrary Python code in a sandboxed environment. Features:
 
 See: [`src/envs/coding_env/README.md`](src/envs/coding_env/README.md)
 
+## Community support
+This is an open and community centric project. If you would like to add your name here, please put up a pull request and tag @jspisak for review. Ty!!
 
+Meta-PyTorch, Hugging Face, vLLM, SkyRL (UC-Berkeley), LightningAI, ..
 
 
 ## License
