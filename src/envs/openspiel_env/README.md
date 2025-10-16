@@ -249,6 +249,7 @@ This automated script will:
 - Build and run Docker containers for each game
 - Test reset, step, and state APIs
 - Verify episode completion
+- Report pass/fail for all 6 games
 
 **Expected output:**
 ```
