@@ -43,9 +43,10 @@ WORKDIR /repo/build
 RUN cmake -DPython3_EXECUTABLE=$(which python3) -DCMAKE_CXX_COMPILER=$(which clang++) ../open_spiel
 RUN make -j$(nproc) pyspiel
 
-# Stage 2: Runtime image using envtorch-base
-# Uses the standardized base image from core/containers/images
-FROM envtorch-base:latest
+# Stage 2: Runtime image using published openenv-base
+# Uses the standardized base image from GitHub Container Registry
+# See: https://github.com/meta-pytorch/OpenEnv/pkgs/container/openenv-base
+FROM ghcr.io/meta-pytorch/openenv-base:latest
 
 # Copy OpenSpiel build artifacts from builder
 RUN mkdir -p /repo

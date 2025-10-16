@@ -30,25 +30,8 @@ OPENENV_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 echo "📁 OpenEnv root: $OPENENV_ROOT"
 echo ""
 
-# Check if envtorch-base image exists
-if ! docker image inspect envtorch-base:latest >/dev/null 2>&1; then
-    echo "❌ Base image 'envtorch-base:latest' not found!"
-    echo ""
-    echo "This environment requires the envtorch-base image."
-    echo "Please build it first:"
-    echo ""
-    echo "  cd $OPENENV_ROOT"
-    echo "  docker build -t envtorch-base:latest -f src/core/containers/images/Dockerfile ."
-    echo ""
-    echo "See src/core/containers/images/README.md for more details."
-    echo ""
-    exit 1
-fi
-
-echo "✓ Base image 'envtorch-base:latest' found"
-echo ""
-
 # Build OpenSpiel environment image
+# Note: Docker will automatically pull ghcr.io/meta-pytorch/openenv-base:latest if needed
 echo "⏳ Building (this may take 5-10 minutes due to OpenSpiel compilation)..."
 docker build \
     -f "$SCRIPT_DIR/Dockerfile" \
