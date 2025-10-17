@@ -54,8 +54,8 @@ class SumoObservation(Observation):
         metadata: Additional info (system metrics, etc.)
     """
 
-    observation: List[float]
-    observation_shape: List[int]
+    observation: List[float] = field(default_factory=list)
+    observation_shape: List[int] = field(default_factory=list)
     action_mask: List[int] = field(default_factory=list)
     sim_time: float = 0.0
     done: bool = False

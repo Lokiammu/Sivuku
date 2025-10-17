@@ -13,14 +13,10 @@ ARG BASE_IMAGE=envtorch-base:latest
 FROM ${BASE_IMAGE}
 
 # Install SUMO system dependencies
-# SUMO is a microscopic traffic simulation package
+# SUMO is available in Debian repositories
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    && add-apt-repository ppa:sumo/stable \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        sumo \
-        sumo-tools \
+    sumo \
+    sumo-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Set SUMO_HOME environment variable
