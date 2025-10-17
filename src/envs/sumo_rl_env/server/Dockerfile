@@ -36,10 +36,10 @@ RUN pip install --no-cache-dir \
 # Copy OpenEnv core (base image already set WORKDIR=/app)
 COPY src/core/ /app/src/core/
 
-# Copy SUMO-RL environment code
+# Copy SUMO-RL environment code (includes nets/)
 COPY src/envs/sumo_rl_env/ /app/src/envs/sumo_rl_env/
 
-# Copy example network files
+# Copy example network files to expected location
 # Default: single-intersection (simple 4-way intersection)
 COPY src/envs/sumo_rl_env/nets/single-intersection/ /app/nets/single-intersection/
 
