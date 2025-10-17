@@ -41,7 +41,7 @@ COPY src/envs/sumo_rl_env/ /app/src/envs/sumo_rl_env/
 
 # Copy example network files
 # Default: single-intersection (simple 4-way intersection)
-COPY nets/single-intersection/ /app/nets/single-intersection/
+COPY src/envs/sumo_rl_env/nets/single-intersection/ /app/nets/single-intersection/
 
 # SUMO environment variables (can be overridden at runtime)
 ENV SUMO_NET_FILE=/app/nets/single-intersection/single-intersection.net.xml
