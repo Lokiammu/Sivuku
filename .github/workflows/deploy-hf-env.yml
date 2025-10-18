@@ -3,7 +3,7 @@ name: Deploy to Hugging Face Environment
 on:
   push:
     branches:
-      - main
+      - deploy-hf-env-action
     paths:
       - 'src/envs/coding_env/server/**'
       - 'src/core/**'
