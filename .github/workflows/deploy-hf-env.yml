@@ -1,0 +1,85 @@
+name: Deploy to Hugging Face Environment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/envs/coding_env/server/**'
+      - 'src/core/**'
+      - '.github/workflows/deploy-hf-space.yml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/openenv
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Prepare files for HF Space
+        run: |
+          mkdir -p hf-staging/src/core
+          mkdir -p hf-staging/src/envs/coding_env
+          
+          cp -r src/core/* hf-staging/src/core/
+          cp -r src/envs/coding_env/* hf-staging/src/envs/coding_env/
+          
+          # Copy Dockerfile and update BASE_IMAGE default
+          cp src/envs/coding_env/server/Dockerfile hf-staging/Dockerfile
+          sed -i "s|ARG BASE_IMAGE=openenv-base:latest|ARG BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-base:latest|" hf-staging/Dockerfile
+          
+          # Create HF Space README
+          cat > hf-staging/README.md << 'EOF'
+          ---
+          title: Coding Environment Server
+          emoji: 🐳
+          colorFrom: blue
+          colorTo: green
+          sdk: docker
+          pinned: false
+          app_port: 8000
+          ---
+          
+          # Coding Environment Server
+          
+          FastAPI server for code execution environment powered by Meta's OpenEnv.
+          
+          ## About
+          
+          This Space provides a containerized environment for executing code safely.
+          Built with FastAPI and smolagents.
+          EOF
+
+      - name: Deploy to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
+        run: |
+          git clone https://huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME hf-space
+          cd hf-space
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          cp -r ../hf-staging/* .
+          git remote set-url origin https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME
+          
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "🤖 Update from GitHub - $(date +'%Y-%m-%d %H:%M:%S')"
+            git push
+            echo "✅ Deployed to https://huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME"
+          else
+            echo "ℹ️ No changes to deploy"
+          fi
