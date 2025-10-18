@@ -10,6 +10,7 @@ on:
       - '.github/workflows/deploy-hf-space.yml'
   workflow_dispatch:
 
+
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/openenv
