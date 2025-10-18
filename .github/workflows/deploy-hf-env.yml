@@ -7,7 +7,7 @@ on:
     paths:
       - 'src/envs/coding_env/server/**'
       - 'src/core/**'
-      - '.github/workflows/deploy-hf-space.yml'
+      - '.github/workflows/deploy-hf-env.yml'
   workflow_dispatch:
 
 
