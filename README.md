@@ -140,6 +140,21 @@ client.close()  # Stops and removes container
 - Requests >= 2.25.0
 - smolagents (for coding environment)
 
+## Supported RL Tools
+The goal of this project is to support a broad set of open and closed tools to help standardize the community. If you have a project that supports OpenEnv environments, please put up a PR to add your tool name along with a link to your documentation. 
+
+### torchforge
+(coming soon)
+
+### TRL
+(coming soon} 
+
+### Unsloth
+(coming soon)
+
+### SkyRL
+(coming soon)
+
 ## Example Environments
 
 ### Echo Environment
