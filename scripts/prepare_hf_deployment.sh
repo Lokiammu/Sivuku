@@ -6,11 +6,21 @@
 set -e
 
 ENV_NAME="$1"
+BASE_IMAGE_SHA="$2"
 STAGING_DIR="hf-staging"
 
 if [ -z "$ENV_NAME" ]; then
     echo "Error: Environment name is required"
     exit 1
+fi
+
+# Set base image reference
+if [ -n "$BASE_IMAGE_SHA" ]; then
+    BASE_IMAGE_REF="openenv-base@sha256:$BASE_IMAGE_SHA"
+    echo "Using specific SHA for openenv-base: $BASE_IMAGE_SHA"
+else
+    BASE_IMAGE_REF="openenv-base:latest"
+    echo "Using latest tag for openenv-base"
 fi
 
 echo "Preparing $ENV_NAME environment for deployment..."
@@ -32,37 +42,15 @@ create_environment_dockerfile() {
     local env_name=$1
     
     # Create base Dockerfile
-    cat > $STAGING_DIR/Dockerfile << 'DOCKERFILE_EOF'
+    cat > $STAGING_DIR/Dockerfile << DOCKERFILE_EOF
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-# Multi-stage build: First stage builds the base image
-FROM python:3.11-slim as base-builder
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies that all environments need
-RUN pip install --no-cache-dir \
-    fastapi>=0.104.0 \
-    "uvicorn[standard]>=0.24.0" \
-    requests>=2.25.0 \
-    wsproto>=1.0.0
-
-# Set working directory
-WORKDIR /app
-
-# Default environment variables
-ENV PYTHONPATH=/app/src
-ENV PYTHONUNBUFFERED=1
-
-# Second stage: Use the built base image and add environment-specific dependencies
-FROM base-builder
+# Use the specified openenv-base image
+FROM $BASE_IMAGE_REF
 DOCKERFILE_EOF
 
     # Add environment-specific dependencies
@@ -101,7 +89,7 @@ DOCKERFILE_EOF
             ;;
         "openspiel_env")
             # OpenSpiel requires special C++ build process - replace entire Dockerfile
-            cat > $STAGING_DIR/Dockerfile << 'DOCKERFILE_EOF'
+            cat > $STAGING_DIR/Dockerfile << DOCKERFILE_EOF
 # OpenSpiel requires complex C++ build - using special multi-stage approach
 # Stage 1: Build OpenSpiel C++ bindings
 FROM python:3.11 AS openspiel-builder
@@ -140,30 +128,8 @@ WORKDIR /repo/build
 RUN cmake -DPython3_EXECUTABLE=$(which python3) -DCMAKE_CXX_COMPILER=$(which clang++) ../open_spiel
 RUN make -j$(nproc) pyspiel
 
-# Stage 2: Build OpenEnv base image
-FROM python:3.11-slim as openenv-base
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies that all environments need
-RUN pip install --no-cache-dir \
-    fastapi>=0.104.0 \
-    "uvicorn[standard]>=0.24.0" \
-    requests>=2.25.0 \
-    wsproto>=1.0.0
-
-# Set working directory
-WORKDIR /app
-
-# Default environment variables
-ENV PYTHONPATH=/app/src
-ENV PYTHONUNBUFFERED=1
-
-# Stage 3: Final runtime image
-FROM openenv-base
+# Stage 2: Use the specified openenv-base image
+FROM $BASE_IMAGE_REF
 
 # Copy OpenSpiel build artifacts from builder
 RUN mkdir -p /repo
@@ -219,7 +185,7 @@ CMD ["uvicorn", "envs.ENV_NAME_PLACEHOLDER.server.app:app", "--host", "0.0.0.0",
 DOCKERFILE_EOF
 
     # Replace placeholder with actual environment name
-    sed -i "s/ENV_NAME_PLACEHOLDER/$env_name/g" $STAGING_DIR/Dockerfile
+    sed -i '' "s/ENV_NAME_PLACEHOLDER/$env_name/g" $STAGING_DIR/Dockerfile
 }
 
 create_environment_dockerfile $ENV_NAME

@@ -15,6 +15,24 @@ on:
       - 'scripts/**'
       - '.github/workflows/deploy-hf-env.yml'
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy (leave empty for all)'
+        required: false
+        type: choice
+        default: 'all'
+        options:
+          - 'all'
+          - 'echo_env'
+          - 'coding_env'
+          - 'chat_env'
+          - 'atari_env'
+          - 'openspiel_env'
+      base_image_sha:
+        description: 'SHA for openenv-base image (leave empty for latest)'
+        required: false
+        type: string
+        default: ''
 
 env:
   HF_USERNAME: openenv
@@ -35,6 +53,20 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
+          # Handle manual workflow dispatch
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.environment }}" = "all" ]; then
+              echo "deploy_all=true" >> $GITHUB_OUTPUT
+              echo "environments=echo_env,coding_env,chat_env,atari_env,openspiel_env" >> $GITHUB_OUTPUT
+              echo "Manual trigger - deploying all environments"
+            else
+              echo "deploy_all=false" >> $GITHUB_OUTPUT
+              echo "environments=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+              echo "Manual trigger - deploying ${{ github.event.inputs.environment }} environment"
+            fi
+            exit 0
+          fi
+          
           # Check if core files changed (deploy all environments)
           if git diff --name-only HEAD~1 HEAD | grep -E '^src/core/' > /dev/null; then
             echo "deploy_all=true" >> $GITHUB_OUTPUT
@@ -84,7 +116,7 @@ jobs:
       - name: Prepare files for HF Space
         run: |
           chmod +x scripts/prepare_hf_deployment.sh
-          ./scripts/prepare_hf_deployment.sh "${{ matrix.environment }}"
+          ./scripts/prepare_hf_deployment.sh "${{ matrix.environment }}" "${{ github.event.inputs.base_image_sha || '' }}"
 
       - name: Deploy to Hugging Face Space
         env:
