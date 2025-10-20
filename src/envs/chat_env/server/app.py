@@ -26,7 +26,7 @@ Usage:
 
 import os
 
-from core.env_server import create_fastapi_app
+from core.env_server import create_app
 
 from ..models import ChatAction, ChatObservation
 from .chat_environment import ChatEnvironment
@@ -68,7 +68,7 @@ tokenizer = get_tokenizer()
 env = ChatEnvironment(tokenizer=tokenizer, system_prompt=system_prompt)
 
 # Create the FastAPI app with routes
-app = create_fastapi_app(env, ChatAction, ChatObservation)
+app = create_app(env, ChatAction, ChatObservation)
 
 
 if __name__ == "__main__":

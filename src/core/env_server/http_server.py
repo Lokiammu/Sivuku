@@ -13,6 +13,7 @@ over HTTP endpoints that HTTPEnvClient can consume.
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict
 from typing import Any, Dict, Type
 
@@ -158,6 +159,39 @@ class HTTPEnvServer:
             "done": done,
         }
 
+def create_app(
+    env: Environment,
+    action_cls: Type[Action],
+    observation_cls: Type[Observation],
+) -> Any:
+    """
+    Create a FastAPI application with web interface enabled for Hugging Face deployments.
+    
+    This function checks for the ENABLE_WEB_INTERFACE environment variable to determine
+    whether to enable the web interface. 
+    
+    Args:
+        env: The Environment instance to serve
+        action_cls: The Action subclass this environment expects
+        observation_cls: The Observation subclass this environment returns
+        
+    Returns:
+        FastAPI application instance with or without web interface based on environment
+    """
+    # Check if web interface should be enabled
+    # This can be controlled via environment variable or build argument
+    enable_web = (
+        os.getenv("ENABLE_WEB_INTERFACE", "false").lower() in ("true", "1", "yes")
+    )
+
+    if enable_web:
+        # Import web interface only when needed
+        from .web_interface import create_web_interface_app
+        return create_web_interface_app(env, action_cls, observation_cls)
+    else:
+        # Use standard FastAPI app without web interface
+        return create_fastapi_app(env, action_cls, observation_cls)
+    
 
 def create_fastapi_app(
     env: Environment,

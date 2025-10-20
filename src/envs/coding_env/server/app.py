@@ -21,7 +21,7 @@ Usage:
     python -m envs.coding_env.server.app
 """
 
-from core.env_server import create_fastapi_app
+from core.env_server import create_app
 
 from ..models import CodeAction, CodeObservation
 from .python_codeact_env import PythonCodeActEnv
@@ -29,8 +29,7 @@ from .python_codeact_env import PythonCodeActEnv
 # Create the environment instance
 env = PythonCodeActEnv()
 
-# Create the FastAPI app with routes
-app = create_fastapi_app(env, CodeAction, CodeObservation)
+app = create_app(env, CodeAction, CodeObservation)
 
 
 if __name__ == "__main__":

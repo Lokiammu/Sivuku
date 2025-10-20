@@ -42,6 +42,9 @@ jobs:
           cp src/envs/coding_env/server/Dockerfile hf-staging/Dockerfile
           sed -i "s|ARG BASE_IMAGE=openenv-base:latest|ARG BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-base:latest|" hf-staging/Dockerfile
           
+          # Add environment variable to enable web interface for HF deployments
+          echo "ENV ENABLE_WEB_INTERFACE=true" >> hf-staging/Dockerfile
+          
           # Create HF Space README
           cat > hf-staging/README.md << 'EOF'
           ---
@@ -52,6 +55,7 @@ jobs:
           sdk: docker
           pinned: false
           app_port: 8000
+          base_path: /web
           ---
           
           # Coding Environment Server
@@ -62,6 +66,15 @@ jobs:
           
           This Space provides a containerized environment for executing code safely.
           Built with FastAPI and smolagents.
+          
+          ## Web Interface
+          
+          This deployment includes an interactive web interface for exploring the environment:
+          - **HumanAgent Interface**: Interact with the environment using a web form
+          - **State Observer**: Real-time view of environment state and action history
+          - **Live Updates**: WebSocket-based real-time updates
+          
+          Access the web interface at: `/web`
           EOF
 
       - name: Deploy to Hugging Face Space

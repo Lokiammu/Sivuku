@@ -47,7 +47,34 @@ Below is a list of active and historical RFCs for OpenEnv. RFCs are proposals fo
 
 ### Core Components
 
-#### 1. Environment (Server-Side)
+#### 1. Web Interface
+
+OpenEnv includes a built-in web interface for interactive environment exploration and debugging. The web interface provides:
+
+- **Two-Pane Layout**: HumanAgent interaction on the left, state observation on the right
+- **Real-time Updates**: WebSocket-based live updates without page refresh
+- **Dynamic Forms**: Automatically generated action forms based on environment Action types
+- **Action History**: Complete log of all actions taken and their results
+
+The web interface is **conditionally enabled** based on environment variables:
+
+- **Local Development**: Disabled by default for lightweight development
+- **Manual Override**: Enable with `ENABLE_WEB_INTERFACE=true`
+
+To use the web interface:
+
+```python
+from core.env_server import create_hf_web_interface_app
+from your_env.models import YourAction, YourObservation
+from your_env.server.your_environment import YourEnvironment
+
+env = YourEnvironment()
+app = create_web_interface_app(env, YourAction, YourObservation)
+```
+
+When enabled, open `http://localhost:8000/web` in your browser to interact with the environment.
+
+#### 2. Environment (Server-Side)
 Base class for implementing environment logic:
 - **`reset()`**: Initialize a new episode, returns initial `Observation`
 - **`step(action)`**: Execute an `Action`, returns resulting `Observation`

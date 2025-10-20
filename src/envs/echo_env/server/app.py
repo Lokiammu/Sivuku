@@ -21,7 +21,7 @@ Usage:
     python -m envs.echo_env.server.app
 """
 
-from core.env_server import create_fastapi_app
+from core.env_server.http_server import create_app
 
 from ..models import EchoAction, EchoObservation
 from .echo_environment import EchoEnvironment
@@ -29,8 +29,8 @@ from .echo_environment import EchoEnvironment
 # Create the environment instance
 env = EchoEnvironment()
 
-# Create the FastAPI app with routes (one line!)
-app = create_fastapi_app(env, EchoAction, EchoObservation)
+# Create the app with routes (one line!)
+app = create_app(env, EchoAction, EchoObservation)
 
 
 if __name__ == "__main__":
