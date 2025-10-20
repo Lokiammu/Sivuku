@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - deploy-hf-env-action
+      - env-frontend
     paths:
       - 'src/envs/coding_env/server/**'
       - 'src/core/**'
