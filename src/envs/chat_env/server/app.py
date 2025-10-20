@@ -27,6 +27,7 @@ Usage:
 import os
 
 from core.env_server import create_app
+from core.env_server.web_interface import create_web_interface_app
 
 from ..models import ChatAction, ChatObservation
 from .chat_environment import ChatEnvironment
@@ -67,8 +68,8 @@ system_prompt = os.environ.get("SYSTEM_PROMPT", None)
 tokenizer = get_tokenizer()
 env = ChatEnvironment(tokenizer=tokenizer, system_prompt=system_prompt)
 
-# Create the FastAPI app with routes
-app = create_app(env, ChatAction, ChatObservation)
+# Create the FastAPI app with web interface and README integration
+app = create_app(env, ChatAction, ChatObservation, env_name="chat_env")
 
 
 if __name__ == "__main__":

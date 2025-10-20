@@ -25,6 +25,9 @@ COPY src/core/ /app/src/core/
 # Copy Atari environment code
 COPY src/envs/atari_env/ /app/src/envs/atari_env/
 
+# Copy README for web interface documentation
+COPY src/envs/atari_env/README.md /app/README.md
+
 # Atari-specific environment variables (can be overridden at runtime)
 ENV ATARI_GAME=pong
 ENV ATARI_OBS_TYPE=rgb

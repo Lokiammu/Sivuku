@@ -29,8 +29,8 @@ from .echo_environment import EchoEnvironment
 # Create the environment instance
 env = EchoEnvironment()
 
-# Create the app with routes (one line!)
-app = create_app(env, EchoAction, EchoObservation)
+# Create the app with web interface and README integration
+app = create_app(env, EchoAction, EchoObservation, env_name="echo_env")
 
 
 if __name__ == "__main__":

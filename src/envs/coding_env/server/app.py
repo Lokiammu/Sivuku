@@ -29,7 +29,8 @@ from .python_codeact_env import PythonCodeActEnv
 # Create the environment instance
 env = PythonCodeActEnv()
 
-app = create_app(env, CodeAction, CodeObservation)
+# Create the app with web interface and README integration
+app = create_app(env, CodeAction, CodeObservation, env_name="coding_env")
 
 
 if __name__ == "__main__":

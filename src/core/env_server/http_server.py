@@ -163,6 +163,7 @@ def create_app(
     env: Environment,
     action_cls: Type[Action],
     observation_cls: Type[Observation],
+    env_name: Optional[str] = None,
 ) -> Any:
     """
     Create a FastAPI application with web interface enabled for Hugging Face deployments.
@@ -187,7 +188,7 @@ def create_app(
     if enable_web:
         # Import web interface only when needed
         from .web_interface import create_web_interface_app
-        return create_web_interface_app(env, action_cls, observation_cls)
+        return create_web_interface_app(env, action_cls, observation_cls, env_name)
     else:
         # Use standard FastAPI app without web interface
         return create_fastapi_app(env, action_cls, observation_cls)

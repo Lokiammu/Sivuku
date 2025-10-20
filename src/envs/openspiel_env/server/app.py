@@ -45,8 +45,8 @@ env = OpenSpielEnvironment(
     opponent_policy=opponent_policy,
 )
 
-# Create the FastAPI app with routes
-app = create_app(env, OpenSpielAction, OpenSpielObservation)
+# Create the FastAPI app with web interface and README integration
+app = create_app(env, OpenSpielAction, OpenSpielObservation, env_name="openspiel_env")
 
 
 if __name__ == "__main__":

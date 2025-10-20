@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir smolagents
 COPY src/core/ /app/src/core/
 COPY src/envs/coding_env/ /app/src/envs/coding_env/
 
+# Copy README for web interface documentation
+COPY src/envs/coding_env/README.md /app/README.md
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1

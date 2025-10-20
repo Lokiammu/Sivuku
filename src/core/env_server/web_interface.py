@@ -25,7 +25,77 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .interfaces import Environment
-from .types import Action, Observation, State
+from .types import Action, Observation, State, EnvironmentMetadata
+
+
+def load_environment_metadata(env: Environment, env_name: Optional[str] = None) -> EnvironmentMetadata:
+    """
+    Load environment metadata including README content.
+    
+    Args:
+        env: The environment instance
+        env_name: Optional environment name for README file lookup
+        
+    Returns:
+        EnvironmentMetadata with loaded information
+    """
+    # Try to get metadata from environment if it has a method for it
+    if hasattr(env, 'get_metadata'):
+        return env.get_metadata()
+    
+    # Default metadata
+    metadata = EnvironmentMetadata(
+        name=env_name or env.__class__.__name__,
+        description=f"{env.__class__.__name__} environment",
+        version="1.0.0"
+    )
+    
+    # Try to load README from file system
+    readme_content = _load_readme_from_filesystem(env_name)
+    if readme_content:
+        metadata.readme_content = readme_content
+    
+    return metadata
+
+
+def _load_readme_from_filesystem(env_name: Optional[str]) -> Optional[str]:
+    """
+    Load README content from the filesystem.
+    
+    Tries multiple locations:
+    1. Container filesystem: /app/README.md
+    2. Local development: src/envs/{env_name}/README.md
+    3. Environment variable: ENV_README_PATH
+    """
+    import os
+    from pathlib import Path
+    
+    # Try container filesystem first
+    container_readme = Path("/app/README.md")
+    if container_readme.exists():
+        try:
+            return container_readme.read_text(encoding='utf-8')
+        except Exception:
+            pass
+    
+    # Try environment variable path
+    custom_path = os.environ.get("ENV_README_PATH")
+    if custom_path and Path(custom_path).exists():
+        try:
+            return Path(custom_path).read_text(encoding='utf-8')
+        except Exception:
+            pass
+    
+    # Try local development path
+    if env_name:
+        local_readme = Path(f"src/envs/{env_name}/README.md")
+        if local_readme.exists():
+            try:
+                return local_readme.read_text(encoding='utf-8')
+            except Exception:
+                pass
+    
+    return None
 
 
 @dataclass
@@ -57,10 +127,15 @@ class WebInterfaceManager:
         env: Environment,
         action_cls: Type[Action],
         observation_cls: Type[Observation],
+        metadata: Optional[EnvironmentMetadata] = None,
     ):
         self.env = env
         self.action_cls = action_cls
         self.observation_cls = observation_cls
+        self.metadata = metadata or EnvironmentMetadata(
+            name=env.__class__.__name__,
+            description=f"{env.__class__.__name__} environment"
+        )
         self.episode_state = EpisodeState(
             episode_id=None,
             step_count=0,
@@ -199,6 +274,7 @@ def create_web_interface_app(
     env: Environment,
     action_cls: Type[Action],
     observation_cls: Type[Observation],
+    env_name: Optional[str] = None,
 ) -> FastAPI:
     """
     Create a FastAPI application with web interface for the given environment.
@@ -207,6 +283,7 @@ def create_web_interface_app(
         env: The Environment instance to serve
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
+        env_name: Optional environment name for README loading
         
     Returns:
         FastAPI application instance with web interface
@@ -216,14 +293,22 @@ def create_web_interface_app(
     # Create the base environment app
     app = create_fastapi_app(env, action_cls, observation_cls)
     
+    # Load environment metadata
+    metadata = load_environment_metadata(env, env_name)
+    
     # Create web interface manager
-    web_manager = WebInterfaceManager(env, action_cls, observation_cls)
+    web_manager = WebInterfaceManager(env, action_cls, observation_cls, metadata)
     
     # Add web interface routes
     @app.get("/web", response_class=HTMLResponse)
     async def web_interface():
         """Serve the web interface."""
-        return get_web_interface_html(action_cls)
+        return get_web_interface_html(action_cls, web_manager.metadata)
+    
+    @app.get("/web/metadata")
+    async def web_metadata():
+        """Get environment metadata."""
+        return asdict(web_manager.metadata)
     
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
@@ -244,7 +329,15 @@ def create_web_interface_app(
     @app.post("/web/step")
     async def web_step(request: Dict[str, Any]):
         """Step endpoint for web interface."""
-        action_data = request.get("action", {})
+        # Check if this is a message-based request (chat environment)
+        if "message" in request:
+            message = request["message"]
+            # Convert message to action using the environment's message_to_action method
+            action = web_manager.env.message_to_action(message)
+            action_data = {"tokens": action.tokens.tolist()}
+        else:
+            action_data = request.get("action", {})
+        
         return await web_manager.step_environment(action_data)
     
     @app.get("/web/state")
@@ -255,8 +348,16 @@ def create_web_interface_app(
     return app
 
 
-def get_web_interface_html(action_cls: Type[Action]) -> str:
+def get_web_interface_html(action_cls: Type[Action], metadata: Optional[EnvironmentMetadata] = None) -> str:
     """Generate the HTML for the web interface."""
+    
+    # Check if this is a chat environment by looking for tokens field
+    is_chat_env = False
+    if hasattr(action_cls, '__dataclass_fields__'):
+        for field_name, field_info in action_cls.__dataclass_fields__.items():
+            if field_name == 'tokens' and hasattr(field_info.type, '__name__') and 'Tensor' in field_info.type.__name__:
+                is_chat_env = True
+                break
     
     # Get action fields for dynamic form generation
     action_fields = []
@@ -500,6 +601,229 @@ def get_web_interface_html(action_cls: Type[Action]) -> str:
             max-height: 200px;
             overflow-y: auto;
         }}
+        
+        /* Chat Interface Styles */
+        .chat-interface {{
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }}
+        
+        .chat-messages {{
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }}
+        
+        .chat-message {{
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+        }}
+        
+        .chat-message:last-child {{
+            margin-bottom: 0;
+        }}
+        
+        .chat-message.user {{
+            background: #e3f2fd;
+            margin-left: 20px;
+        }}
+        
+        .chat-message.assistant {{
+            background: #f3e5f5;
+            margin-right: 20px;
+        }}
+        
+        .chat-message.system {{
+            background: #e8f5e8;
+            font-style: italic;
+        }}
+        
+        .message-role {{
+            font-weight: 600;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }}
+        
+        .message-content {{
+            font-size: 14px;
+            line-height: 1.4;
+        }}
+        
+        .chat-input-container {{
+            border-top: 1px solid #e0e0e0;
+            padding-top: 15px;
+        }}
+        
+        .role-selector {{
+            margin-bottom: 10px;
+        }}
+        
+        .role-selector label {{
+            font-weight: 500;
+            margin-right: 10px;
+        }}
+        
+        .role-selector select {{
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }}
+        
+        .message-input {{
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }}
+        
+        .message-input textarea {{
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            font-family: inherit;
+        }}
+        
+        .message-input textarea:focus {{
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }}
+        
+        /* Instructions Section Styles */
+        .instructions-section {{
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }}
+        
+        .instructions-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }}
+        
+        .instructions-title {{
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin: 0;
+        }}
+        
+        .instructions-toggle {{
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #6c757d;
+        }}
+        
+        .instructions-toggle:hover {{
+            background: #e9ecef;
+        }}
+        
+        .instructions-content {{
+            display: none;
+            max-height: 400px;
+            overflow-y: auto;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 15px;
+        }}
+        
+        .instructions-content.expanded {{
+            display: block;
+        }}
+        
+        .instructions-content h1,
+        .instructions-content h2,
+        .instructions-content h3 {{
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }}
+        
+        .instructions-content h1 {{
+            font-size: 24px;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }}
+        
+        .instructions-content h2 {{
+            font-size: 20px;
+        }}
+        
+        .instructions-content h3 {{
+            font-size: 16px;
+        }}
+        
+        .instructions-content p {{
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }}
+        
+        .instructions-content code {{
+            background: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 14px;
+        }}
+        
+        .instructions-content pre {{
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }}
+        
+        .instructions-content pre code {{
+            background: none;
+            padding: 0;
+        }}
+        
+        .instructions-content ul,
+        .instructions-content ol {{
+            margin: 10px 0;
+            padding-left: 20px;
+        }}
+        
+        .instructions-content li {{
+            margin-bottom: 5px;
+        }}
+        
+        .instructions-content table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }}
+        
+        .instructions-content th,
+        .instructions-content td {{
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            text-align: left;
+        }}
+        
+        .instructions-content th {{
+            background: #f8f9fa;
+            font-weight: 600;
+        }}
     </style>
 </head>
 <body>
@@ -511,14 +835,11 @@ def get_web_interface_html(action_cls: Type[Action]) -> str:
                 HumanAgent Interface
             </div>
             <div class="pane-content">
-                <!-- Action Form -->
-                <div class="action-form">
-                    <h3>Take Action</h3>
-                    <form id="action-form">
-                        {_generate_action_form_fields(action_fields)}
-                        <button type="submit" class="btn" id="step-btn">Step</button>
-                    </form>
-                </div>
+                <!-- Instructions Section -->
+                {_generate_instructions_section(metadata)}
+                
+                <!-- Action Form or Chat Interface -->
+                {_generate_action_interface(action_fields, is_chat_env)}
                 
                 <!-- Control Buttons -->
                 <div style="margin-bottom: 20px;">
@@ -618,11 +939,43 @@ def get_web_interface_html(action_cls: Type[Action]) -> str:
             }}
             
             setupEventListeners() {{
-                // Action form submission
-                document.getElementById('action-form').addEventListener('submit', (e) => {{
-                    e.preventDefault();
-                    this.submitAction();
-                }});
+                // Instructions toggle
+                const instructionsToggle = document.getElementById('instructions-toggle');
+                const instructionsContent = document.getElementById('instructions-content');
+                if (instructionsToggle && instructionsContent) {{
+                    instructionsToggle.addEventListener('click', () => {{
+                        instructionsContent.classList.toggle('expanded');
+                        instructionsToggle.textContent = instructionsContent.classList.contains('expanded') 
+                            ? 'Hide Instructions' : 'Show Instructions';
+                    }});
+                }}
+                
+                // Check if this is a chat environment
+                const isChatEnv = document.getElementById('chat-messages') !== null;
+                
+                if (isChatEnv) {{
+                    // Chat environment event listeners
+                    document.getElementById('send-message-btn').addEventListener('click', () => {{
+                        this.sendMessage();
+                    }});
+                    
+                    // Send message on Enter (but allow Shift+Enter for new lines)
+                    document.getElementById('message-input').addEventListener('keydown', (e) => {{
+                        if (e.key === 'Enter' && !e.shiftKey) {{
+                            e.preventDefault();
+                            this.sendMessage();
+                        }}
+                    }});
+                }} else {{
+                    // Traditional action form submission
+                    const actionForm = document.getElementById('action-form');
+                    if (actionForm) {{
+                        actionForm.addEventListener('submit', (e) => {{
+                            e.preventDefault();
+                            this.submitAction();
+                        }});
+                    }}
+                }}
                 
                 // Reset button
                 document.getElementById('reset-btn').addEventListener('click', () => {{
@@ -633,6 +986,61 @@ def get_web_interface_html(action_cls: Type[Action]) -> str:
                 document.getElementById('state-btn').addEventListener('click', () => {{
                     this.getState();
                 }});
+            }}
+            
+            async sendMessage() {{
+                const messageInput = document.getElementById('message-input');
+                const roleSelect = document.getElementById('message-role');
+                const message = messageInput.value.trim();
+                const role = roleSelect.value;
+                
+                if (!message) {{
+                    return;
+                }}
+                
+                // Add message to chat display immediately
+                this.addMessageToChat(role, message);
+                
+                // Clear input
+                messageInput.value = '';
+                
+                try {{
+                    // Send message to server to convert to action and step
+                    const response = await fetch('/web/step', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{ 
+                            message: {{
+                                role: role,
+                                content: message
+                            }}
+                        }})
+                    }});
+                    
+                    if (!response.ok) {{
+                        throw new Error(`HTTP error! status: ${{response.status}}`);
+                    }}
+                    
+                    const result = await response.json();
+                    console.log('Message sent:', result);
+                }} catch (error) {{
+                    console.error('Error sending message:', error);
+                    alert('Error sending message: ' + error.message);
+                }}
+            }}
+            
+            addMessageToChat(role, content) {{
+                const chatMessages = document.getElementById('chat-messages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `chat-message ${{role}}`;
+                
+                messageDiv.innerHTML = `
+                    <div class="message-role">${{role.charAt(0).toUpperCase() + role.slice(1)}}</div>
+                    <div class="message-content">${{content}}</div>
+                `;
+                
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
             }}
             
             async submitAction() {{
@@ -716,6 +1124,9 @@ def get_web_interface_html(action_cls: Type[Action]) -> str:
             }}
             
             updateUI(episodeState) {{
+                // Check if this is a chat environment
+                const isChatEnv = document.getElementById('chat-messages') !== null;
+                
                 // Update current state
                 document.getElementById('env-status').textContent = 
                     episodeState.is_reset ? 'Reset' : 'Running';
@@ -724,14 +1135,19 @@ def get_web_interface_html(action_cls: Type[Action]) -> str:
                 document.getElementById('step-count').textContent = 
                     episodeState.step_count.toString();
                 
-                // Update current observation
-                const observationDiv = document.getElementById('current-observation');
-                if (episodeState.current_observation) {{
-                    observationDiv.textContent = JSON.stringify(
-                        episodeState.current_observation, null, 2
-                    );
+                if (isChatEnv) {{
+                    // Update chat interface
+                    this.updateChatInterface(episodeState);
                 }} else {{
-                    observationDiv.textContent = 'No observation yet';
+                    // Update traditional observation display
+                    const observationDiv = document.getElementById('current-observation');
+                    if (episodeState.current_observation) {{
+                        observationDiv.textContent = JSON.stringify(
+                            episodeState.current_observation, null, 2
+                        );
+                    }} else {{
+                        observationDiv.textContent = 'No observation yet';
+                    }}
                 }}
                 
                 // Update action logs
@@ -752,6 +1168,25 @@ def get_web_interface_html(action_cls: Type[Action]) -> str:
                     `).join('');
                 }}
             }}
+            
+            updateChatInterface(episodeState) {{
+                const chatMessages = document.getElementById('chat-messages');
+                if (!chatMessages) return;
+                
+                // Clear existing messages (except system message)
+                const systemMessage = chatMessages.querySelector('.chat-message.system');
+                chatMessages.innerHTML = '';
+                if (systemMessage) {{
+                    chatMessages.appendChild(systemMessage);
+                }}
+                
+                // Add messages from current observation
+                if (episodeState.current_observation && episodeState.current_observation.messages) {{
+                    episodeState.current_observation.messages.forEach(msg => {{
+                        this.addMessageToChat(msg.role, msg.content);
+                    }});
+                }}
+            }}
         }}
         
         // Initialize the web interface when the page loads
@@ -763,6 +1198,110 @@ def get_web_interface_html(action_cls: Type[Action]) -> str:
 </html>
     """.replace('{_generate_action_form_fields(action_fields)}', _generate_action_form_fields(action_fields))
 
+
+def _generate_instructions_section(metadata: Optional[EnvironmentMetadata]) -> str:
+    """Generate the instructions section with environment documentation."""
+    if not metadata or not metadata.readme_content:
+        return ''
+    
+    # Convert markdown to HTML (basic conversion)
+    import re
+    html_content = _markdown_to_html(metadata.readme_content)
+    
+    return f'''
+                <!-- Instructions Section -->
+                <div class="instructions-section">
+                    <div class="instructions-header">
+                        <h3 class="instructions-title">{metadata.name}</h3>
+                        <button class="instructions-toggle" id="instructions-toggle">Show Instructions</button>
+                    </div>
+                    <div class="instructions-content" id="instructions-content">
+                        <div class="instructions-readme">
+                            {html_content}
+                        </div>
+                    </div>
+                </div>
+    '''
+
+
+def _markdown_to_html(markdown: str) -> str:
+    """Convert basic markdown to HTML for README display."""
+    import html
+    import re
+    
+    # Escape HTML first
+    html_content = html.escape(markdown)
+    
+    # Convert headers
+    html_content = re.sub(r'^# (.*?)$', r'<h1>\1</h1>', html_content, flags=re.MULTILINE)
+    html_content = re.sub(r'^## (.*?)$', r'<h2>\1</h2>', html_content, flags=re.MULTILINE)
+    html_content = re.sub(r'^### (.*?)$', r'<h3>\1</h3>', html_content, flags=re.MULTILINE)
+    
+    # Convert code blocks
+    html_content = re.sub(r'```(.*?)\n(.*?)\n```', r'<pre><code>\2</code></pre>', html_content, flags=re.DOTALL)
+    html_content = re.sub(r'`([^`]+)`', r'<code>\1</code>', html_content)
+    
+    # Convert bold and italic
+    html_content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html_content)
+    html_content = re.sub(r'\*(.*?)\*', r'<em>\1</em>', html_content)
+    
+    # Convert lists
+    html_content = re.sub(r'^- (.*?)$', r'<li>\1</li>', html_content, flags=re.MULTILINE)
+    html_content = re.sub(r'(<li>.*</li>)', r'<ul>\1</ul>', html_content, flags=re.DOTALL)
+    
+    # Convert line breaks
+    html_content = html_content.replace('\n', '<br>')
+    
+    return html_content
+
+
+def _generate_action_interface(action_fields: List[Dict[str, Any]], is_chat_env: bool) -> str:
+    """Generate either a chat interface or action form based on environment type."""
+    if is_chat_env:
+        return _generate_chat_interface()
+    else:
+        return _generate_action_form(action_fields)
+
+def _generate_chat_interface() -> str:
+    """Generate a chat-style interface for chat environments."""
+    return '''
+                <!-- Chat Interface -->
+                <div class="chat-interface">
+                    <h3>Chat Interface</h3>
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="chat-message system">
+                            <div class="message-role">System</div>
+                            <div class="message-content">Chat environment ready. Send a message to start the conversation.</div>
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <div class="role-selector">
+                            <label for="message-role">Role:</label>
+                            <select id="message-role">
+                                <option value="user">User</option>
+                                <option value="assistant">Assistant</option>
+                            </select>
+                        </div>
+                        <div class="message-input">
+                            <textarea id="message-input" placeholder="Type your message here..." rows="3"></textarea>
+                            <button class="btn" id="send-message-btn">Send Message</button>
+                        </div>
+                    </div>
+                </div>
+    '''
+
+def _generate_action_form(action_fields: List[Dict[str, Any]]) -> str:
+    """Generate a traditional action form for non-chat environments."""
+    return f'''
+                <!-- Action Form -->
+                <div class="action-form">
+                    <h3>Take Action</h3>
+                    <form id="action-form">
+                        {_generate_action_form_fields(action_fields)}
+                        <button type="submit" class="btn" id="step-btn">Step</button>
+                    </form>
+                </div>
+    '''
 
 def _generate_action_form_fields(action_fields: List[Dict[str, Any]]) -> str:
     """Generate HTML form fields for action input."""
