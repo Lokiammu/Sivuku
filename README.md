@@ -179,7 +179,7 @@ This is an open and community centric project. If you would like to add your nam
 
 Supporters include: Meta-PyTorch, Hugging Face, Unsloth AI, Reflection AI, vLLM, SkyRL (UC-Berkeley), LightningAI, ..
 
-And we'd also like to acknowledge the team at Farama Foundation as the API was heavily inspired by the work you all have done on Gymnasium. Cheers!
+And we'd also like to acknowledge the team at Farama Foundation as the OpenEnv API was heavily inspired by the work you all have done on Gymnasium. Cheers!
 
 ## License
 
