@@ -6,19 +6,69 @@ on:
       - deploy-hf-env-action
       - env-frontend
     paths:
-      - 'src/envs/coding_env/server/**'
+      - 'src/envs/echo_env/**'
+      - 'src/envs/coding_env/**'
+      - 'src/envs/chat_env/**'
+      - 'src/envs/atari_env/**'
+      - 'src/envs/openspiel_env/**'
       - 'src/core/**'
+      - 'scripts/**'
       - '.github/workflows/deploy-hf-env.yml'
   workflow_dispatch:
 
-
 env:
-  REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/openenv
+  HF_USERNAME: openenv
 
 jobs:
-  deploy:
+  # Job to determine which environments to deploy
+  determine-environments:
     runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.changes.outputs.environments }}
+      deploy_all: ${{ steps.changes.outputs.deploy_all }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for changes
+        id: changes
+        run: |
+          # Check if core files changed (deploy all environments)
+          if git diff --name-only HEAD~1 HEAD | grep -E '^src/core/' > /dev/null; then
+            echo "deploy_all=true" >> $GITHUB_OUTPUT
+            echo "environments=echo_env,coding_env,chat_env,atari_env,openspiel_env" >> $GITHUB_OUTPUT
+            echo "Core files changed - deploying all environments"
+            exit 0
+          fi
+          
+          # Check which specific environments changed
+          changed_envs=()
+          for env in echo_env coding_env chat_env atari_env openspiel_env; do
+            if git diff --name-only HEAD~1 HEAD | grep -E "^src/envs/$env/" > /dev/null; then
+              changed_envs+=("$env")
+            fi
+          done
+          
+          if [ ${#changed_envs[@]} -eq 0 ]; then
+            echo "deploy_all=false" >> $GITHUB_OUTPUT
+            echo "environments=" >> $GITHUB_OUTPUT
+            echo "No environment changes detected"
+          else
+            echo "deploy_all=false" >> $GITHUB_OUTPUT
+            echo "environments=$(IFS=,; echo "${changed_envs[*]}")" >> $GITHUB_OUTPUT
+            echo "Changed environments: ${changed_envs[*]}"
+          fi
+
+  # Job to deploy environments
+  deploy:
+    needs: determine-environments
+    if: needs.determine-environments.outputs.environments != ''
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ fromJSON(format('["{0}"]', needs.determine-environments.outputs.environments)) }}
     permissions:
       contents: read
     
@@ -33,67 +83,63 @@ jobs:
 
       - name: Prepare files for HF Space
         run: |
-          mkdir -p hf-staging/src/core
-          mkdir -p hf-staging/src/envs/coding_env
-          
-          cp -r src/core/* hf-staging/src/core/
-          cp -r src/envs/coding_env/* hf-staging/src/envs/coding_env/
-          
-          # Copy Dockerfile and update BASE_IMAGE default
-          cp src/envs/coding_env/server/Dockerfile hf-staging/Dockerfile
-          sed -i "s|ARG BASE_IMAGE=openenv-base:latest|ARG BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-base:latest|" hf-staging/Dockerfile
-          
-          # Add environment variable to enable web interface for HF deployments
-          echo "ENV ENABLE_WEB_INTERFACE=true" >> hf-staging/Dockerfile
-          
-          # Create HF Space README
-          cat > hf-staging/README.md << 'EOF'
-          ---
-          title: Coding Environment Server
-          emoji: 🐳
-          colorFrom: blue
-          colorTo: green
-          sdk: docker
-          pinned: false
-          app_port: 8000
-          base_path: /web
-          ---
-          
-          # Coding Environment Server
-          
-          FastAPI server for code execution environment powered by Meta's OpenEnv.
-          
-          ## About
-          
-          This Space provides a containerized environment for executing code safely.
-          Built with FastAPI and smolagents.
-          
-          ## Web Interface
-          
-          This deployment includes an interactive web interface for exploring the environment:
-          - **HumanAgent Interface**: Interact with the environment using a web form
-          - **State Observer**: Real-time view of environment state and action history
-          - **Live Updates**: WebSocket-based real-time updates
-          
-          Access the web interface at: `/web`
-          EOF
+          chmod +x scripts/prepare_hf_deployment.sh
+          ./scripts/prepare_hf_deployment.sh "${{ matrix.environment }}"
 
       - name: Deploy to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_USERNAME: openenv
         run: |
-          git clone https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/coding_env hf-space
-          cd hf-space
-          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-          cp -r ../hf-staging/* .
-          git remote set-url origin https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/coding_env
+          ENV_NAME="${{ matrix.environment }}"
+          SPACE_NAME="$ENV_NAME"
           
+          echo "Deploying $ENV_NAME environment to HF Space: $SPACE_NAME"
+          
+          # Clone the target space
+          HF_SPACE_URL="https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$SPACE_NAME"
+          echo "Cloning HF Space..."
+          
+          if git clone $HF_SPACE_URL hf-space 2>/dev/null; then
+            echo "Space exists, updating..."
+          else
+            echo "Space doesn't exist, will be created on first push"
+            mkdir -p hf-space
+            cd hf-space
+            git init
+            git remote add origin $HF_SPACE_URL
+            cd ..
+          fi
+          
+          cd hf-space
+          
+          # Clear existing files (except .git)
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          
+          # Copy prepared files
+          cp -r ../hf-staging/* .
+          
+          # Set the correct remote URL
+          git remote set-url origin $HF_SPACE_URL
+          
+          # Check if there are changes
           if [ -n "$(git status --porcelain)" ]; then
+            echo "Committing changes..."
             git add .
-            git commit -m "🤖 Update from GitHub - $(date +'%Y-%m-%d %H:%M:%S')"
-            git push
-            echo "✅ Deployed to https://huggingface.co/spaces/$HF_USERNAME/coding_env"
+            git commit -m "🤖 Deploy $ENV_NAME environment - $(date +'%Y-%m-%d %H:%M:%S')"
+            
+            echo "Pushing to Hugging Face..."
+            if git push origin main 2>/dev/null || git push origin master 2>/dev/null; then
+              echo "✅ Successfully deployed to https://huggingface.co/spaces/$HF_USERNAME/$SPACE_NAME"
+            else
+              echo "❌ Failed to push to Hugging Face. Check your credentials and permissions."
+              exit 1
+            fi
           else
             echo "ℹ️ No changes to deploy"
           fi
+          
+          # Cleanup
+          cd ..
+          rm -rf hf-space
+          rm -rf hf-staging
