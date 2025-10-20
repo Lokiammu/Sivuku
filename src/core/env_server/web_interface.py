@@ -168,7 +168,29 @@ class WebInterfaceManager:
     def _deserialize_action(self, action_data: Dict[str, Any]) -> Action:
         """Convert JSON dict to Action instance."""
         metadata = action_data.pop("metadata", {})
-        action = self.action_cls(**action_data)
+        
+        # Handle tensor fields that come from JSON as lists
+        processed_data = {}
+        for key, value in action_data.items():
+            if key == "tokens" and isinstance(value, (list, str)):
+                # Convert list or string to tensor
+                if isinstance(value, str):
+                    # If it's a string, try to parse it as a list of numbers
+                    try:
+                        import json
+                        value = json.loads(value)
+                    except:
+                        # If parsing fails, treat as empty list
+                        value = []
+                if isinstance(value, list):
+                    import torch
+                    processed_data[key] = torch.tensor(value, dtype=torch.long)
+                else:
+                    processed_data[key] = value
+            else:
+                processed_data[key] = value
+        
+        action = self.action_cls(**processed_data)
         action.metadata = metadata
         return action
 
@@ -250,6 +272,8 @@ def get_web_interface_html(action_cls: Type[Action]) -> str:
                     input_type = "number"
                 elif field_type == bool:
                     input_type = "checkbox"
+                elif hasattr(field_type, '__name__') and 'Tensor' in field_type.__name__:
+                    input_type = "tensor"
                 else:
                     input_type = "text"
                 
@@ -618,7 +642,17 @@ def get_web_interface_html(action_cls: Type[Action]) -> str:
                 // Collect form data
                 for (const [key, value] of formData.entries()) {{
                     if (value !== '') {{
-                        action[key] = value;
+                        // Handle tensor fields (tokens) - convert comma-separated string to array
+                        if (key === 'tokens') {{
+                            try {{
+                                action[key] = value.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x));
+                            }} catch (e) {{
+                                console.error('Error parsing tokens:', e);
+                                action[key] = [];
+                            }}
+                        }} else {{
+                            action[key] = value;
+                        }}
                     }}
                 }}
                 
@@ -744,6 +778,14 @@ def _generate_action_form_fields(action_fields: List[Dict[str, Any]]) -> str:
                         <input type="checkbox" name="{field['name']}" value="true">
                         {field['name']}
                     </label>
+                </div>
+            ''')
+        elif field['type'] == 'tensor':
+            fields_html.append(f'''
+                <div class="form-group">
+                    <label for="{field['name']}">{field['name']} (comma-separated integers):</label>
+                    <input type="text" name="{field['name']}" id="{field['name']}" placeholder="e.g., 1,2,3,4,5" {"required" if field['required'] else ""}>
+                    <small>Enter token IDs as comma-separated integers</small>
                 </div>
             ''')
         elif field['type'] == 'text' and 'message' in field['name'].lower():
