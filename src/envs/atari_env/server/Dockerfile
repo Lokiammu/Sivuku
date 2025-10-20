@@ -9,7 +9,7 @@
 #
 # CI/CD build: docker build --build-arg BASE_IMAGE=ghcr.io/meta-pytorch/openenv-base:latest \
 #              -f src/envs/atari_env/server/Dockerfile -t atari-env:latest .
-ARG BASE_IMAGE=envtorch-base:latest
+ARG BASE_IMAGE=openenv-base:latest
 FROM ${BASE_IMAGE}
 
 # Install ALE-specific dependencies

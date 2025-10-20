@@ -166,18 +166,19 @@ def create_app(
     env_name: Optional[str] = None,
 ) -> Any:
     """
-    Create a FastAPI application with web interface enabled for Hugging Face deployments.
+    Create a FastAPI application with or without web interface.
     
-    This function checks for the ENABLE_WEB_INTERFACE environment variable to determine
-    whether to enable the web interface. 
+    This function creates a FastAPI app with the web interface enabled by default,
+    including README integration for better user experience.
     
     Args:
         env: The Environment instance to serve
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
+        env_name: Optional environment name for README loading
         
     Returns:
-        FastAPI application instance with or without web interface based on environment
+        FastAPI application instance with or without web interface and README integration
     """
     # Check if web interface should be enabled
     # This can be controlled via environment variable or build argument

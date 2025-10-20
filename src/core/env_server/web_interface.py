@@ -262,6 +262,13 @@ class WebInterfaceManager:
                     processed_data[key] = torch.tensor(value, dtype=torch.long)
                 else:
                     processed_data[key] = value
+            elif key == "action_id" and isinstance(value, str):
+                # Convert action_id from string to int
+                try:
+                    processed_data[key] = int(value)
+                except ValueError:
+                    # If conversion fails, keep original value
+                    processed_data[key] = value
             else:
                 processed_data[key] = value
         
@@ -359,30 +366,8 @@ def get_web_interface_html(action_cls: Type[Action], metadata: Optional[Environm
                 is_chat_env = True
                 break
     
-    # Get action fields for dynamic form generation
-    action_fields = []
-    if hasattr(action_cls, '__dataclass_fields__'):
-        for field_name, field_info in action_cls.__dataclass_fields__.items():
-            if field_name != 'metadata':
-                field_type = field_info.type
-                if field_type == str:
-                    input_type = "text"
-                elif field_type == int:
-                    input_type = "number"
-                elif field_type == float:
-                    input_type = "number"
-                elif field_type == bool:
-                    input_type = "checkbox"
-                elif hasattr(field_type, '__name__') and 'Tensor' in field_type.__name__:
-                    input_type = "tensor"
-                else:
-                    input_type = "text"
-                
-                action_fields.append({
-                    'name': field_name,
-                    'type': input_type,
-                    'required': field_info.default is field_info.default_factory
-                })
+    # Get action fields for dynamic form generation with enhanced metadata
+    action_fields = _extract_action_fields(action_cls)
     
     return f"""
 <!DOCTYPE html>
@@ -824,6 +809,84 @@ def get_web_interface_html(action_cls: Type[Action], metadata: Optional[Environm
             background: #f8f9fa;
             font-weight: 600;
         }}
+        
+        /* Enhanced Form Styles */
+        .help-text {{
+            display: block;
+            margin-top: 5px;
+            font-size: 12px;
+            color: #6c757d;
+            font-style: italic;
+        }}
+        
+        .form-group label {{
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 5px;
+        }}
+        
+        .form-group select {{
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background-color: white;
+        }}
+        
+        .form-group select:focus {{
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }}
+        
+        .form-group textarea {{
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+        }}
+        
+        .form-group textarea:focus {{
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }}
+        
+        .form-group input[type="number"] {{
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }}
+        
+        .form-group input[type="number"]:focus {{
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }}
+        
+        .form-group input[type="text"]:focus {{
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }}
+        
+        .required-indicator {{
+            color: #dc3545;
+            font-weight: bold;
+        }}
+        
+        .form-group .field-description {{
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
+            font-style: italic;
+        }}
     </style>
 </head>
 <body>
@@ -1224,6 +1287,150 @@ def _generate_instructions_section(metadata: Optional[EnvironmentMetadata]) -> s
     '''
 
 
+def _extract_action_fields(action_cls: Type[Action]) -> List[Dict[str, Any]]:
+    """Extract enhanced field metadata from Action class for form generation."""
+    import typing
+    from typing import get_origin, get_args
+    
+    action_fields = []
+    if not hasattr(action_cls, '__dataclass_fields__'):
+        return action_fields
+    
+    for field_name, field_info in action_cls.__dataclass_fields__.items():
+        if field_name == 'metadata':
+            continue
+            
+        field_type = field_info.type
+        field_metadata = _extract_field_metadata(field_name, field_info)
+        
+        # Determine input type based on field type
+        input_type = _determine_input_type(field_type)
+        
+        # Check if field is required
+        is_required = field_info.default is field_info.default_factory
+        
+        action_fields.append({
+            'name': field_name,
+            'type': input_type,
+            'required': is_required,
+            'description': field_metadata.get('description', ''),
+            'default_value': field_metadata.get('default_value'),
+            'choices': field_metadata.get('choices', []),
+            'min_value': field_metadata.get('min_value'),
+            'max_value': field_metadata.get('max_value'),
+            'placeholder': field_metadata.get('placeholder', ''),
+            'help_text': field_metadata.get('help_text', ''),
+        })
+    
+    return action_fields
+
+
+def _extract_field_metadata(field_name: str, field_info) -> Dict[str, Any]:
+    """Extract metadata from dataclass field including docstring and type hints."""
+    import typing
+    from typing import get_origin, get_args, Literal, Union, Optional
+    
+    metadata = {}
+    
+    # Extract description from field docstring or annotation
+    if hasattr(field_info, 'metadata') and field_info.metadata:
+        # Check for custom metadata
+        for meta in field_info.metadata:
+            if isinstance(meta, dict):
+                metadata.update(meta)
+    
+    # Extract type information
+    field_type = field_info.type
+    origin = get_origin(field_type)
+    
+    # Handle Literal types for dropdown choices
+    if origin is Literal:
+        args = get_args(field_type)
+        metadata['choices'] = list(args)
+    
+    # Handle Optional types
+    if origin is Union:
+        args = get_args(field_type)
+        if len(args) == 2 and type(None) in args:
+            # This is Optional[SomeType]
+            non_none_type = args[0] if args[1] is type(None) else args[1]
+            metadata['optional'] = True
+            # Recursively check the non-None type for choices
+            if get_origin(non_none_type) is Literal:
+                metadata['choices'] = list(get_args(non_none_type))
+        else:
+            # Regular Union type
+            metadata['choices'] = [str(arg) for arg in args if arg is not type(None)]
+    
+    # Handle numeric constraints
+    if field_type in (int, float):
+        # Check for common constraint patterns in field name
+        if 'count' in field_name.lower() or 'num' in field_name.lower():
+            metadata['min_value'] = 0
+        if 'id' in field_name.lower():
+            metadata['min_value'] = 0
+    
+    # Generate placeholder text
+    if 'message' in field_name.lower():
+        metadata['placeholder'] = f'Enter {field_name.replace("_", " ")}...'
+    elif 'code' in field_name.lower():
+        metadata['placeholder'] = 'Enter Python code here...'
+    elif 'tokens' in field_name.lower():
+        metadata['placeholder'] = 'Enter comma-separated token IDs (e.g., 1,2,3,4,5)'
+    else:
+        metadata['placeholder'] = f'Enter {field_name.replace("_", " ")}...'
+    
+    # Generate help text based on field name and type
+    if 'action_id' in field_name.lower():
+        metadata['help_text'] = 'The action ID to execute in the environment'
+    elif 'game_name' in field_name.lower():
+        metadata['help_text'] = 'Name of the game or environment'
+    elif 'tokens' in field_name.lower():
+        metadata['help_text'] = 'Token IDs as a comma-separated list of integers'
+    elif 'code' in field_name.lower():
+        metadata['help_text'] = 'Python code to execute in the environment'
+    elif 'message' in field_name.lower():
+        metadata['help_text'] = 'Text message to send'
+    
+    return metadata
+
+
+def _determine_input_type(field_type) -> str:
+    """Determine the appropriate HTML input type for a field type."""
+    import typing
+    from typing import get_origin, get_args, Literal, Union
+    
+    # Handle direct types
+    if field_type == str:
+        return "text"
+    elif field_type == int:
+        return "number"
+    elif field_type == float:
+        return "number"
+    elif field_type == bool:
+        return "checkbox"
+    
+    # Handle complex types
+    origin = get_origin(field_type)
+    
+    if origin is Literal:
+        return "select"
+    elif origin is Union:
+        args = get_args(field_type)
+        if len(args) == 2 and type(None) in args:
+            # Optional type - use the non-None type
+            non_none_type = args[0] if args[1] is type(None) else args[1]
+            return _determine_input_type(non_none_type)
+        elif all(isinstance(arg, str) for arg in args if arg is not type(None)):
+            return "select"
+        else:
+            return "text"
+    elif hasattr(field_type, '__name__') and 'Tensor' in field_type.__name__:
+        return "tensor"
+    else:
+        return "text"
+
+
 def _markdown_to_html(markdown: str) -> str:
     """Convert basic markdown to HTML for README display."""
     import html
@@ -1304,42 +1511,103 @@ def _generate_action_form(action_fields: List[Dict[str, Any]]) -> str:
     '''
 
 def _generate_action_form_fields(action_fields: List[Dict[str, Any]]) -> str:
-    """Generate HTML form fields for action input."""
+    """Generate HTML form fields for action input with enhanced metadata."""
     if not action_fields:
         return '<p>No action fields available</p>'
     
     fields_html = []
     for field in action_fields:
-        if field['type'] == 'checkbox':
-            fields_html.append(f'''
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" name="{field['name']}" value="true">
-                        {field['name']}
-                    </label>
-                </div>
-            ''')
-        elif field['type'] == 'tensor':
-            fields_html.append(f'''
-                <div class="form-group">
-                    <label for="{field['name']}">{field['name']} (comma-separated integers):</label>
-                    <input type="text" name="{field['name']}" id="{field['name']}" placeholder="e.g., 1,2,3,4,5" {"required" if field['required'] else ""}>
-                    <small>Enter token IDs as comma-separated integers</small>
-                </div>
-            ''')
-        elif field['type'] == 'text' and 'message' in field['name'].lower():
-            fields_html.append(f'''
-                <div class="form-group">
-                    <label for="{field['name']}">{field['name']}:</label>
-                    <textarea name="{field['name']}" id="{field['name']}" rows="3" placeholder="Enter {field['name']}..."></textarea>
-                </div>
-            ''')
-        else:
-            fields_html.append(f'''
-                <div class="form-group">
-                    <label for="{field['name']}">{field['name']}:</label>
-                    <input type="{field['type']}" name="{field['name']}" id="{field['name']}" placeholder="Enter {field['name']}..." {"required" if field['required'] else ""}>
-                </div>
-            ''')
+        field_html = _generate_single_field(field)
+        fields_html.append(field_html)
     
     return '\n'.join(fields_html)
+
+
+def _generate_single_field(field: Dict[str, Any]) -> str:
+    """Generate HTML for a single form field with enhanced metadata."""
+    field_name = field['name']
+    field_type = field['type']
+    required = field['required']
+    placeholder = field.get('placeholder', '')
+    help_text = field.get('help_text', '')
+    choices = field.get('choices', [])
+    min_value = field.get('min_value')
+    max_value = field.get('max_value')
+    default_value = field.get('default_value')
+    
+    # Build label with required indicator
+    label_text = field_name.replace('_', ' ').title()
+    if required:
+        label_text += ' <span style="color: red;">*</span>'
+    
+    # Build input attributes
+    input_attrs = []
+    if required:
+        input_attrs.append('required')
+    if placeholder:
+        input_attrs.append(f'placeholder="{placeholder}"')
+    if min_value is not None:
+        input_attrs.append(f'min="{min_value}"')
+    if max_value is not None:
+        input_attrs.append(f'max="{max_value}"')
+    if default_value is not None:
+        input_attrs.append(f'value="{default_value}"')
+    
+    attrs_str = ' '.join(input_attrs)
+    
+    if field_type == 'checkbox':
+        return f'''
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="{field_name}" value="true" {attrs_str}>
+                    {label_text}
+                </label>
+                {f'<small class="help-text">{help_text}</small>' if help_text else ''}
+            </div>
+        '''
+    
+    elif field_type == 'select':
+        options_html = []
+        if not required:
+            options_html.append(f'<option value="">-- Select {label_text} --</option>')
+        
+        for choice in choices:
+            selected = 'selected' if str(choice) == str(default_value) else ''
+            options_html.append(f'<option value="{choice}" {selected}>{choice}</option>')
+        
+        return f'''
+            <div class="form-group">
+                <label for="{field_name}">{label_text}:</label>
+                <select name="{field_name}" id="{field_name}" {attrs_str}>
+                    {''.join(options_html)}
+                </select>
+                {f'<small class="help-text">{help_text}</small>' if help_text else ''}
+            </div>
+        '''
+    
+    elif field_type == 'tensor':
+        return f'''
+            <div class="form-group">
+                <label for="{field_name}">{label_text} (comma-separated integers):</label>
+                <input type="text" name="{field_name}" id="{field_name}" {attrs_str}>
+                <small class="help-text">{help_text or 'Enter token IDs as comma-separated integers (e.g., 1,2,3,4,5)'}</small>
+            </div>
+        '''
+    
+    elif field_type == 'text' and ('message' in field_name.lower() or 'code' in field_name.lower()):
+        return f'''
+            <div class="form-group">
+                <label for="{field_name}">{label_text}:</label>
+                <textarea name="{field_name}" id="{field_name}" rows="3" {attrs_str}></textarea>
+                {f'<small class="help-text">{help_text}</small>' if help_text else ''}
+            </div>
+        '''
+    
+    else:
+        return f'''
+            <div class="form-group">
+                <label for="{field_name}">{label_text}:</label>
+                <input type="{field_type}" name="{field_name}" id="{field_name}" {attrs_str}>
+                {f'<small class="help-text">{help_text}</small>' if help_text else ''}
+            </div>
+        '''
