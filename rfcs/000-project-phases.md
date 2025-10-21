@@ -14,7 +14,10 @@ We recommend starting here to get a mental model of what's in here already, what
 This project aims at standardizing environments for both training and evaluation. In the training space, this means also standardizing reward pipelines, while in the eval space this means helping with reproducibility where a model can be shipped with a complete set of agentic evals that can be easily run by others.
 
 ### The problem with abstraction boundaries
-Ideally, we would draw a boundary between environments and everything else (orchestration, resource allocation, RPCs, etc). We will try to do this as much as possible, but we will have to create additional interfaces so that if folks want to cross this boundary, they can. This will likely be necessary for things like reward pipelines that call reward models (which will very likely need to RPC to GPU machines), as well as for agentic evals like Tau where the eval itself involve two agents interacting with one another (and sending many RPCs).
+Ideally, we would draw a boundary between environments and everything else (orchestration, resource allocation, RPCs, etc). We will try to do this as much as possible, but we will have to create additional interfaces so that if folks want to cross this boundary, they can. This will likely be necessary for things like:
+- Reward pipelines that call reward models (which will very likely need to RPC to GPU machines)
+- Agentic evals like Tau where the eval itself involves two agents interacting with one another (and sending many RPCs)
+- Container provider interfaces to support different deployment targets (Docker, Kubernetes, cloud providers, etc.)
 
 ## Phases
 We plan to build things incrementally, from inside out, adding and expanding only whenever necessary.
@@ -22,11 +25,15 @@ We plan to build things incrementally, from inside out, adding and expanding onl
 We will group development from now till version 1.0 into three phases.
 
 In the **first phase** of this project, we will focus **exclusively** on the narrowest definition of environments, without even worrying about rewards nor evals. Instead, the focus in this phase (and in the RFCs you find in this directory) is going to be on:
-1. Establishing a convention on what is an environment and where we draw the "environment" box.
-2. Nailing our tools support
-3. Landing the basics of _sandboxing_, _versioning_, _binary distribution_, _dependency management_.
+1. Establishing a convention on what is an environment and where we draw the "environment" box (RFC 001).
+2. Landing the basics of _sandboxing_, _versioning_, _binary distribution_, _dependency management_ (RFC 002).
+3. Nailing our tools support through MCP (Model Context Protocol) integration for both remote and local tools (RFC 003).
+4. Defining a unified action interface for all environment types (RFC 004).
+5. Exploring RPC communication patterns beyond HTTP for long-running sessions (particularly for interpreted languages like Python, Bash, Ruby, etc.). Coming in an upcoming RFC.
 
 We will conclude this phase with version 0.3.
+
+**Note on versioning**: We're using 0.3 increments for each phase to leave room for minor releases and patches within each phase. This gives us flexibility to ship iteratively while working toward each phase's goals.
 
 In the **second phase** of this project, we will add rewards. Reward pipelines are crucial to get right since that is one of the main levels that ML engineers have to improve the model (much more than the general algorithm) so all the questions around versioning and deps that we tackled in the first phase will start being useful right away. We will introduce a way to RPC outside the Environment boundary: we expect this to require active discussion.
 
