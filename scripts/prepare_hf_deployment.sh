@@ -185,7 +185,7 @@ CMD ["uvicorn", "envs.ENV_NAME_PLACEHOLDER.server.app:app", "--host", "0.0.0.0",
 DOCKERFILE_EOF
 
     # Replace placeholder with actual environment name
-    sed -i '' "s/ENV_NAME_PLACEHOLDER/$env_name/g" $STAGING_DIR/Dockerfile
+    sed -i "s/ENV_NAME_PLACEHOLDER/$env_name/g" $STAGING_DIR/Dockerfile
 }
 
 create_environment_dockerfile $ENV_NAME
