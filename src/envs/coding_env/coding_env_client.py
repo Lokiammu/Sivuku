@@ -13,10 +13,11 @@ Talks HTTP to a single base_url exposing: /reset and /step.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import Optional, TYPE_CHECKING
+
+from core.client_types import StepResult
 
 from core.http_env_client import HTTPEnvClient
-from core.types import StepResult
 
 from .models import CodeAction, CodeObservation, CodeState
 

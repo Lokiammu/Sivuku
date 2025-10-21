@@ -14,11 +14,11 @@ over HTTP.
 from typing import Any, Dict
 
 import torch
+from core.client_types import StepResult
 
 from core.env_server.interfaces import Message
 from core.env_server.types import State
 from core.http_env_client import HTTPEnvClient
-from core.types import StepResult
 
 from .models import ChatAction, ChatObservation, ChatState
 

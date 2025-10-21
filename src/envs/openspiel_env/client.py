@@ -15,8 +15,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
+from core.client_types import StepResult
+
 from core.http_env_client import HTTPEnvClient
-from core.types import StepResult
 
 from .models import OpenSpielAction, OpenSpielObservation, OpenSpielState
 
@@ -64,7 +65,9 @@ class OpenSpielEnv(HTTPEnvClient[OpenSpielAction, OpenSpielObservation]):
             "game_params": action.game_params,
         }
 
-    def _parse_result(self, payload: Dict[str, Any]) -> StepResult[OpenSpielObservation]:
+    def _parse_result(
+        self, payload: Dict[str, Any]
+    ) -> StepResult[OpenSpielObservation]:
         """
         Parse server response into StepResult[OpenSpielObservation].
 
