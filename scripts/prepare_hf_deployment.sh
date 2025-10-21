@@ -24,7 +24,7 @@ fi
 
 # Set base image reference
 if [ -n "$BASE_IMAGE_SHA" ]; then
-    BASE_IMAGE_REF="openenv-base@sha256:$BASE_IMAGE_SHA"
+    BASE_IMAGE_REF="openenv-base:$BASE_IMAGE_SHA"
     echo "Using specific SHA for openenv-base: $BASE_IMAGE_SHA"
 else
     BASE_IMAGE_REF="openenv-base:latest"
