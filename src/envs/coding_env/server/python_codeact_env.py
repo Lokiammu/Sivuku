@@ -13,11 +13,12 @@ Python code actions using PyExecutor.
 
 import uuid
 
-from core.env_server import Action, Environment, Observation, Transform
+from core.env_server import Action, Environment, Observation
 from core.tools import PyExecutor
 
 from ..models import CodeAction, CodeObservation, CodeState
 from .transforms import create_safe_coding_transform
+
 
 class PythonCodeActEnv(Environment):
     """
@@ -60,6 +61,12 @@ class PythonCodeActEnv(Environment):
         self._state = CodeState(episode_id=str(uuid.uuid4()), step_count=0)
         # Add last_exit_code to state
         self._state.last_exit_code = 0
+
+        # Reset executor to clear any previously defined variables/functions
+        self._executor = PyExecutor()
+
+        # Reset transform to clear any accumulated state
+        self.transform = create_safe_coding_transform()
 
         # Return initial observation
         observation = CodeObservation(
