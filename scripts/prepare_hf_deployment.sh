@@ -14,6 +14,14 @@ if [ -z "$ENV_NAME" ]; then
     exit 1
 fi
 
+# Handle "all" case by getting list of all available environments
+if [ "$ENV_NAME" = "all" ]; then
+    ENV_NAMES=$(ls -1 src/envs/ | grep -v README.md)
+    echo "Detected 'all' - will process environments: $ENV_NAMES"
+else
+    ENV_NAMES="$ENV_NAME"
+fi
+
 # Set base image reference
 if [ -n "$BASE_IMAGE_SHA" ]; then
     BASE_IMAGE_REF="openenv-base@sha256:$BASE_IMAGE_SHA"
@@ -23,26 +31,29 @@ else
     echo "Using latest tag for openenv-base"
 fi
 
-echo "Preparing $ENV_NAME environment for deployment..."
+# Process each environment
+for CURRENT_ENV in $ENV_NAMES; do
+    echo "Preparing $CURRENT_ENV environment for deployment..."
+    
+    # Create staging directory for this environment
+    CURRENT_STAGING_DIR="${STAGING_DIR}_${CURRENT_ENV}"
+    mkdir -p $CURRENT_STAGING_DIR/src/core
+    mkdir -p $CURRENT_STAGING_DIR/src/envs/$CURRENT_ENV
 
-# Create staging directory
-mkdir -p $STAGING_DIR/src/core
-mkdir -p $STAGING_DIR/src/envs/$ENV_NAME
+    # Copy core files
+    cp -r src/core/* $CURRENT_STAGING_DIR/src/core/
+    echo "Copied core files for $CURRENT_ENV"
 
-# Copy core files
-cp -r src/core/* $STAGING_DIR/src/core/
-echo "Copied core files"
-
-# Copy environment files
-cp -r src/envs/$ENV_NAME/* $STAGING_DIR/src/envs/$ENV_NAME/
-echo "Copied $ENV_NAME environment files"
+    # Copy environment files
+    cp -r src/envs/$CURRENT_ENV/* $CURRENT_STAGING_DIR/src/envs/$CURRENT_ENV/
+    echo "Copied $CURRENT_ENV environment files"
 
 # Create environment-specific multi-stage Dockerfile
 create_environment_dockerfile() {
     local env_name=$1
     
     # Create base Dockerfile
-    cat > $STAGING_DIR/Dockerfile << DOCKERFILE_EOF
+    cat > $CURRENT_STAGING_DIR/Dockerfile << DOCKERFILE_EOF
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
@@ -59,13 +70,13 @@ DOCKERFILE_EOF
             # Echo environment needs no additional dependencies
             ;;
         "coding_env")
-            cat >> $STAGING_DIR/Dockerfile << 'DOCKERFILE_EOF'
+            cat >> $CURRENT_STAGING_DIR/Dockerfile << 'DOCKERFILE_EOF'
 # Install smolagents for code execution
 RUN pip install --no-cache-dir smolagents
 DOCKERFILE_EOF
             ;;
         "chat_env")
-            cat >> $STAGING_DIR/Dockerfile << 'DOCKERFILE_EOF'
+            cat >> $CURRENT_STAGING_DIR/Dockerfile << 'DOCKERFILE_EOF'
 # Install additional dependencies for ChatEnvironment
 RUN pip install --no-cache-dir torch transformers
 
@@ -79,7 +90,7 @@ RUN python -c "from transformers import GPT2Tokenizer; GPT2Tokenizer.from_pretra
 DOCKERFILE_EOF
             ;;
         "atari_env")
-            cat >> $STAGING_DIR/Dockerfile << 'DOCKERFILE_EOF'
+            cat >> $CURRENT_STAGING_DIR/Dockerfile << 'DOCKERFILE_EOF'
 # Install ALE-specific dependencies
 RUN pip install --no-cache-dir \
     gymnasium>=0.29.0 \
@@ -89,7 +100,7 @@ DOCKERFILE_EOF
             ;;
         "openspiel_env")
             # OpenSpiel requires special C++ build process - replace entire Dockerfile
-            cat > $STAGING_DIR/Dockerfile << DOCKERFILE_EOF
+            cat > $CURRENT_STAGING_DIR/Dockerfile << DOCKERFILE_EOF
 # OpenSpiel requires complex C++ build - using special multi-stage approach
 # Stage 1: Build OpenSpiel C++ bindings
 FROM python:3.11 AS openspiel-builder
@@ -170,7 +181,7 @@ DOCKERFILE_EOF
     esac
 
     # Add common parts
-    cat >> $STAGING_DIR/Dockerfile << 'DOCKERFILE_EOF'
+    cat >> $CURRENT_STAGING_DIR/Dockerfile << 'DOCKERFILE_EOF'
 
 # Copy only what's needed for this environment
 COPY src/core/ /app/src/core/
@@ -185,23 +196,23 @@ CMD ["uvicorn", "envs.ENV_NAME_PLACEHOLDER.server.app:app", "--host", "0.0.0.0",
 DOCKERFILE_EOF
 
     # Replace placeholder with actual environment name
-    sed -i "s/ENV_NAME_PLACEHOLDER/$env_name/g" $STAGING_DIR/Dockerfile
+    sed -i "s/ENV_NAME_PLACEHOLDER/$env_name/g" $CURRENT_STAGING_DIR/Dockerfile
 }
 
-create_environment_dockerfile $ENV_NAME
+    create_environment_dockerfile $CURRENT_ENV
 
-# Add web interface support
-echo "ENV ENABLE_WEB_INTERFACE=true" >> $STAGING_DIR/Dockerfile
-echo "Added web interface support"
+    # Add web interface support
+    echo "ENV ENABLE_WEB_INTERFACE=true" >> $CURRENT_STAGING_DIR/Dockerfile
+    echo "Added web interface support for $CURRENT_ENV"
 
-# Create environment-specific README
+    # Create environment-specific README
 create_readme() {
     local env_name=$1
     
     # Capitalize first letter of environment name
     env_title=$(echo "$env_name" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
     
-    cat > $STAGING_DIR/README.md << README_EOF
+    cat > $CURRENT_STAGING_DIR/README.md << README_EOF
 ---
 title: ${env_title} Environment Server
 emoji: 🐳
@@ -236,7 +247,7 @@ README_EOF
     # Add environment-specific information
     case $env_name in
         "echo_env")
-            cat >> $STAGING_DIR/README.md << 'README_EOF'
+            cat >> $CURRENT_STAGING_DIR/README.md << 'README_EOF'
 ## Echo Environment
 
 Simple test environment that echoes back messages. Perfect for testing the OpenEnv APIs.
@@ -251,7 +262,7 @@ Send a POST request to `/step` with:
 README_EOF
             ;;
         "coding_env")
-            cat >> $STAGING_DIR/README.md << 'README_EOF'
+            cat >> $CURRENT_STAGING_DIR/README.md << 'README_EOF'
 ## Coding Environment
 
 Executes Python code in a sandboxed environment with safety checks.
@@ -266,7 +277,7 @@ Send a POST request to `/step` with:
 README_EOF
             ;;
         "chat_env")
-            cat >> $STAGING_DIR/README.md << 'README_EOF'
+            cat >> $CURRENT_STAGING_DIR/README.md << 'README_EOF'
 ## Chat Environment
 
 Provides a chat-based interface for LLMs with tokenization support.
@@ -281,7 +292,7 @@ Send a POST request to `/step` with tokenized input:
 README_EOF
             ;;
         "atari_env")
-            cat >> $STAGING_DIR/README.md << 'README_EOF'
+            cat >> $CURRENT_STAGING_DIR/README.md << 'README_EOF'
 ## Atari Environment
 
 Provides Atari 2600 games via the Arcade Learning Environment (ALE).
@@ -297,7 +308,7 @@ Send a POST request to `/step` with:
 README_EOF
             ;;
         "openspiel_env")
-            cat >> $STAGING_DIR/README.md << 'README_EOF'
+            cat >> $CURRENT_STAGING_DIR/README.md << 'README_EOF'
 ## OpenSpiel Environment
 
 Provides access to OpenSpiel games for multi-agent reinforcement learning.
@@ -313,7 +324,7 @@ README_EOF
             ;;
     esac
 
-    cat >> $STAGING_DIR/README.md << 'README_EOF'
+    cat >> $CURRENT_STAGING_DIR/README.md << 'README_EOF'
 
 ## API Documentation
 
@@ -325,5 +336,9 @@ The environment provides a health check endpoint at `/health`.
 README_EOF
 }
 
-create_readme $ENV_NAME
-echo "Created README for HF Space"
+    create_readme $CURRENT_ENV
+    echo "Created README for HF Space for $CURRENT_ENV"
+    echo "Completed preparation for $CURRENT_ENV environment"
+done
+
+echo "All environments prepared successfully!"
