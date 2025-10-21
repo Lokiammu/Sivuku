@@ -1,10 +1,24 @@
+# <img width="35" height="35" alt="image" src="https://github.com/user-attachments/assets/2700a971-e5d6-4036-b03f-2f89c9791609" /> OpenEnv: Agentic Execution Environments
+
+An e2e framework for creating, deploying and using isolated execution environments for agentic RL training, built using Gymnasium style simple APIs. OpenEnv provides a standard for interacting with agentic execution environments via simple Gymnasium style APIs - step(), reset(), state(). Users of agentic execution environments can interact with the environment during RL training loops using these simple APIs.
+
+In addition to making it easier for researchers and RL framework writers, we also provide tools for environment creators making it easier for them to create richer environments and make them available over familar protocols like HTTP and packaged using canonical technologies like docker. Environment creators can use the OpenEnv framework to create environments that are isolated, secure, and easy to deploy and use.
+
+
+## Overview
+`openenv-core` provides the foundational building blocks for creating and interacting with containerized environments over HTTP. It enables you to build agent environments that can be deployed as Docker containers and accessed via a simple HTTP API.
+
+> ⚠️ **Early Development Warning** OpenEnv is currently in an experimental
+> stage. You should expect bugs, incomplete features, and APIs that may change
+> in future versions. The project welcomes bugfixes, but to make sure things are
+> well coordinated you should discuss any significant change before starting the
+> work. It's recommended that you signal your intention to contribute in the
+> issue tracker, either by filing a new issue or by claiming an existing one.
+
+
 # OpenEnv Core
 
 Core components for OpenEnv - a framework for building HTTP-based agentic environments.
-
-## Overview
-
-`openenv-core` provides the foundational building blocks for creating and interacting with containerized environments over HTTP. It enables you to build agent environments that can be deployed as Docker containers and accessed via a simple HTTP API.
 
 ## Features
 
@@ -124,24 +138,6 @@ base_url = provider.start_container("my-env:latest")
 provider.stop_container()
 ```
 
-## Architecture
-
-OpenEnv Core follows a client-server architecture:
-
-```
-┌─────────────────┐         HTTP          ┌─────────────────┐
-│                 │◄─────────────────────►│                 │
-│  HTTPEnvClient  │   /reset, /step       │  HTTPEnvServer  │
-│                 │   /state, /health     │                 │
-└─────────────────┘                       └─────────────────┘
-        │                                          │
-        │                                          │
-        ▼                                          ▼
-┌─────────────────┐                       ┌─────────────────┐
-│ Container       │                       │  Environment    │
-│ Provider        │                       │  Implementation │
-└─────────────────┘                       └─────────────────┘
-```
 
 ## API Reference
 
