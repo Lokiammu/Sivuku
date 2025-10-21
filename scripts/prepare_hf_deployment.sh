@@ -14,10 +14,11 @@ if [ -z "$ENV_NAME" ]; then
     exit 1
 fi
 
-# Handle "all" case by getting list of all available environments
-if [ "$ENV_NAME" = "all" ]; then
-    ENV_NAMES=$(ls -1 src/envs/ | grep -v README.md)
-    echo "Detected 'all' - will process environments: $ENV_NAMES"
+# Handle "all" case or comma-separated list of environments
+if [[ "$ENV_NAME" == *","* ]]; then
+    # Handle comma-separated list of environments
+    ENV_NAMES=$(echo "$ENV_NAME" | tr ',' ' ')
+    echo "Detected comma-separated list - will process environments: $ENV_NAMES"
 else
     ENV_NAMES="$ENV_NAME"
 fi
