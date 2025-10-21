@@ -12,11 +12,12 @@ Future hooks (commented below) for:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, Generic, Optional, Type, TypeVar
-from .containers.runtime import LocalDockerProvider
+from typing import Any, Dict, Generic, Optional, Type, TYPE_CHECKING, TypeVar
+
 import requests
 
-from .types import StepResult
+from .client_types import StepResult
+from .containers.runtime import LocalDockerProvider
 
 if TYPE_CHECKING:
     from .containers.runtime import ContainerProvider

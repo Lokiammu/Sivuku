@@ -35,7 +35,7 @@ Documentation = "https://github.com/facebookresearch/OpenEnv/blob/main/README.md
 "Bug Tracker" = "https://github.com/facebookresearch/OpenEnv/issues"
 
 [tool.setuptools]
-py-modules = ["openenv_core.__init__", "openenv_core.http_env_client", "openenv_core.types"]
+py-modules = ["openenv_core.__init__", "openenv_core.http_env_client", "openenv_core.client_types"]
 packages = [
     "openenv_core",
     "openenv_core.containers",
