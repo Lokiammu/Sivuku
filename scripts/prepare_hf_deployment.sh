@@ -14,14 +14,8 @@ if [ -z "$ENV_NAME" ]; then
     exit 1
 fi
 
-# Handle "all" case or comma-separated list of environments
-if [[ "$ENV_NAME" == *","* ]]; then
-    # Handle comma-separated list of environments
-    ENV_NAMES=$(echo "$ENV_NAME" | tr ',' ' ')
-    echo "Detected comma-separated list - will process environments: $ENV_NAMES"
-else
-    ENV_NAMES="$ENV_NAME"
-fi
+# Validate environment name
+ENV_NAMES="$ENV_NAME"
 
 # Set base image reference
 if [ -n "$BASE_IMAGE_SHA" ]; then
@@ -32,22 +26,20 @@ else
     echo "Using latest tag for openenv-base"
 fi
 
-# Process each environment
-for CURRENT_ENV in $ENV_NAMES; do
-    echo "Preparing $CURRENT_ENV environment for deployment..."
-    
-    # Create staging directory for this environment
-    CURRENT_STAGING_DIR="${STAGING_DIR}_${CURRENT_ENV}"
-    mkdir -p $CURRENT_STAGING_DIR/src/core
-    mkdir -p $CURRENT_STAGING_DIR/src/envs/$CURRENT_ENV
+echo "Preparing $ENV_NAME environment for deployment..."
 
-    # Copy core files
-    cp -r src/core/* $CURRENT_STAGING_DIR/src/core/
-    echo "Copied core files for $CURRENT_ENV"
+# Create staging directory
+CURRENT_STAGING_DIR="${STAGING_DIR}_${ENV_NAME}"
+mkdir -p $CURRENT_STAGING_DIR/src/core
+mkdir -p $CURRENT_STAGING_DIR/src/envs/$ENV_NAME
 
-    # Copy environment files
-    cp -r src/envs/$CURRENT_ENV/* $CURRENT_STAGING_DIR/src/envs/$CURRENT_ENV/
-    echo "Copied $CURRENT_ENV environment files"
+# Copy core files
+cp -r src/core/* $CURRENT_STAGING_DIR/src/core/
+echo "Copied core files"
+
+# Copy environment files
+cp -r src/envs/$ENV_NAME/* $CURRENT_STAGING_DIR/src/envs/$ENV_NAME/
+echo "Copied $ENV_NAME environment files"
 
 # Create environment-specific multi-stage Dockerfile
 create_environment_dockerfile() {
@@ -200,13 +192,13 @@ DOCKERFILE_EOF
     sed -i "s/ENV_NAME_PLACEHOLDER/$env_name/g" $CURRENT_STAGING_DIR/Dockerfile
 }
 
-    create_environment_dockerfile $CURRENT_ENV
+create_environment_dockerfile $ENV_NAME
 
-    # Add web interface support
-    echo "ENV ENABLE_WEB_INTERFACE=true" >> $CURRENT_STAGING_DIR/Dockerfile
-    echo "Added web interface support for $CURRENT_ENV"
+# Add web interface support
+echo "ENV ENABLE_WEB_INTERFACE=true" >> $CURRENT_STAGING_DIR/Dockerfile
+echo "Added web interface support"
 
-    # Create environment-specific README
+# Create environment-specific README
 create_readme() {
     local env_name=$1
     
@@ -337,9 +329,6 @@ The environment provides a health check endpoint at `/health`.
 README_EOF
 }
 
-    create_readme $CURRENT_ENV
-    echo "Created README for HF Space for $CURRENT_ENV"
-    echo "Completed preparation for $CURRENT_ENV environment"
-done
-
-echo "All environments prepared successfully!"
+create_readme $ENV_NAME
+echo "Created README for HF Space"
+echo "Completed preparation for $ENV_NAME environment"
