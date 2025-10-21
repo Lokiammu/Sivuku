@@ -1,19 +1,6 @@
 name: Deploy to Hugging Face Environment
 
 on:
-  push:
-    branches:
-      - deploy-hf-env-action
-      - env-frontend
-    paths:
-      - 'src/envs/echo_env/**'
-      - 'src/envs/coding_env/**'
-      - 'src/envs/chat_env/**'
-      - 'src/envs/atari_env/**'
-      - 'src/envs/openspiel_env/**'
-      - 'src/core/**'
-      - 'scripts/**'
-      - '.github/workflows/deploy-hf-env.yml'
   workflow_dispatch:
     inputs:
       environment:
