@@ -17,6 +17,9 @@ RUN pip install torch transformers
 COPY src/core/ /app/src/core/
 COPY src/envs/chat_env/ /app/src/envs/chat_env/
 
+# Copy README for web interface documentation
+COPY src/envs/chat_env/README.md /app/README.md
+
 # Environment variables that can be overridden at runtime
 ENV TOKENIZER_NAME=gpt2
 ENV SYSTEM_PROMPT="You are a helpful AI assistant."

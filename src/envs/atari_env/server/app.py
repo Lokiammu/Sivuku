@@ -32,7 +32,7 @@ Environment variables:
 
 import os
 
-from core.env_server import create_fastapi_app
+from core.env_server import create_app
 
 from ..models import AtariAction, AtariObservation
 from .atari_environment import AtariEnvironment
@@ -63,8 +63,8 @@ env = AtariEnvironment(
     frameskip=frameskip,
 )
 
-# Create the FastAPI app with routes
-app = create_fastapi_app(env, AtariAction, AtariObservation)
+# Create the FastAPI app with web interface and README integration
+app = create_app(env, AtariAction, AtariObservation, env_name="atari_env")
 
 
 if __name__ == "__main__":

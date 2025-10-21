@@ -28,7 +28,7 @@ Environment variables:
 
 import os
 
-from core.env_server import create_fastapi_app
+from core.env_server import create_app
 
 from ..models import OpenSpielAction, OpenSpielObservation
 from .openspiel_environment import OpenSpielEnvironment
@@ -45,8 +45,8 @@ env = OpenSpielEnvironment(
     opponent_policy=opponent_policy,
 )
 
-# Create the FastAPI app with routes
-app = create_fastapi_app(env, OpenSpielAction, OpenSpielObservation)
+# Create the FastAPI app with web interface and README integration
+app = create_app(env, OpenSpielAction, OpenSpielObservation, env_name="openspiel_env")
 
 
 if __name__ == "__main__":

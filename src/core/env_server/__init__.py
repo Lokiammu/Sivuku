@@ -7,9 +7,10 @@
 """Core environment interfaces and types."""
 
 from .base_transforms import CompositeTransform, NullTransform
-from .http_server import HTTPEnvServer, create_fastapi_app
+from .http_server import HTTPEnvServer, create_app, create_fastapi_app
 from .interfaces import Environment, Message, ModelTokenizer, Transform
 from .types import Action, Observation, State
+from .web_interface import create_web_interface_app, WebInterfaceManager
 
 __all__ = [
     # Core interfaces
@@ -26,5 +27,9 @@ __all__ = [
     "NullTransform",
     # HTTP Server
     "HTTPEnvServer",
+    "create_app",
     "create_fastapi_app",
+    # Web Interface
+    "create_web_interface_app",
+    "WebInterfaceManager",
 ]
