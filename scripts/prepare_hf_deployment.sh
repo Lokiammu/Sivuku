@@ -17,12 +17,12 @@ fi
 # Validate environment name
 ENV_NAMES="$ENV_NAME"
 
-# Set base image reference
+# Set base image reference (using GHCR)
 if [ -n "$BASE_IMAGE_SHA" ]; then
-    BASE_IMAGE_REF="openenv-base:$BASE_IMAGE_SHA"
+    BASE_IMAGE_REF="ghcr.io/meta-pytorch/openenv-base:$BASE_IMAGE_SHA"
     echo "Using specific SHA for openenv-base: $BASE_IMAGE_SHA"
 else
-    BASE_IMAGE_REF="openenv-base:latest"
+    BASE_IMAGE_REF="ghcr.io/meta-pytorch/openenv-base:latest"
     echo "Using latest tag for openenv-base"
 fi
 
