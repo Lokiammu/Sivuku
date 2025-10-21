@@ -75,6 +75,8 @@ jobs:
             dockerfile: src/envs/coding_env/server/Dockerfile
           - name: sumo-rl-env
             dockerfile: src/envs/sumo_rl_env/server/Dockerfile
+          - name: atari-env
+            dockerfile: src/envs/atari_env/server/Dockerfile
 
     steps:
       - name: Checkout code

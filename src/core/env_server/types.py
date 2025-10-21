@@ -43,3 +43,15 @@ class CodeExecResult:
     stdout: str
     stderr: str
     exit_code: int
+
+
+@dataclass
+class EnvironmentMetadata:
+    """Metadata about an environment for documentation and UI purposes."""
+    
+    name: str
+    description: str
+    readme_content: Optional[str] = None
+    version: Optional[str] = None
+    author: Optional[str] = None
+    documentation_url: Optional[str] = None

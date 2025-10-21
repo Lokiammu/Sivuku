@@ -14,6 +14,9 @@ FROM ${BASE_IMAGE}
 COPY src/core/ /app/src/core/
 COPY src/envs/echo_env/ /app/src/envs/echo_env/
 
+# Copy README for web interface documentation
+COPY src/envs/echo_env/README.md /app/README.md
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1

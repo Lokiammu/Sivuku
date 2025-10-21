@@ -13,6 +13,7 @@ over HTTP endpoints that HTTPEnvClient can consume.
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict
 from typing import Any, Dict, Type
 
@@ -158,6 +159,41 @@ class HTTPEnvServer:
             "done": done,
         }
 
+def create_app(
+    env: Environment,
+    action_cls: Type[Action],
+    observation_cls: Type[Observation],
+    env_name: Optional[str] = None,
+) -> Any:
+    """
+    Create a FastAPI application with or without web interface.
+    
+    This function creates a FastAPI app with the web interface enabled by default,
+    including README integration for better user experience.
+    
+    Args:
+        env: The Environment instance to serve
+        action_cls: The Action subclass this environment expects
+        observation_cls: The Observation subclass this environment returns
+        env_name: Optional environment name for README loading
+        
+    Returns:
+        FastAPI application instance with or without web interface and README integration
+    """
+    # Check if web interface should be enabled
+    # This can be controlled via environment variable or build argument
+    enable_web = (
+        os.getenv("ENABLE_WEB_INTERFACE", "false").lower() in ("true", "1", "yes")
+    )
+
+    if enable_web:
+        # Import web interface only when needed
+        from .web_interface import create_web_interface_app
+        return create_web_interface_app(env, action_cls, observation_cls, env_name)
+    else:
+        # Use standard FastAPI app without web interface
+        return create_fastapi_app(env, action_cls, observation_cls)
+    
 
 def create_fastapi_app(
     env: Environment,
