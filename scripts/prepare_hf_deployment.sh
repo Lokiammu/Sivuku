@@ -94,62 +94,22 @@ DOCKERFILE_EOF
         "openspiel_env")
             # OpenSpiel requires special C++ build process - replace entire Dockerfile
             cat > $CURRENT_STAGING_DIR/Dockerfile << DOCKERFILE_EOF
-# OpenSpiel requires complex C++ build - using special multi-stage approach
-# Stage 1: Build OpenSpiel C++ bindings
-FROM python:3.11 AS openspiel-builder
+# OpenSpiel environment using pre-built OpenSpiel base image
+# Use the pre-built OpenSpiel base image (contains compiled OpenSpiel)
+# Built from: docker build -t openspiel-base:latest -f src/envs/openspiel_env/server/Dockerfile.openspiel-base .
+# In GitHub Actions, this is overridden to use the GHCR base image
+ARG OPENSPIEL_BASE_IMAGE=openspiel-base:latest
+FROM \${OPENSPIEL_BASE_IMAGE}
 
-# Avoid interactive prompts during build
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=UTC
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    clang \
-    cmake \
-    curl \
-    git \
-    sudo \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set up OpenSpiel build directory
-RUN mkdir /repo
-WORKDIR /repo
-
-# Clone OpenSpiel
-RUN git clone https://github.com/google-deepmind/open_spiel.git .
-
-# Run OpenSpiel's installation script (downloads C++ dependencies)
-RUN ./install.sh
-
-# Install Python dependencies
-RUN pip3 install --no-cache-dir --upgrade setuptools testresources importlib_metadata
-RUN pip3 install --no-cache-dir --upgrade -r requirements.txt cmake
-
-# Build OpenSpiel with Python 3.11
-RUN mkdir -p build
-WORKDIR /repo/build
-RUN cmake -DPython3_EXECUTABLE=$(which python3) -DCMAKE_CXX_COMPILER=$(which clang++) ../open_spiel
-RUN make -j$(nproc) pyspiel
-
-# Stage 2: Use the specified openenv-base image
-FROM $BASE_IMAGE_REF
-
-# Copy OpenSpiel build artifacts from builder
-RUN mkdir -p /repo
-COPY --from=openspiel-builder /repo /repo
-
-# Install OpenSpiel Python requirements in runtime
-WORKDIR /repo
-RUN pip3 install --no-cache-dir --upgrade -r requirements.txt
-
-# Set Python path for OpenSpiel
-ENV PYTHONPATH=/repo:/repo/build/python:${PYTHONPATH}
-
-# Copy OpenEnv core
+# Copy OpenEnv core (base image already set WORKDIR=/app)
 WORKDIR /app
 COPY src/core/ /app/src/core/
+
+# Copy OpenSpiel environment
 COPY src/envs/openspiel_env/ /app/src/envs/openspiel_env/
+
+# Copy README for web interface documentation
+COPY src/envs/openspiel_env/README.md /app/README.md
 
 # Extend Python path for OpenEnv (base image set PYTHONPATH=/app/src)
 # We prepend OpenSpiel paths
@@ -160,11 +120,13 @@ ENV OPENSPIEL_GAME=catch
 ENV OPENSPIEL_AGENT_PLAYER=0
 ENV OPENSPIEL_OPPONENT_POLICY=random
 
-# Health check
+# Health check (curl is provided by openenv-base)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the FastAPI server
+# Note: EXPOSE 8000 already set by openenv-base
+
+# Run the FastAPI server (uvicorn installed by openenv-base)
 CMD ["uvicorn", "envs.openspiel_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
 DOCKERFILE_EOF
             echo "Created special OpenSpiel Dockerfile with C++ build process"
@@ -205,12 +167,46 @@ create_readme() {
     # Capitalize first letter of environment name
     env_title=$(echo "$env_name" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
     
+    # Set environment-specific colors and emoji
+    case $env_name in
+        "atari_env")
+            EMOJI="🕹️"
+            COLOR_FROM="#FF6200"
+            COLOR_TO="#D4151B"
+            ;;
+        "coding_env")
+            EMOJI="💻"
+            COLOR_FROM="#007ACC"
+            COLOR_TO="#1E1E1E"
+            ;;
+        "openspiel_env")
+            EMOJI="🎮"
+            COLOR_FROM="#9146FF"
+            COLOR_TO="#00FFA3"
+            ;;
+        "echo_env")
+            EMOJI="🔊"
+            COLOR_FROM="#00C9FF"
+            COLOR_TO="#1B2845"
+            ;;
+        "chat_env")
+            EMOJI="💬"
+            COLOR_FROM="#0084FF"
+            COLOR_TO="#25D366"
+            ;;
+        *)
+            EMOJI="🐳"
+            COLOR_FROM="blue"
+            COLOR_TO="green"
+            ;;
+    esac
+
     cat > $CURRENT_STAGING_DIR/README.md << README_EOF
 ---
 title: ${env_title} Environment Server
-emoji: 🐳
-colorFrom: blue
-colorTo: green
+emoji: ${EMOJI}
+colorFrom: ${COLOR_FROM}
+colorTo: ${COLOR_TO}
 sdk: docker
 pinned: false
 app_port: 8000
@@ -310,9 +306,10 @@ Provides access to OpenSpiel games for multi-agent reinforcement learning.
 Send a POST request to `/step` with:
 ```json
 {
-  "action": 0
+  "action": {
+    "action_id": 1
+  }
 }
-```
 README_EOF
             ;;
     esac
