@@ -56,7 +56,7 @@ def main():
             action_id = np.random.choice(result.observation.action_mask)
 
             # Take action
-            result = env.step(SumoAction(phase_id=action_id))
+            result = env.step(SumoAction(phase_id=int(action_id)))
 
             episode_reward += result.reward or 0
             steps += 1
