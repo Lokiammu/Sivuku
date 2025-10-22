@@ -22,7 +22,6 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from envs.git_env import GitAction, GitEnv
-from core.containers.runtime import LocalDockerProvider
 
 
 def main():
@@ -47,16 +46,11 @@ def main():
             return False
 
         print("Creating client from Docker image with .env credentials...")
-        print("  Using LocalDockerProvider with env_vars")
+        print("  Using GitEnv.from_docker_image() factory method")
         print()
 
-        # Create provider and start container with environment variables
-        provider = LocalDockerProvider()
-        base_url = provider.start_container("git-env:latest", env_vars=env_vars)
-        provider.wait_for_ready(base_url)
-
-        # Create client connected to the container
-        client = GitEnv(base_url=base_url, provider=provider)
+        # Create client using from_docker_image factory method
+        client = GitEnv.from_docker_image("git-env:latest", env_vars=env_vars)
 
         print("✓ Client created and container started!\n")
 
