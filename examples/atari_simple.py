@@ -24,7 +24,7 @@ def main():
     """Run a simple Atari episode."""
     # Connect to the Atari environment server
     print("Connecting to Atari environment...")
-    env = AtariEnv(base_url="http://localhost:8001")
+    env = AtariEnv(base_url="http://localhost:8000")
 
     try:
         # Reset the environment
