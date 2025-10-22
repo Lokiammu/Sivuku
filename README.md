@@ -6,6 +6,12 @@ An e2e framework for creating, deploying and using isolated execution environmen
 [![Discord](https://img.shields.io/badge/Discord-OpenEnv-7289da?style=flat&logo=discord&logoColor=white)](https://discord.gg/YsTYBh6PD9)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meta-pytorch/OpenEnv/blob/main/examples/OpenEnv_Tutorial.ipynb) **← Try the Interactive Tutorial!**
 
+## OpenEnv on partner platforms:
+
+- [Lightning AI Studio](https://lightning.ai/environments?section=featured)
+- TRL Example (Coming Soon)!
+- Unsloth Google Colab (Coming soon)!
+
 ## Overview
 
 OpenEnv provides a standard for interacting with agentic execution environments via simple Gymnasium style APIs - step(), reset(), state(). Users of agentic execution environments can interact with the environment during RL training loops using these simple APIs.
