@@ -8,7 +8,7 @@
 # This image contains OpenSpiel compiled and ready to use
 # Built from: docker build -t openspiel-base:latest -f src/envs/openspiel_env/server/Dockerfile.openspiel-base .
 # In GitHub Actions, this is overridden to use the GHCR base image
-ARG BASE_IMAGE=ghcr.io/meta-pytorch/openenv-base:latest
+ARG BASE_IMAGE=openenv-base:latest
 FROM ${BASE_IMAGE}
 
 # Avoid interactive prompts during build

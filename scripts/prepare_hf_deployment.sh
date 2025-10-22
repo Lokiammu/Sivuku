@@ -95,10 +95,7 @@ DOCKERFILE_EOF
             # OpenSpiel requires special C++ build process - replace entire Dockerfile
             cat > $CURRENT_STAGING_DIR/Dockerfile << DOCKERFILE_EOF
 # OpenSpiel environment using pre-built OpenSpiel base image
-# Use the pre-built OpenSpiel base image (contains compiled OpenSpiel)
-# Built from: docker build -t openspiel-base:latest -f src/envs/openspiel_env/server/Dockerfile.openspiel-base .
-# In GitHub Actions, this is overridden to use the GHCR base image
-ARG OPENSPIEL_BASE_IMAGE=openspiel-base:latest
+ARG OPENSPIEL_BASE_IMAGE=ghcr.io/meta-pytorch/openenv-openspiel-base:sha-e622c7e
 FROM \${OPENSPIEL_BASE_IMAGE}
 
 # Copy OpenEnv core (base image already set WORKDIR=/app)
