@@ -6,6 +6,11 @@
 
 """Core tools for code execution and other utilities."""
 
+from .git_server_client import GitServerClient, RepoInfo
 from .local_python_executor import PyExecutor
 
-__all__ = ["PyExecutor"]
+__all__ = [
+    "PyExecutor",
+    "GitServerClient",
+    "RepoInfo",
+]
