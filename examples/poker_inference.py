@@ -41,23 +41,22 @@ from openai import OpenAI
 from envs.openspiel_env import OpenSpielEnv, OpenSpielAction
 
 
-# python -m uvicorn envs.openspiel_env.server.app:app --host 0.0.0.0 --port 8001
-OPENSPIEL_SERVER_URL = "http://localhost:8001"
-
+# We are using the HuggingFace Inference Providers API to access the models
+# If you want to use a different provider, like vLLM, you can change the 
+# API_BASE_URL, API_KEY, and MODELS list to match.
 API_BASE_URL = "https://router.huggingface.co/v1"
-API_KEY = os.getenv("API_KEY")
-# Note: Add ":provider_name" suffix to specify provider if using HuggingFace Inference Providers
+API_KEY = os.getenv("API_KEY") or os.getenv("HF_TOKEN")
 MODELS = [
-    "deepseek-ai/DeepSeek-V3.1-Terminus:hyperbolic",
-    "Qwen/Qwen3-235B-A22B-Instruct-2507:hyperbolic",
+    "deepseek-ai/DeepSeek-V3.1-Terminus",
+    "Qwen/Qwen3-235B-A22B-Instruct-2507",
 ]
 
-MAX_GAMES = 100
 TEMPERATURE = 0.8
+MAX_GAMES = 100
 MAX_TOKENS = 100
-VERBOSE = False
+VERBOSE = True
 
-# Streamlined prompt
+# Game prompt
 BASE_PROMPT = """Kuhn Poker: You have {card_name}. 
 
 Betting: {history}
@@ -132,7 +131,7 @@ def play_kuhn_poker_game(env, client, model_name, game_num):
                 model=model_name,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS,
-                temperature=TEMPERATURE,
+                temperature=0.8, # just pin for simplicity
                 stream=False,
             )
 
@@ -178,7 +177,7 @@ def main():
         base_url=API_BASE_URL,
         api_key=API_KEY,
     )
-    env = OpenSpielEnv(base_url=OPENSPIEL_SERVER_URL)
+    env = OpenSpielEnv.from_docker_image("ghcr.io/meta-pytorch/openspiel-env:latest")
 
     # Store results for all models
     all_model_results = {
