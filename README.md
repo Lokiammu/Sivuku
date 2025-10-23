@@ -5,6 +5,8 @@ An e2e framework for creating, deploying and using isolated execution environmen
 [![PyPI](https://img.shields.io/pypi/v/openenv-core?color=blue)](https://pypi.org/project/openenv-core/)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meta-pytorch/OpenEnv/blob/main/examples/OpenEnv_Tutorial.ipynb) **← Try the Interactive Tutorial!**
 
+Train LLMs to play BlackJack using torchforge (PyTorch's native RL framework) + OpenEnv: [`examples/grpo_blackjack/`](examples/grpo_blackjack/)
+
 ## Overview
 
 OpenEnv provides a standard for interacting with agentic execution environments via simple Gymnasium style APIs - step(), reset(), state(). Users of agentic execution environments can interact with the environment during RL training loops using these simple APIs.
@@ -171,10 +173,10 @@ client.close()  # Stops and removes container
 - smolagents (for coding environment)
 
 ## Supported RL Tools
-The goal of this project is to support a broad set of open and closed tools to help standardize the agentic RL community. If you have a project that supports OpenEnv environments, please put up a PR to add your tool name along with a link to your documentation. 
+The goal of this project is to support a broad set of open and closed tools to help standardize the agentic RL community. If you have a project that supports OpenEnv environments, please put up a PR to add your tool name along with a link to your documentation.
 
 ### torchforge
-(coming soon)
+See GRPO BlackJack training example: [`examples/grpo_blackjack/`](examples/grpo_blackjack/)
 
 ### TRL
 (coming soon} 
