@@ -13,7 +13,7 @@ An e2e framework for creating, deploying and using isolated execution environmen
 ## OpenEnv on partner platforms:
 
 - [Lightning AI Studio](https://lightning.ai/environments?section=featured)
-- TRL Example (Coming Soon)!
+- [TRL example](https://huggingface.co/docs/trl/main/en/openenv)
 - Unsloth Google Colab (Coming soon)!
 
 ## Overview
@@ -188,7 +188,7 @@ The goal of this project is to support a broad set of open and closed tools to h
 See GRPO BlackJack training example: [`examples/grpo_blackjack/`](examples/grpo_blackjack/)
 
 ### TRL
-(coming soon} 
+See the [TRL example](https://huggingface.co/docs/trl/main/en/openenv) on how to integrate OpenEnv environments with GRPO training.
 
 ### Unsloth
 (coming soon)
