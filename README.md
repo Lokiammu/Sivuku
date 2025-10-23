@@ -194,7 +194,7 @@ See the [TRL example](https://huggingface.co/docs/trl/main/en/openenv) on how to
 See the 2048 game example based on gpt-oss: [Colab notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb)
 
 ### SkyRL
-(coming soon)
+See the [SkyRL example](https://github.com/NovaSky-AI/SkyRL/tree/main/skyrl-train/integrations/openenv) on how to train on OpenEnv environments with SkyRL.
 
 ## Example Environments
 
