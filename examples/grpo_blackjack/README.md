@@ -74,17 +74,6 @@ env.close()                       # Cleanup
 
 Change one environment variable → train on different games!
 
-### GRPO: Group Relative Policy Optimization
-
-GRPO is more efficient than PPO (used by ChatGPT):
-
-| Algorithm | Models Needed | Memory | Speed |
-|-----------|---------------|--------|-------|
-| PPO (ChatGPT) | 3 (Policy, Reference, Value) | High | Slower |
-| **GRPO (DeepSeek R1)** | **2 (Policy, Reference)** | **Lower** | **Faster** |
-
-Key insight: Sample the model multiple times per question, compute group statistics → no Value Model needed!
-
 ### Forge: PyTorch-Native Agentic RL
 
 Forge handles all distributed systems complexity:
