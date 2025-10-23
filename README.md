@@ -14,7 +14,7 @@ An e2e framework for creating, deploying and using isolated execution environmen
 
 - [Lightning AI Studio](https://lightning.ai/environments?section=featured)
 - [TRL example](https://huggingface.co/docs/trl/main/en/openenv)
-- Unsloth Google Colab (Coming soon)!
+- [Unsloth Google Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb)
 
 ## Overview
 
