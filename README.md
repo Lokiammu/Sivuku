@@ -191,7 +191,7 @@ See GRPO BlackJack training example: [`examples/grpo_blackjack/`](examples/grpo_
 See the [TRL example](https://huggingface.co/docs/trl/main/en/openenv) on how to integrate OpenEnv environments with GRPO training.
 
 ### Unsloth
-(coming soon)
+See the 2048 game example based on gpt-oss: [Colab notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb)
 
 ### SkyRL
 (coming soon)
