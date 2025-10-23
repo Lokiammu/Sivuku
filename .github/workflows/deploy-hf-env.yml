@@ -167,7 +167,7 @@ jobs:
           # Cleanup
           cd ..
           rm -rf hf-space
-          rm -rf hf-staging_$ENV_NAME_$ENV_NAME
+          rm -rf hf-staging_$ENV_NAME
 
   # Job to deploy single environment
   deploy-single:
