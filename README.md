@@ -7,10 +7,17 @@ An e2e framework for creating, deploying and using isolated execution environmen
 
 ---
 
-**🚀 Featured Example:** Train LLMs to play BlackJack using [torchforge](https://github.com/meta-pytorch/torchforge) (PyTorch's agentic RL framework) + OpenEnv
+**🚀 Featured:** Train LLMs to play BlackJack using [torchforge](https://github.com/meta-pytorch/torchforge) (PyTorch's agentic RL framework):
 → See full tutorial: [`examples/grpo_blackjack/`](examples/grpo_blackjack/)
 
 ---
+
+## OpenEnv on partner platforms:
+
+- [Lightning AI Studio](https://lightning.ai/environments?section=featured)
+- TRL Example (Coming Soon)!
+- Unsloth Google Colab (Coming soon)!
+
 
 ## Overview
 
