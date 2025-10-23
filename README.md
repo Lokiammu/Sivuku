@@ -6,6 +6,9 @@ An e2e framework for creating, deploying and using isolated execution environmen
 [![Discord](https://img.shields.io/badge/Discord-OpenEnv-7289da?style=flat&logo=discord&logoColor=white)](https://discord.gg/YsTYBh6PD9)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meta-pytorch/OpenEnv/blob/main/examples/OpenEnv_Tutorial.ipynb) **← Try the Interactive Tutorial!**
 
+**🚀 Featured Example:** Train LLMs to play BlackJack using [torchforge](https://github.com/meta-pytorch/torchforge) (PyTorch's agentic RL framework) + OpenEnv
+→ See full tutorial: [`examples/grpo_blackjack/`](examples/grpo_blackjack/)
+
 ## OpenEnv on partner platforms:
 
 - [Lightning AI Studio](https://lightning.ai/environments?section=featured)
