@@ -15,6 +15,7 @@ An e2e framework for creating, deploying and using isolated execution environmen
 - [Lightning AI Studio](https://lightning.ai/environments?section=featured)
 - [TRL example](https://huggingface.co/docs/trl/main/en/openenv)
 - [Unsloth Google Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb)
+- [ART example](https://art.openpipe.ai/integrations/openenv-integration)
 
 ## Overview
 
@@ -195,6 +196,9 @@ See the 2048 game example based on gpt-oss: [Colab notebook](https://colab.resea
 
 ### SkyRL
 See the [SkyRL example](https://skyrl.readthedocs.io/en/latest/examples/openenv.html) on how to train on OpenEnv environments with SkyRL.
+
+### ART
+See the [ART example](https://art.openpipe.ai/integrations/openenv-integration) on how OpenEnv environments can be used to train models with ART.
 
 ## Example Environments
 
