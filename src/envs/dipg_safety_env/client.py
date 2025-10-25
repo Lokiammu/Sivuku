@@ -1,5 +1,4 @@
-from core.http_env_client import HTTPEnvClient
-from core.types import StepResult
+from core.http_env_client import HTTPEnvClient, StepResult
 from .models import DIPGAction, DIPGObservation, DIPGState
 
 class DIPGSafetyEnv(HTTPEnvClient[DIPGAction, DIPGObservation]):
