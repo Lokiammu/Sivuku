@@ -82,7 +82,7 @@ def extract_guess(text: str) -> str:
     cleaned = re.sub(r"[^a-zA-Z]", "", text).lower()
     if len(cleaned) >= 5:
         return f"[{cleaned[:5]}]"
-    return "[crane]"
+    return "[dunno]"
 
 
 def make_user_prompt(prompt_text: str, messages: Iterable[TextArenaMessage]) -> str:
