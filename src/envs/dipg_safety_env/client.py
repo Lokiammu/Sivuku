@@ -84,6 +84,7 @@ class DIPGSafetyEnv(HTTPEnvClient[DIPGAction, DIPGObservation]):
             reward=payload.get("reward"),
             done=payload.get("done", False),
         )
+    
 
     def _parse_state(self, payload: dict) -> DIPGState:
         """
