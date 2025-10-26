@@ -39,35 +39,46 @@ class DIPGSafetyEnv(HTTPEnvClient[DIPGAction, DIPGObservation]):
 
     def _parse_result(self, payload: dict) -> StepResult[DIPGObservation]:
         """
-        Parses the JSON payload from the server's response into a `StepResult`.
+        Parses the JSON payload from the server into a `StepResult`,
+        robustly handling inconsistencies and potential missing data.
 
-        This method contains critical logic to handle a known inconsistency between
-        the data structures returned by the server's `/reset` and `/step` endpoints.
+        This method is designed to be crash-proof and handles three key scenarios:
+        1. The single-nested 'observation' dictionary from the `/reset` endpoint.
+        2. The double-nested 'observation' dictionary from the `/step` endpoint.
+        3. A payload where the 'observation' key might be missing entirely.
 
         Args:
             payload: The raw dictionary parsed from the server's JSON response.
 
         Returns:
-            A structured `StepResult` object containing the observation, reward, and done status.
+            A structured `StepResult` object.
         """
-        # The server's response contains an 'observation' key.
-        obs_data = payload.get("observation", {})
+        # Safely get the top-level 'observation' object. It could be a dict or None.
+        obs_data = payload.get("observation")
 
-        # ROBUSTNESS FIX: The server's /step endpoint returns a double-nested
-        # observation `{'observation': {'observation': {...}}}` while the /reset
-        # endpoint returns a single-nested one `{'observation': {...}}`.
-        # This code checks for the double-nesting and handles both cases gracefully.
-        if "observation" in obs_data:
-            # If it's double-nested (from /step), go one level deeper.
-            actual_obs_data = obs_data["observation"]
+        # Check if the object is a dictionary and contains the nested 'observation' key.
+        # This identifies the double-nested structure from the /step endpoint.
+        if isinstance(obs_data, dict) and "observation" in obs_data:
+            # If so, go one level deeper to get the actual data payload.
+            actual_obs_data = obs_data.get("observation")
         else:
-            # If it's single-nested (from /reset), use the data directly.
+            # Otherwise, it's either the single-nested structure from /reset or None.
             actual_obs_data = obs_data
+
+        # To prevent crashes, ensure `actual_obs_data` is a dictionary before
+        # we try to access keys from it. If it was None, it becomes an empty dict.
+        if not isinstance(actual_obs_data, dict):
+            actual_obs_data = {}
         
-        # Create the DIPGObservation object from the correctly identified data.
-        obs = DIPGObservation(**actual_obs_data)
+        # Construct the DIPGObservation object safely.
+        # Using .get() with a default value ("") prevents a KeyError if 'context' or
+        # 'question' are missing from the payload, ensuring the client never crashes.
+        obs = DIPGObservation(
+            context=actual_obs_data.get("context", ""),
+            question=actual_obs_data.get("question", ""),
+        )
         
-        # Assemble the final StepResult object for the agent.
+        # Assemble and return the final, structured StepResult.
         return StepResult(
             observation=obs,
             reward=payload.get("reward"),
