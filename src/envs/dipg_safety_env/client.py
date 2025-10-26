@@ -11,7 +11,8 @@ class DIPGSafetyEnv(HTTPEnvClient[DIPGAction, DIPGObservation]):
         print(payload)
         print("-------------------------------------------")
         # -----------------------------        
-        obs = DIPGObservation(**payload["observation"])
+        # Go one level deeper to get the actual observation data
+        obs = DIPGObservation(**payload["observation"]["observation"])
         return StepResult(
             observation=obs,
             reward=payload.get("reward"),
