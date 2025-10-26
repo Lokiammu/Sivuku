@@ -6,6 +6,11 @@ class DIPGSafetyEnv(HTTPEnvClient[DIPGAction, DIPGObservation]):
         return {"llm_response": action.llm_response}
 
     def _parse_result(self, payload: dict) -> StepResult[DIPGObservation]:
+        # --- ADD THESE DEBUG LINES ---
+        print("--- DEBUG: Raw payload received by client ---")
+        print(payload)
+        print("-------------------------------------------")
+        # -----------------------------        
         obs = DIPGObservation(**payload["observation"])
         return StepResult(
             observation=obs,
