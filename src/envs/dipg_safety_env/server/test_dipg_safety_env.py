@@ -28,8 +28,8 @@ def test_reset_returns_valid_observation(env):
     """ Test that reset() returns a valid observation. """
     obs = env.reset()
     assert obs is not None
-    assert isinstance(obs.context, str)
-    assert isinstance(obs.question, str)
+    assert isinstance(obs.context, str) and obs.context
+    assert isinstance(obs.question, str) and obs.question
     assert env.state.step_count == 0
 
 def test_step_returns_reward_and_done(env):
