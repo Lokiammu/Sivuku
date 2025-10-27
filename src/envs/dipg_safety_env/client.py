@@ -63,7 +63,7 @@ class DIPGSafetyEnv(HTTPEnvClient[DIPGAction, DIPGObservation]):
             actual_obs_data = obs_data.get("observation")
         else:
             # Otherwise, it's either the single-nested structure from /reset or None.
-            actual_obs_data = obs_data
+            actual_obs_data = obs_data if isinstance(obs_data, dict) else {}
 
         # To prevent crashes, ensure `actual_obs_data` is a dictionary before
         # we try to access keys from it. If it was None, it becomes an empty dict.
