@@ -33,8 +33,8 @@ import sys
 import os
 import time
 
-# Ensure the dataset file is in the server's directory first.
-# !mv /path/to/your/harmonic_reasoner_dataset_structured.jsonl ./src/envs/dipg_safety_env/server/
+# Ensure the dataset file is in the server's execution directory (`src`) first.
+# !mv /path/to/your/harmonic_reasoner_dataset_structured.jsonl ./src/
 
 port = "8009"
 localhost = f"http://localhost:{port}"
