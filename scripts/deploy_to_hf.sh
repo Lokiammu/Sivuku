@@ -45,13 +45,7 @@ cd "$REPO_ROOT"
 
 if ! command -v hf >/dev/null 2>&1; then
     echo "Error: huggingface-hub CLI 'hf' not found in PATH. hf is required to deploy to Hugging Face Spaces." >&2
-
-    if [ "$OSTYPE" == "linux-gnu"* || "$OSTYPE" == "darwin"* ]; then
-        echo "Install the HF CLI: curl -LsSf https://hf.co/cli/install.sh | sh" >&2
-    elif [ "$OSTYPE" == "windows"* ]; then
-        echo "Install the HF CLI: powershell -ExecutionPolicy ByPass -c \"irm https://hf.co/cli/install.ps1 | iex\"" >&2
-    fi
-
+    echo "Install the HF CLI: curl -LsSf https://hf.co/cli/install.sh | sh" >&2
     exit 1
 fi
 
