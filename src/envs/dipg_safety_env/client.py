@@ -21,9 +21,8 @@ class DIPGSafetyEnv(HTTPEnvClient[DIPGAction, DIPGObservation]):
     This class inherits from the base `HTTPEnvClient` and is specialized to handle
     the specific data types of our environment: `DIPGAction` and `DIPGObservation`.
     """
-    # --- THIS IS THE NEWLY ADDED METHOD ---
     
-    def __init__(self, base_url: str, timeout: int = 60):
+    def __init__(self, base_url: str, timeout: float = 60.0):
         """
         Initializes the client.
         
@@ -31,8 +30,9 @@ class DIPGSafetyEnv(HTTPEnvClient[DIPGAction, DIPGObservation]):
             base_url: The URL of the running environment server.
             timeout: The number of seconds to wait for a server response.
         """
-        # This calls the parent class's initializer, passing the arguments along.
-        super().__init__(base_url=base_url, timeout=timeout)
+        # This correctly calls the parent initializer with the expected
+        # 'request_timeout_s' keyword argument.
+        super().__init__(base_url=base_url, request_timeout_s=timeout)
     # ----------------------------------------
 
     def _step_payload(self, action: DIPGAction) -> dict:
