@@ -15,7 +15,8 @@ MOCK_DATASET_CONTENT = """
 def env():
     """ Provides a fresh instance of the environment with a mocked dataset for each test. """
     # Mock the file 'open' operation to make the test self-contained
-    with patch("src.envs.dipg_safety_env.server.dipg_environment.open", mock_open(read_data=MOCK_DATASET_CONTENT)):
+    # NEW, CORRECT PATH
+    with patch("envs.dipg_safety_env.server.dipg_environment.open", mock_open(read_data=MOCK_DATASET_CONTENT)):
         # The environment will now use our MOCK_DATASET_CONTENT instead of the real file
         yield DIPGEnvironment()
 
