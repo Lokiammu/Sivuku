@@ -7,7 +7,7 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: scripts/prepare_hf_deployment.sh --env <environment_name> [options]
+Usage: scripts/deploy_to_hf.sh --env <environment_name> [options]
 
 Required arguments:
   --env <name>               Environment name under src/envs (e.g. textarena_env)
@@ -16,15 +16,16 @@ Optional arguments:
   --base-sha <sha|tag>       Override openenv-base image reference (defaults to :latest)
   --hf-namespace <user>      Hugging Face username/organization (defaults to HF_USERNAME/HF_USER or meta-openenv)
   --staging-dir <path>       Output directory for staging (defaults to hf-staging)
+  --dry-run                  Prepare files without pushing to Hugging Face Spaces
   -h, --help                 Show this help message
 
 Positional compatibility:
   You can also call the script as:
-    scripts/prepare_hf_deployment.sh <env_name> [base_image_sha]
+    scripts/deploy_to_hf.sh <env_name> [base_image_sha]
 
 Examples:
-  scripts/prepare_hf_deployment.sh --env textarena_env --hf-namespace my-team
-  scripts/prepare_hf_deployment.sh chat_env sha-0123456789abcdef
+  scripts/deploy_to_hf.sh --env textarena_env --hf-namespace my-team
+  scripts/deploy_to_hf.sh chat_env sha-0123456789abcdef
 EOF
 }
 
@@ -42,10 +43,29 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 cd "$REPO_ROOT"
 
+if ! command -v hf >/dev/null 2>&1; then
+    echo "Error: huggingface-hub CLI 'hf' not found in PATH. hf is required to deploy to Hugging Face Spaces." >&2
+
+    if [ "$OSTYPE" == "linux-gnu"* || "$OSTYPE" == "darwin"* ]; then
+        echo "Install the HF CLI: curl -LsSf https://hf.co/cli/install.sh | sh" >&2
+    elif [ "$OSTYPE" == "windows"* ]; then
+        echo "Install the HF CLI: powershell -ExecutionPolicy ByPass -c \"irm https://hf.co/cli/install.ps1 | iex\"" >&2
+    fi
+
+    exit 1
+fi
+
+HF_USERNAME=$(hf auth whoami | head -n1 | tr -d '\n')
+
+if [ -z "${HF_NAMESPACE:-}" ]; then
+    echo "🙋 Using default namespace: $HF_USERNAME. You can override the namespace with --hf-namespace"
+    HF_NAMESPACE="${HF_USERNAME:-}"
+fi
+
 ENV_NAME=""
 BASE_IMAGE_SHA=""
-HF_NAMESPACE="${HF_NAMESPACE:-}"
 STAGING_DIR="hf-staging"
+DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -64,6 +84,10 @@ while [[ $# -gt 0 ]]; do
         --staging-dir)
             STAGING_DIR="$2"
             shift 2
+            ;;
+        --dry-run)
+            DRY_RUN=true
+            shift
             ;;
         -h|--help)
             usage
@@ -125,10 +149,7 @@ if [ -n "$BASE_IMAGE_SHA" ]; then
     echo "Using specific SHA for openenv-base: $BASE_IMAGE_SHA"
 else
     BASE_IMAGE_REF="ghcr.io/meta-pytorch/openenv-base:latest"
-    echo "Using latest tag for openenv-base"
 fi
-
-echo "Preparing $ENV_NAME environment for deployment..."
 
 # Create staging directory
 CURRENT_STAGING_DIR="${STAGING_DIR}/${HF_NAMESPACE}/${ENV_NAME}"
@@ -137,11 +158,9 @@ mkdir -p "$CURRENT_STAGING_DIR/src/envs/$ENV_NAME"
 
 # Copy core files
 cp -R src/core/ "$CURRENT_STAGING_DIR/src/core/"
-echo "Copied core files"
-
 # Copy environment files
 cp -R "src/envs/$ENV_NAME/" "$CURRENT_STAGING_DIR/src/envs/$ENV_NAME/"
-echo "Copied $ENV_NAME environment files"
+echo "📁 Copied core and $ENV_NAME environment files to $CURRENT_STAGING_DIR"
 
 # Create environment-specific multi-stage Dockerfile
 create_environment_dockerfile() {
@@ -271,7 +290,6 @@ create_environment_dockerfile "$ENV_NAME"
 
 # Add web interface support
 echo "ENV ENABLE_WEB_INTERFACE=true" >> $CURRENT_STAGING_DIR/Dockerfile
-echo "Added web interface support"
 
 # Create environment-specific README
 create_readme() {
@@ -462,5 +480,53 @@ README_EOF
 }
 
 create_readme "$ENV_NAME"
-echo "Created README for HF Space"
-echo "Completed preparation for $ENV_NAME environment"
+echo "📝 Created README and web interface support for HF Space"
+
+if $DRY_RUN; then
+    echo "👀 Dry run enabled; skipping Hugging Face upload."
+    exit 0
+fi
+
+echo "🔑 Ensuring Hugging Face authentication..."
+
+# just get the env token if it's set
+if [ -n "${HF_TOKEN:-}" ]; then
+    hf auth login --token "$HF_TOKEN" --add-to-git-credential >/dev/null 2>&1 || true
+fi
+
+# ask the user to login if they're not authenticated
+if ! hf auth whoami >/dev/null 2>&1; then
+    hf auth login
+fi
+
+if ! hf auth whoami >/dev/null 2>&1; then
+    echo "Error: Hugging Face authentication failed" >&2
+    exit 1
+fi
+
+# ensure hf authentication on the namespace
+# Check if the user has access to the target HF_NAMESPACE/org
+if ! hf auth whoami | grep -qw "$HF_NAMESPACE"; then
+    echo "Error: Your account does not have access to the Hugging Face namespace '$HF_NAMESPACE'." >&2
+    echo "Get the correct access token from https://huggingface.co/settings/tokens and set if with 'hf auth login' " >&2
+    exit 1
+fi
+
+SPACE_REPO="${HF_NAMESPACE}/${ENV_NAME}-test"
+CURRENT_STAGING_DIR_ABS=$(cd "$CURRENT_STAGING_DIR" && pwd)
+
+# create the space if it doesn't exist
+hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok --quiet >/dev/null 2>&1 || true
+# upload the staged content
+SPACE_UPLOAD_RESULT=$(hf upload --repo-type=space --quiet "$SPACE_REPO" "$CURRENT_STAGING_DIR_ABS")
+if [ $? -ne 0 ]; then
+    echo "❌ Upload failed: $SPACE_UPLOAD_RESULT" >&2
+    exit 1
+fi
+# print the URL of the deployed space
+echo "✅ Upload completed for https://huggingface.co/spaces/$SPACE_REPO"
+
+# safely cleanup the staging directory
+if [ -d "$CURRENT_STAGING_DIR_ABS" ]; then
+    rm -rf "$CURRENT_STAGING_DIR_ABS"
+fi
