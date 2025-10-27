@@ -24,7 +24,14 @@ def main() -> None:
     print("💬 TextArena Hello World - GuessTheNumber-v0")
     print("=" * 60)
 
-    env = TextArenaEnv("https://huggingface.co/spaces/burtenshaw/textarena")
+    env = TextArenaEnv.from_docker_image(
+        "textarena-env:latest",
+        env_vars={
+            "TEXTARENA_ENV_ID": "GuessTheNumber-v0",
+            "TEXTARENA_NUM_PLAYERS": "1",
+        },
+        ports={8000: 8000},
+    )
 
     try:
         print("\n📍 Resetting environment...")
