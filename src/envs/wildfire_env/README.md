@@ -9,6 +9,28 @@ Agents must contain spreading fires using **water**, **firebreaks**, and **timin
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 ---
+## 🔥 Why Wildfire Simulation?
+
+Wildland fires are intensifying globally due to climate change — increasing the urgency for **AI-assisted decision-making**.  
+This environment explores how intelligent systems can **control** fire spread in real time, under limited resources.
+
+### Research Motivation
+✅ Based on real wildfire science inspired by:
+- **Rothermel Surface Fire Spread Model** (USDA Forest Service)
+- **MITRE Fireline’s SimFire** — physics-informed RL fire simulator
+- **SimHarness** — RL evaluation for disaster response
+
+### Application Goals
+| Research Theme | Role in This Environment |
+|---|---|
+| Resource-Constrained Planning | Finite water + firebreak budgets |
+| Fire Spread + Containment Strategy | Directional wind & moisture effects |
+| Disaster Response RL | Safety-focused reward design |
+| LLM Agents for Control Tasks | Text-based action decision making |
+
+This makes WildfireEnv a **fast, controllable**, and **open benchmark** for applied RL and LLM reasoning.
+
+---
 
 ## 🔥 Environment Overview
 
@@ -315,10 +337,33 @@ strategy:
 - [Fire Spread Simulation Models (USFS Research)](https://www.fs.fed.us/rm/pubs/rmrs_gtr371.html)
 
 ---
-
-## 🪵 Citation
+## 🔖 Citations
 
 ```bibtex
+@techreport{rothermel2022surface,
+  title     = {The Rothermel Surface Fire Spread Model and Associated Developments},
+  author    = {Andrews, Patricia L. and Rothermel, Richard C.},
+  year      = {2022},
+  institution = {USDA Forest Service},
+  number    = {RMRS-GTR-371},
+  url       = {https://www.fs.usda.gov/rm/pubs_series/rmrs/gtr/rmrs_gtr371.pdf}
+}
+
+@article{tapley2023reinforcement,
+  title   = {Reinforcement Learning for Wildfire Mitigation in Simulated Disaster Environments},
+  author  = {Tapley, A. and Dotter, M. and Doyle, M. and others},
+  journal = {arXiv preprint arXiv:2311.15925},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2311.15925}
+}
+
+@misc{mitrefireline2023simfire,
+  author = {{MITRE Fireline Project}},
+  title  = {SimFire: Wildfire Simulator for Decision-Support and AI Research},
+  year   = {2023},
+  howpublished = {\url{https://github.com/mitrefireline/simfire}}
+}
+
 @misc{wildfire-openenv-2025,
   title  = {Wildfire Environment for OpenEnv: Containment-Focused RL Simulation},
   author = {Harikrishnan, Ram Sankar},
