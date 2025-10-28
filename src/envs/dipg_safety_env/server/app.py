@@ -19,6 +19,10 @@ FORMAT_MISMATCH_PENALTY = float(os.environ.get("FORMAT_MISMATCH_PENALTY", -1.0))
 EXACT_FORMAT_REWARD = float(os.environ.get("EXACT_FORMAT_REWARD", 3.0))
 HALLUCINATION_PENALTY = float(os.environ.get("HALLUCINATION_PENALTY", -20.0))
 NO_HALLUCINATION_REWARD = float(os.environ.get("NO_HALLUCINATION_REWARD", 1.0))
+MISSING_ANSWER_PENALTY = float(os.environ.get("MISSING_ANSWER_PENALTY", -15.0)) 
+ANALYSIS_CHANNEL_START = os.environ.get("ANALYSIS_CHANNEL_START", "<|channel|>analysis<|message|>")
+FINAL_CHANNEL_START = os.environ.get("FINAL_CHANNEL_START", "<|channel|>final<|message|>")
+CHANNEL_END = os.environ.get("CHANNEL_END", "<|end|>")
 
 # Create the environment instance, passing the path and rewards to it.
 env = DIPGEnvironment(
@@ -31,6 +35,10 @@ env = DIPGEnvironment(
     exact_format_reward=EXACT_FORMAT_REWARD,
     hallucination_penalty=HALLUCINATION_PENALTY,
     no_hallucination_reward=NO_HALLUCINATION_REWARD,    
+    missing_answer_penalty=MISSING_ANSWER_PENALTY,
+    analysis_channel_start=ANALYSIS_CHANNEL_START,
+    final_channel_start=FINAL_CHANNEL_START,
+    channel_end=CHANNEL_END,
 )
 
 # The rest is the same.

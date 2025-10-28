@@ -14,7 +14,7 @@ from envs.dipg_safety_env.models import DIPGAction
 def server():
     """Starts the environment server as a background process."""
     # --- Define Absolute Paths & Port ---
-    ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     SRC_PATH = os.path.join(ROOT_DIR, "src")
     DATASET_SOURCE_PATH = os.path.abspath("harmonic_reasoner_dataset_structured.jsonl")
     PORT = 8009

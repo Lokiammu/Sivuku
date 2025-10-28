@@ -3,9 +3,6 @@ import requests
 import os
 import argparse
 
-# The DEFAULT dataset URL for your specific DIPG use case.
-DEFAULT_DATASET_URL = "https://your-hosting-location/harmonic_reasoner_dataset_structured.jsonl"
-
 def download_file(url, local_filename):
     """Downloads a file from a given URL."""
     print(f"Downloading from: {url}")
@@ -21,11 +18,11 @@ if __name__ == "__main__":
     # --- THIS IS THE NEW, FLEXIBLE PART ---
     parser = argparse.ArgumentParser(description="Download a dataset for the environment.")
     
-    # The user can provide a URL with --url
+    # The user must provide a URL with --url
     parser.add_argument(
         "--url",
         type=str,
-        default=DEFAULT_DATASET_URL,
+        required=True,
         help="The URL of the .jsonl dataset to download."
     )
     # The user specifies where to save the file with --output
