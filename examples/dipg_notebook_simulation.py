@@ -8,7 +8,7 @@ import requests
 ROOT_DIR = "/workspace/AIAC"
 REPO_PATH = os.path.join(ROOT_DIR, "OpenEnv")
 SRC_PATH = os.path.join(REPO_PATH, "src")
-DATASET_FILE_PATH = os.path.join(REPO_PATH, "dataset.jsonl")
+DATASET_FILE_PATH = os.path.join(ROOT_DIR, "harmonic_reasoner_dataset_structured.jsonl")
 PORT = 8009
 
 # --- 0. Kill any old server processes ---
@@ -25,13 +25,29 @@ print(f"--- 1. Resetting working directory and cloning repo ---")
 sys.path.insert(0, SRC_PATH)
 print(f"✅ Setup complete. Current directory: {os.getcwd()}\n")
 
-# --- Download the Dataset ---
-print(f"--- 2. Downloading dataset ---")
-download_command = f"python {os.path.join(REPO_PATH, 'scripts/download_dataset.py')} --output {DATASET_FILE_PATH}"
-if USER_DATASET_URL:
-    download_command += f" --url {USER_DATASET_URL}"
-!{download_command}
-print("✅ Dataset is ready.\n")
+# --- 2. Smart Dataset Handling ---
+print(f"--- 2. Checking for local dataset at '{DATASET_FILE_PATH}' ---")
+
+if os.path.exists(DATASET_FILE_PATH):
+    print("✅ Found local dataset. Skipping download.\n")
+else:
+    print(f"⚠️ Local dataset not found. Attempting to download...")
+    download_script_path = os.path.join(REPO_PATH, 'scripts/download_dataset.py')
+    download_command = f"python {download_script_path} --output {DATASET_FILE_PATH}"
+    if USER_DATASET_URL:
+        download_command += f" --url {USER_DATASET_URL}"
+    
+    # Execute the download command
+    !{download_command}
+    
+    # Final check to ensure download was successful
+    if os.path.exists(DATASET_FILE_PATH):
+        print("✅ Dataset downloaded successfully.\n")
+    else:
+        print(f"❌ FATAL ERROR: Failed to find or download the dataset.")
+        raise FileNotFoundError(f"Dataset could not be located at {DATASET_FILE_PATH}")
+# =================================================
+
 
 # ===> CHANGE #1: INSTALL GUNICORN <===
 print("--- 3. Installing Gunicorn for a robust server ---")
@@ -66,7 +82,6 @@ server_env = {
     "NO_HALLUCINATION_REWARD": "1.0",
     # Penalty for not providing a final answer in the required format.
     "MISSING_ANSWER_PENALTY": "-15.0",
-
     # --- Channel Marker Configuration ---
     # The start marker for the agent's internal analysis.
     "ANALYSIS_CHANNEL_START": "<|channel|>analysis<|message|>",
