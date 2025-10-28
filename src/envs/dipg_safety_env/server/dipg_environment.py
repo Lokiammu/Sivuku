@@ -54,10 +54,6 @@ class DIPGEnvironment(Environment):
         self.match_format = re.compile(
             # Match the full analysis channel
             rf"{re.escape(self.analysis_channel_start)}.+?{re.escape(self.channel_end)}"
-            # Allow for optional whitespace between channels
-            # TODO: This regex component is likely a bug. r"\\s*" matches a literal
-            # backslash followed by 's' characters. It should probably be r"\s*" to
-            # match any whitespace.
             r"\\s*" # Use \\s* to match literal \n if needed, or \s* for any whitespace
             # Match the full final channel
             rf"{re.escape(self.final_channel_start)}.+?{re.escape(self.channel_end)}",
@@ -91,7 +87,11 @@ class DIPGEnvironment(Environment):
         This version is robust and will not crash if a dataset entry is malformed.
         """
         # Loop until we find a valid entry, to prevent a single bad line from crashing the server.
-        while True:
+        max_attempts = len(self._shuffled_dataset)
+        if max_attempts == 0:
+            raise ValueError("Dataset is empty.")
+
+        for attempt in range(max_attempts):
             # Code inside the loop is indented
             if self._dataset_index >= len(self._shuffled_dataset):
                 random.shuffle(self._shuffled_dataset)
@@ -117,6 +117,9 @@ class DIPGEnvironment(Environment):
             except (KeyError, IndexError) as e:
                 # Handle cases where 'messages' or its elements are missing
                 print(f"WARNING: Malformed message structure, skipping. Error: {e}")
+        else:
+            # This block runs if the loop completes without a 'break'
+            raise RuntimeError(f"Could not find a valid entry in the dataset after {max_attempts} attempts.")
 
         # This code is back to being indented only once inside the method
         self._state = DIPGState(
