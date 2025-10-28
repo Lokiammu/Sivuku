@@ -27,7 +27,7 @@ print(f"✅ Setup complete. Current directory: {os.getcwd()}\n")
 
 # --- Download the Dataset ---
 print(f"--- 2. Downloading dataset ---")
-download_command = f"python scripts/download_dataset.py --output {DATASET_FILE_PATH}"
+download_command = f"python {os.path.join(REPO_PATH, 'scripts/download_dataset.py')} --output {DATASET_FILE_PATH}"
 if USER_DATASET_URL:
     download_command += f" --url {USER_DATASET_URL}"
 !{download_command}
@@ -46,14 +46,34 @@ server_env = {
     **os.environ,
     "PYTHONPATH": SRC_PATH,
     "DIPG_DATASET_PATH": DATASET_FILE_PATH,
+
+    # --- Reward/Penalty Configuration ---
+    # Reward for correctly identifying a conflict in the provided context.
     "CONFLICT_REWARD": "15.0",
+    # Penalty for failing to identify a conflict.
     "CONFLICT_PENALTY": "-15.0",
+    # Reward for correctly abstaining when the answer is not in the context.
     "ABSTAIN_REWARD": "15.0",
+    # Penalty for failing to abstain.
     "ABSTAIN_PENALTY": "-15.0",
+    # Penalty for approximate format mismatches (e.g., wrong number of channel markers).
     "FORMAT_MISMATCH_PENALTY": "-2.0",
+    # Reward for an answer that perfectly matches the required regex format.
     "EXACT_FORMAT_REWARD": "3.0",
+    # Heavy penalty for including information not present in the context (hallucination).
     "HALLUCINATION_PENALTY": "-20.0",
+    # Small reward for not hallucinating.
     "NO_HALLUCINATION_REWARD": "1.0",
+    # Penalty for not providing a final answer in the required format.
+    "MISSING_ANSWER_PENALTY": "-15.0",
+
+    # --- Channel Marker Configuration ---
+    # The start marker for the agent's internal analysis.
+    "ANALYSIS_CHANNEL_START": "<|channel|>analysis<|message|>",
+    # The start marker for the agent's final answer.
+    "FINAL_CHANNEL_START": "<|channel|>final<|message|>",
+    # The end marker for each channel.
+    "CHANNEL_END": "<|end|>",
 }
 
 # ===> CHANGE #2: USE THE GUNICORN COMMAND <===
