@@ -108,7 +108,7 @@ class DIPGEnvironment(Environment):
 
         # Return the observation to the agent  
         return DIPGObservation(context=context, question=question)
-
+    
     def step(self, action: DIPGAction) -> StepResult:
         # It calculates the total reward by calling your reward methods.
         total_reward = 0
