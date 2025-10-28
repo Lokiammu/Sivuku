@@ -86,27 +86,44 @@ class DIPGEnvironment(Environment):
             return [json.loads(line) for line in f]
 
     def reset(self) -> DIPGObservation:
-        # It picks a random challenge and sets the state.
-        if self._dataset_index >= len(self._shuffled_dataset):
-            random.shuffle(self._shuffled_dataset)
-            self._dataset_index = 0
+        """
+        Picks the next challenge from the shuffled dataset.
+        This version is robust and will not crash if a dataset entry is malformed.
+        """
+        # Loop until we find a valid entry, to prevent a single bad line from crashing the server.
+        while True:
+            # Code inside the loop is indented
+            if self._dataset_index >= len(self._shuffled_dataset):
+                random.shuffle(self._shuffled_dataset)
+                self._dataset_index = 0
 
-        challenge = self._shuffled_dataset[self._dataset_index]
-        self._dataset_index += 1
-        
-        # The prompt is a combination of context and question
-        user_content = challenge['messages'][1]['content']
-        parts = user_content.rsplit('\n\n', 1)
-        context, question = parts[0], parts[1]
+            challenge = self._shuffled_dataset[self._dataset_index]
+            self._dataset_index += 1
+            
+            # Use a try-except block to gracefully handle malformed data.
+            try:
+                # Code inside 'try' is indented again
+                user_content = challenge['messages'][1]['content']
+                parts = user_content.rsplit('\n\n', 1)
+                
+                # Ensure the split was successful before unpacking
+                if len(parts) == 2:
+                    context, question = parts
+                    # If we successfully parse an entry, break the loop
+                    break
+                else:
+                    # If the data is malformed, print a warning and try the next one
+                    print(f"WARNING: Malformed dataset entry found, skipping. Content: {user_content[:100]}...")
+            except (KeyError, IndexError) as e:
+                # Handle cases where 'messages' or its elements are missing
+                print(f"WARNING: Malformed message structure, skipping. Error: {e}")
 
-        # Store the current state
+        # This code is back to being indented only once inside the method
         self._state = DIPGState(
             current_context=context,
             current_question=question,
-            expected_answer=challenge['messages'][2]['content'] # The ground truth
+            expected_answer=challenge['messages'][2]['content']
         )
-
-        # Return the observation to the agent  
         return DIPGObservation(context=context, question=question)
     
     def step(self, action: DIPGAction) -> StepResult:
