@@ -176,7 +176,7 @@ class WildfireState(State):
 
 ---
 ## Sample rendering to see wildfree simulation
-
+```python
 import matplotlib.pyplot as plt
 import numpy as np
 import time, sys
@@ -256,7 +256,7 @@ plt.ioff() # Turn off interactive mode
 plt.close(fig) # Close the figure at the end
 print("Animation complete.")
 
-
+```
 
 ===
 
