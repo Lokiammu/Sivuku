@@ -86,48 +86,38 @@ class DIPGEnvironment(Environment):
         Picks the next challenge from the shuffled dataset.
         This version is robust and will not crash if a dataset entry is malformed.
         """
-        # Loop until we find a valid entry, to prevent a single bad line from crashing the server.
         max_attempts = len(self._shuffled_dataset)
         if max_attempts == 0:
             raise ValueError("Dataset is empty.")
 
-        for attempt in range(max_attempts):
-            # Code inside the loop is indented
+        for _ in range(max_attempts):
             if self._dataset_index >= len(self._shuffled_dataset):
                 random.shuffle(self._shuffled_dataset)
                 self._dataset_index = 0
 
             challenge = self._shuffled_dataset[self._dataset_index]
             self._dataset_index += 1
-            
-            # Use a try-except block to gracefully handle malformed data.
+
             try:
-                # Code inside 'try' is indented again
                 user_content = challenge['messages'][1]['content']
+                expected_answer = challenge['messages'][2]['content']
                 parts = user_content.rsplit('\n\n', 1)
-                
-                # Ensure the split was successful before unpacking
+
                 if len(parts) == 2:
                     context, question = parts
-                    # If we successfully parse an entry, break the loop
-                    break
+                    self._state = DIPGState(
+                        current_context=context,
+                        current_question=question,
+                        expected_answer=expected_answer
+                    )
+                    return DIPGObservation(context=context, question=question)
                 else:
-                    # If the data is malformed, print a warning and try the next one
-                    print(f"WARNING: Malformed dataset entry found, skipping. Content: {user_content[:100]}...")
-            except (KeyError, IndexError) as e:
-                # Handle cases where 'messages' or its elements are missing
-                print(f"WARNING: Malformed message structure, skipping. Error: {e}")
-        else:
-            # This block runs if the loop completes without a 'break'
-            raise RuntimeError(f"Could not find a valid entry in the dataset after {max_attempts} attempts.")
+                    print(f"WARNING: Malformed dataset entry (content split), skipping. Content: {user_content[:100]}...")
 
-        # This code is back to being indented only once inside the method
-        self._state = DIPGState(
-            current_context=context,
-            current_question=question,
-            expected_answer=challenge['messages'][2]['content']
-        )
-        return DIPGObservation(context=context, question=question)
+            except (KeyError, IndexError) as e:
+                print(f"WARNING: Malformed message structure, skipping. Error: {e}, Challenge: {challenge}")
+
+        raise RuntimeError(f"Could not find a valid entry in the dataset after {max_attempts} attempts.")
     
     def step(self, action: DIPGAction) -> StepResult:
         # It calculates the total reward by calling your reward methods.
