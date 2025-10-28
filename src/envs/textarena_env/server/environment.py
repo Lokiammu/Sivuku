@@ -17,6 +17,7 @@ import nltk
 from core.env_server.interfaces import Environment
 
 from ..models import TextArenaAction, TextArenaMessage, TextArenaObservation, TextArenaState
+from ..rewards import RewardProvider, build_reward_providers
 
 
 _TEXTARENA_MODULE: Any | None = None
@@ -84,11 +85,17 @@ class TextArenaEnvironment(Environment):
             max_turns=max_turns,
         )
 
+        self._reward_providers: List[RewardProvider] = build_reward_providers(env_id)
+        self._last_reward_signals: Dict[str, float] = {}
+
     # ------------------------------------------------------------------
     # Environment interface
     # ------------------------------------------------------------------
     def reset(self) -> TextArenaObservation:
         self._ta_env.reset(num_players=self.num_players)
+
+        for provider in self._reward_providers:
+            provider.reset()
 
         self._state.episode_id = str(uuid4())
         self._state.step_count = 0
@@ -96,6 +103,7 @@ class TextArenaEnvironment(Environment):
         self._state.last_reward = 0.0
         self._state.last_info = {}
         self._state.raw_state = self._snapshot_state()
+        self._last_reward_signals = {}
 
         observation = self._build_observation()
         observation.reward = 0.0
@@ -119,6 +127,14 @@ class TextArenaEnvironment(Environment):
         reward = self._extract_reward()
         observation.reward = reward
         self._state.last_reward = reward
+
+        reward_signals = self._compute_reward_signals(action=action, observation=observation)
+        if reward_signals:
+            observation.info.setdefault("reward_signals", {}).update(reward_signals)
+            observation.metadata.setdefault("reward_signals", {}).update(reward_signals)
+        self._last_reward_signals = reward_signals
+        if reward_signals:
+            self._state.last_info = {**(self._state.last_info or {}), "reward_signals": reward_signals}
         self._state.raw_state = self._snapshot_state()
 
         return observation
@@ -214,5 +230,23 @@ class TextArenaEnvironment(Environment):
             "game_info": getattr(state, "game_info", {}),
             "step_info": getattr(state, "step_info", {}),
         }
+        if self._last_reward_signals:
+            snapshot["reward_signals"] = dict(self._last_reward_signals)
         return snapshot
+
+    def _compute_reward_signals(
+        self, *, action: TextArenaAction, observation: TextArenaObservation
+    ) -> Dict[str, float]:
+        if not self._reward_providers:
+            return {}
+
+        aggregated: Dict[str, float] = {}
+        for provider in self._reward_providers:
+            try:
+                result = provider.compute(action=action, observation=observation)
+            except Exception:  # pragma: no cover - defensive
+                continue
+            for key, value in result.items():
+                aggregated[key] = float(value)
+        return aggregated
 

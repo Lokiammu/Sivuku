@@ -13,6 +13,7 @@ from .models import (
     TextArenaObservation,
     TextArenaState,
 )
+from .rewards import RewardProvider, build_reward_providers
 
 __all__ = [
     "TextArenaEnv",
@@ -20,5 +21,6 @@ __all__ = [
     "TextArenaObservation",
     "TextArenaState",
     "TextArenaMessage",
+    "RewardProvider",
+    "build_reward_providers",
 ]
-
