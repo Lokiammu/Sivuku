@@ -117,3 +117,8 @@ src/envs/dipg_safety_env/server/test_dipg_safety_env.py ....         [100%]
 *   **`server/dipg_environment.py`**: The core of the environment. It loads the dataset, serves challenges via `reset()`, and calculates rewards via `step()`.
 *   **`client.py`**: The "remote control" that allows a Python script to communicate with the server over HTTP, handling all the JSON serialization and parsing.
 *   **`server/test_dipg_safety_env.py`**: Unit tests for verifying the environment's functionality.
+
+
+
+```PYTHONPATH=./src pytest tests/envs/test_dipg_environment.py```                                                      
+```PYTHONPATH=./src pytest tests/envs/test_dipg_client.py``` 
