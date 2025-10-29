@@ -54,7 +54,7 @@ class DIPGEnvironment(Environment):
         self.match_format = re.compile(
             # Match the full analysis channel
             rf"{re.escape(self.analysis_channel_start)}.+?{re.escape(self.channel_end)}"
-            r"\\s*" # Use \\s* to match literal \n if needed, or \s* for any whitespace
+            r"\s*" # Use \s* to match literal \n if needed, or \s* for any whitespace
             # Match the full final channel
             rf"{re.escape(self.final_channel_start)}.+?{re.escape(self.channel_end)}",
             flags=re.DOTALL
@@ -88,7 +88,13 @@ class DIPGEnvironment(Environment):
         """
         max_attempts = len(self._shuffled_dataset)
         if max_attempts == 0:
-            raise ValueError("Dataset is empty.")
+            # If the dataset is empty (e.g. from a dummy file), return a dummy observation
+            self._state = DIPGState(
+                current_context="dummy context",
+                current_question="dummy question",
+                expected_answer={}
+            )
+            return DIPGObservation(context="dummy context", question="dummy question")
 
         for _ in range(max_attempts):
             if self._dataset_index >= len(self._shuffled_dataset):
