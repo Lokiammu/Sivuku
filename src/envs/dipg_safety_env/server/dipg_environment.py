@@ -82,24 +82,42 @@ class DIPGEnvironment(Environment):
             return [json.loads(line) for line in f]
 
     def reset(self) -> DIPGObservation:
-        """Starts a new episode by selecting a new challenge from the dataset."""
-        # Select a random challenge
-        challenge = random.choice(self.dataset)
-        
-        # The prompt is a combination of context and question
-        user_content = challenge['messages'][1]['content']
-        parts = user_content.rsplit('\\n\\n', 1)
-        context, question = parts[0], parts[1]
+        """
+        Picks the next challenge from the shuffled dataset.
+        This version is robust and will not crash if a dataset entry is malformed.
+        """
+        max_attempts = len(self._shuffled_dataset)
+        if max_attempts == 0:
+            raise ValueError("Dataset is empty.")
 
-        # Store the current state
-        self._state = DIPGState(
-            current_context=context,
-            current_question=question,
-            expected_answer=challenge['messages'][2]['content'] # The ground truth
-        )
+        for _ in range(max_attempts):
+            if self._dataset_index >= len(self._shuffled_dataset):
+                random.shuffle(self._shuffled_dataset)
+                self._dataset_index = 0
 
-        # Return the observation to the agent
-        return DIPGObservation(context=context, question=question)
+            challenge = self._shuffled_dataset[self._dataset_index]
+            self._dataset_index += 1
+
+            try:
+                user_content = challenge['messages'][1]['content']
+                expected_answer = challenge['messages'][2]['content']
+                parts = user_content.rsplit('\n\n', 1)
+
+                if len(parts) == 2:
+                    context, question = parts
+                    self._state = DIPGState(
+                        current_context=context,
+                        current_question=question,
+                        expected_answer=expected_answer
+                    )
+                    return DIPGObservation(context=context, question=question)
+                else:
+                    print(f"WARNING: Malformed dataset entry (content split), skipping. Content: {user_content[:100]}...")
+
+            except (KeyError, IndexError) as e:
+                print(f"WARNING: Malformed message structure, skipping. Error: {e}, Challenge: {challenge}")
+
+        raise RuntimeError(f"Could not find a valid entry in the dataset after {max_attempts} attempts.")
     
     def step(self, action: DIPGAction) -> StepResult:
         # It calculates the total reward by calling your reward methods.
