@@ -16,11 +16,8 @@ def server():
     # --- Define Absolute Paths & Port ---
     ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     SRC_PATH = os.path.join(ROOT_DIR, "src")
-    DATASET_SOURCE_PATH = os.path.abspath("harmonic_reasoner_dataset_structured.jsonl")
+    DATASET_SOURCE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "mock_dataset.jsonl"))
     PORT = 8009
-
-    # --- Download the dataset ---
-    subprocess.run([sys.executable, "scripts/download_dataset.py"], check=True)
 
     # --- Launch the Server using Gunicorn ---
     localhost = f"http://localhost:{PORT}"
@@ -84,4 +81,4 @@ def test_reset(server):
     env = DIPGSafetyEnv(base_url=server, timeout=300)
     obs1 = env.reset()
     obs2 = env.reset()
-    assert obs1.question != obs2.question
+    assert obs1.observation.question != obs2.observation.question
