@@ -82,3 +82,12 @@ def test_reset(server):
     obs1 = env.reset()
     obs2 = env.reset()
     assert obs1.observation.question != obs2.observation.question
+
+def test_step(server):
+    """Test that step() returns a valid result."""
+    env = DIPGSafetyEnv(base_url=server, timeout=300)
+    env.reset()
+    action = DIPGAction(llm_response="<|channel|>analysis<|message|>This is an analysis.<|end|>\n<|channel|>final<|message|>This is the final answer.<|end|>")
+    result = env.step(action)
+    assert isinstance(result.reward, float)
+    assert result.done is True
