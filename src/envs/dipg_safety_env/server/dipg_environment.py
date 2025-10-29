@@ -7,6 +7,10 @@ from core.http_env_client import StepResult
 from core.env_server import Environment
 from ..models import DIPGAction, DIPGObservation, DIPGState
 import re
+import logging
+
+# Get a logger instance
+logger = logging.getLogger(__name__)
 
 real_world_facts = [
     ("What is the capital of the United States?", "Washington, D.C."),
@@ -126,6 +130,7 @@ class DIPGEnvironment(Environment):
         raise RuntimeError(f"Could not find a valid entry in the dataset after {max_attempts} attempts.")
     
     def step(self, action: DIPGAction) -> StepResult:
+        logger.info(f"Received action: {action.llm_response}")
         # It calculates the total reward by calling your reward methods.
         total_reward = 0
         
