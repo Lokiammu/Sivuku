@@ -9,7 +9,41 @@ Agents must contain spreading fires using **water**, **firebreaks**, and **timin
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 ---
+## 🔥 Why Wildfire Simulation?
 
+Wildland fires are intensifying globally due to climate change — increasing the urgency for **AI-assisted decision-making**.  
+This environment explores how intelligent systems can **control** fire spread in real time, under limited resources.
+
+### Research Motivation
+✅ Based on real wildfire science inspired by:
+- **Rothermel Surface Fire Spread Model** (USDA Forest Service)
+- **MITRE Fireline’s SimFire** — physics-informed RL fire simulator
+- **SimHarness** — RL evaluation for disaster response
+
+### Application Goals
+| Research Theme | Role in This Environment |
+|---|---|
+| Resource-Constrained Planning | Finite water + firebreak budgets |
+| Fire Spread + Containment Strategy | Directional wind & moisture effects |
+| Disaster Response RL | Safety-focused reward design |
+| LLM Agents for Control Tasks | Text-based action decision making |
+
+This makes WildfireEnv a **fast, controllable**, and **open benchmark** for applied RL and LLM reasoning.
+
+---
+
+## 🔥 Environment Overview
+
+This environment models **forest-fire dynamics** influenced by:
+- **Wind direction** (8 directions + calm)
+- **Humidity** (suppresses ignition 🍵)
+- **Fuel state and burn progression**
+- **Limited resources** (water + barriers)
+- **Time pressure** (steps = cost)
+
+🎯 **Goal** → Minimize new fire spread + total burned land
+
+---
 ## 🔥 Environment Overview
 
 This environment models **forest-fire dynamics** influenced by:
@@ -176,7 +210,7 @@ class WildfireState(State):
 
 ---
 ## Sample rendering to see wildfree simulation
-
+```python
 import matplotlib.pyplot as plt
 import numpy as np
 import time, sys
@@ -255,7 +289,7 @@ for _ in range(100):
 plt.ioff() # Turn off interactive mode
 plt.close(fig) # Close the figure at the end
 print("Animation complete.")
-
+```
 
 
 ===
