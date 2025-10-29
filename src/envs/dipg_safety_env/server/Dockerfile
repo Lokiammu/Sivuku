@@ -1,16 +1,34 @@
-# src/envs/dipg_safety_env/server/Dockerfile
-ARG BASE_IMAGE=openenv-base:latest
-FROM ${BASE_IMAGE}
+# Start from a public, official Python image
+FROM python:3.11-slim
 
-# Copy environment code
+# Install system dependencies like curl (for the health check)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install all necessary Python packages for the server, including gunicorn
+RUN pip install --no-cache-dir \
+    fastapi>=0.104.0 \
+    "uvicorn[standard]>=0.24.0" \
+    requests>=2.25.0 \
+    wsproto>=1.0.0 \
+    gunicorn
+
+# Set the working directory and PYTHONPATH inside the container
+WORKDIR /app
+ENV PYTHONPATH="/app/src"
+
+# Copy all the application source code into the container
 COPY src/core/ /app/src/core/
 COPY src/envs/dipg_safety_env/ /app/src/envs/dipg_safety_env/
 
-# ===> ADD THIS LINE <===
-# Copy your dataset so the environment can read it.
-# Make sure the path is correct relative to the Docker build context.
-COPY harmonic_reasoner_dataset_structured.jsonl /app/harmonic_reasoner_dataset_structured.jsonl
+# Expose the port the server will run on
+EXPOSE 8000
 
-# Health check & CMD (same as example)
-HEALTHCHECK CMD curl -f http://localhost:8000/health || exit 1
-CMD ["uvicorn", "envs.dipg_safety_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Add a robust health check
+HEALTHCHECK --interval=60s --timeout=10s --start-period=180s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+
+# Note: The DIPG_DATASET_PATH must be provided when running this container.
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "envs.dipg_safety_env.server.app:app"]

@@ -88,7 +88,7 @@ From the **root directory** of the `OpenEnv` project, run the following commands
 source venv/bin/activate
 
 # Set the PYTHONPATH
-export PYTHONPATH=./src
+export PYTHONPATH=src
 
 # Run the tests
 pytest tests/envs/test_dipg_environment.py
