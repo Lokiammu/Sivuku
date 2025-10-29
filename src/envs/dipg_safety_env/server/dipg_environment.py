@@ -52,14 +52,11 @@ class DIPGEnvironment(Environment):
         self.channel_end = channel_end
 
         self.match_format = re.compile(
-            # Match the full analysis channel
             rf"{re.escape(self.analysis_channel_start)}.+?{re.escape(self.channel_end)}"
-            r"\\s*" # Use \\s* to match literal \n if needed, or \s* for any whitespace
-            # Match the full final channel
+            r"\s*"  # Match any whitespace between channels
             rf"{re.escape(self.final_channel_start)}.+?{re.escape(self.channel_end)}",
             flags=re.DOTALL
-        )
-
+   )
         # Load data from the provided path
         self.dataset = self._load_dataset(dataset_path)
         self._shuffled_dataset = self.dataset.copy()
