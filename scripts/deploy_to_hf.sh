@@ -172,10 +172,20 @@ CURRENT_STAGING_DIR="${STAGING_DIR}/${HF_NAMESPACE}/${ENV_NAME}"
 mkdir -p "$CURRENT_STAGING_DIR/src/core"
 mkdir -p "$CURRENT_STAGING_DIR/src/envs/$ENV_NAME"
 
+# Copy src/__init__.py if it exists
+if [ -f "src/__init__.py" ]; then
+    cp src/__init__.py "$CURRENT_STAGING_DIR/src/__init__.py"
+fi
+
 # Copy core files
 cp -R src/core/ "$CURRENT_STAGING_DIR/src/core/"
+
 # Copy environment files
 cp -R "src/envs/$ENV_NAME/" "$CURRENT_STAGING_DIR/src/envs/$ENV_NAME/"
+
+# Create __init__.py for envs package (needed for Python imports)
+touch "$CURRENT_STAGING_DIR/src/envs/__init__.py"
+
 echo "📁 Copied core and $ENV_NAME environment files to $CURRENT_STAGING_DIR"
 
 # Create environment-specific multi-stage Dockerfile
