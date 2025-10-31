@@ -112,7 +112,11 @@ jobs:
           HF_NAMESPACE: ${{ env.HF_USERNAME }}
         run: |
           chmod +x scripts/deploy_to_hf.sh
-          ./scripts/deploy_to_hf.sh "${{ matrix.environment }}" "${{ github.event.inputs.base_image_sha || '' }}"
+          if [ -n "${{ github.event.inputs.base_image_sha }}" ]; then
+            ./scripts/deploy_to_hf.sh --env "${{ matrix.environment }}" --base-sha "${{ github.event.inputs.base_image_sha }}"
+          else
+            ./scripts/deploy_to_hf.sh --env "${{ matrix.environment }}"
+          fi
 
   # Job to deploy single environment
   deploy-single:
@@ -140,4 +144,8 @@ jobs:
           HF_NAMESPACE: ${{ env.HF_USERNAME }}
         run: |
           chmod +x scripts/deploy_to_hf.sh
-          ./scripts/deploy_to_hf.sh "${{ matrix.environment }}" "${{ github.event.inputs.base_image_sha || '' }}"
+          if [ -n "${{ github.event.inputs.base_image_sha }}" ]; then
+            ./scripts/deploy_to_hf.sh --env "${{ matrix.environment }}" --base-sha "${{ github.event.inputs.base_image_sha }}"
+          else
+            ./scripts/deploy_to_hf.sh --env "${{ matrix.environment }}"
+          fi
