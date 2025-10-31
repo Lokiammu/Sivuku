@@ -576,16 +576,6 @@ if [ $CREATE_EXIT_CODE -ne 0 ]; then
     echo "Error output:" >&2
     echo "$CREATE_OUTPUT" >&2
     echo "" >&2
-    echo "Possible causes:" >&2
-    echo "  1. Token doesn't have write access to namespace '$HF_NAMESPACE'" >&2
-    echo "  2. Token doesn't have permission to create spaces in this organization" >&2
-    echo "  3. Organization '$HF_NAMESPACE' doesn't exist or isn't accessible" >&2
-    echo "" >&2
-    echo "To fix:" >&2
-    echo "  1. Verify you have access to https://huggingface.co/$HF_NAMESPACE" >&2
-    echo "  2. Ensure HF_TOKEN has 'write' role (not just 'read')" >&2
-    echo "  3. For organization namespaces, token must have org member/write access" >&2
-    exit 1
 fi
 
 echo "Uploading files to space: $SPACE_REPO"
@@ -598,7 +588,6 @@ if [ $UPLOAD_EXIT_CODE -ne 0 ]; then
     echo "Error output:" >&2
     echo "$SPACE_UPLOAD_RESULT" >&2
     echo "" >&2
-    echo "Debug info:" >&2
     echo "  Space: $SPACE_REPO" >&2
     echo "  Staging dir: $CURRENT_STAGING_DIR_ABS" >&2
     echo "  Files to upload:" >&2
