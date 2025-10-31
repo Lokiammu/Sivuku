@@ -17,6 +17,7 @@ Optional arguments:
   --hf-namespace <user>      Hugging Face username/organization (defaults to HF_USERNAME or meta-openenv)
   --staging-dir <path>       Output directory for staging (defaults to hf-staging)
   --space-suffix <suffix>    Suffix to add to space name (e.g., "-test" for test spaces)
+  --private                   Deploy the space as private (default: public)
   --dry-run                  Prepare files without pushing to Hugging Face Spaces
   -h, --help                 Show this help message
 
@@ -27,6 +28,7 @@ Positional compatibility:
 Examples:
   scripts/deploy_to_hf.sh --env textarena_env --hf-namespace my-team
   scripts/deploy_to_hf.sh chat_env sha-0123456789abcdef
+  scripts/deploy_to_hf.sh echo_env --private --hf-namespace my-org
 EOF
 }
 
@@ -65,6 +67,7 @@ BASE_IMAGE_SHA=""
 HF_NAMESPACE="${HF_NAMESPACE:-}"  # Initialize from env var if set, otherwise empty
 STAGING_DIR="hf-staging"
 SPACE_SUFFIX=""
+PRIVATE=false
 DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
@@ -88,6 +91,10 @@ while [[ $# -gt 0 ]]; do
         --suffix|--space-suffix)
             SPACE_SUFFIX="$2"
             shift 2
+            ;;
+        --private)
+            PRIVATE=true
+            shift
             ;;
         --dry-run)
             DRY_RUN=true
@@ -536,10 +543,16 @@ fi
 SPACE_REPO="${HF_NAMESPACE}/${ENV_NAME}${SPACE_SUFFIX}"
 CURRENT_STAGING_DIR_ABS=$(cd "$CURRENT_STAGING_DIR" && pwd)
 
+# Determine privacy flag (only add --private if needed, default is public)
+PRIVATE_FLAG=""
+if [ "$PRIVATE" = true ]; then
+    PRIVATE_FLAG="--private"
+fi
+
 # create the space if it doesn't exist
-hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok --quiet >/dev/null 2>&1 || true
-# upload the staged content
-SPACE_UPLOAD_RESULT=$(hf upload --repo-type=space --quiet "$SPACE_REPO" "$CURRENT_STAGING_DIR_ABS")
+hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG --quiet >/dev/null 2>&1 || true
+# upload the staged content (if repo doesn't exist, it will be created with the privacy setting)
+SPACE_UPLOAD_RESULT=$(hf upload --repo-type=space $PRIVATE_FLAG --quiet "$SPACE_REPO" "$CURRENT_STAGING_DIR_ABS")
 if [ $? -ne 0 ]; then
     echo "❌ Upload failed: $SPACE_UPLOAD_RESULT" >&2
     exit 1
