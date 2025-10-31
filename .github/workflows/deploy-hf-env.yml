@@ -160,7 +160,7 @@ jobs:
         run: |
           chmod +x scripts/deploy_to_hf.sh
           if [ -n "${{ github.event.inputs.base_image_sha }}" ]; then
-            ./scripts/deploy_to_hf.sh --env "${{ matrix.environment }}" --base-sha "${{ github.event.inputs.base_image_sha }}" --private --suffix -test
+            ./scripts/deploy_to_hf.sh --env "${{ matrix.environment }}" --base-sha "${{ github.event.inputs.base_image_sha }}"
           else
-            ./scripts/deploy_to_hf.sh --env "${{ matrix.environment }}" --private --suffix -test
+            ./scripts/deploy_to_hf.sh --env "${{ matrix.environment }}"
           fi
