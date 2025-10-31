@@ -20,6 +20,21 @@ on:
         required: false
         type: string
         default: ''
+      hf_namespace:
+        description: 'Hugging Face namespace to deploy to (leave empty for openenv)'
+        required: false
+        type: string
+        default: 'openenv'
+      private:
+        description: 'Deploy the space as private (default: public)'
+        required: false
+        type: boolean
+        default: false
+      space_suffix:
+        description: 'Suffix to add to space name (e.g., "-test" for test spaces)'
+        required: false
+        type: string
+        default: ''
 
 env:
   HF_USERNAME: openenv
