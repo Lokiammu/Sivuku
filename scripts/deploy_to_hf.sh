@@ -256,9 +256,6 @@ COPY src/core/ /app/src/core/
 # Copy OpenSpiel environment
 COPY src/envs/openspiel_env/ /app/src/envs/openspiel_env/
 
-# Copy README for web interface documentation
-COPY src/envs/openspiel_env/README.md /app/README.md
-
 # Extend Python path for OpenEnv (base image set PYTHONPATH=/app/src)
 # We prepend OpenSpiel paths
 ENV PYTHONPATH=/repo:/repo/build/python:/app/src
