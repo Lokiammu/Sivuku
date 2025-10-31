@@ -27,7 +27,6 @@ Positional compatibility:
 
 Examples:
   scripts/deploy_to_hf.sh --env textarena_env --hf-namespace my-team
-  scripts/deploy_to_hf.sh chat_env sha-0123456789abcdef
   scripts/deploy_to_hf.sh echo_env --private --hf-namespace my-org
 EOF
 }
