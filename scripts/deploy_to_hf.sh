@@ -558,12 +558,21 @@ if [ "$PRIVATE" = true ]; then
 fi
 
 # create the space if it doesn't exist
-hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} --quiet >/dev/null 2>&1 || true
+CREATE_OUTPUT=$(hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} 2>&1)
+CREATE_EXIT_CODE=$?
+if [ $CREATE_EXIT_CODE -ne 0 ]; then
+    echo "⚠️ Space creation returned non-zero exit code" >&2
+    echo "$CREATE_OUTPUT" >&2
+    # Continue anyway - space might already exist
+fi
 
 # upload the staged content (if repo doesn't exist, it will be created with the privacy setting)
-SPACE_UPLOAD_RESULT=$(hf upload --repo-type=space $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} --quiet "$SPACE_REPO" "$CURRENT_STAGING_DIR_ABS" 2>&1)
-if [ $? -ne 0 ]; then
-    echo "❌ Upload failed: $SPACE_UPLOAD_RESULT" >&2
+SPACE_UPLOAD_RESULT=$(hf upload --repo-type=space $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} "$SPACE_REPO" "$CURRENT_STAGING_DIR_ABS" 2>&1)
+UPLOAD_EXIT_CODE=$?
+if [ $UPLOAD_EXIT_CODE -ne 0 ]; then
+    echo "❌ Upload failed with exit code $UPLOAD_EXIT_CODE" >&2
+    echo "Error output:" >&2
+    echo "$SPACE_UPLOAD_RESULT" >&2
     exit 1
 fi
 # print the URL of the deployed space
