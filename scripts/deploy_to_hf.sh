@@ -566,12 +566,26 @@ fi
 echo "Creating space: $SPACE_REPO"
 echo "Command: hf repo create $SPACE_REPO --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"}"
 # create the space if it doesn't exist
+# Temporarily disable exit-on-error for this command
+set +e
 CREATE_OUTPUT=$(hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} 2>&1)
 CREATE_EXIT_CODE=$?
+set -e
 if [ $CREATE_EXIT_CODE -ne 0 ]; then
-    echo "⚠️ Space creation returned non-zero exit code" >&2
+    echo "❌ Space creation failed with exit code $CREATE_EXIT_CODE" >&2
+    echo "Error output:" >&2
     echo "$CREATE_OUTPUT" >&2
-    # Continue anyway - space might already exist
+    echo "" >&2
+    echo "Possible causes:" >&2
+    echo "  1. Token doesn't have write access to namespace '$HF_NAMESPACE'" >&2
+    echo "  2. Token doesn't have permission to create spaces in this organization" >&2
+    echo "  3. Organization '$HF_NAMESPACE' doesn't exist or isn't accessible" >&2
+    echo "" >&2
+    echo "To fix:" >&2
+    echo "  1. Verify you have access to https://huggingface.co/$HF_NAMESPACE" >&2
+    echo "  2. Ensure HF_TOKEN has 'write' role (not just 'read')" >&2
+    echo "  3. For organization namespaces, token must have org member/write access" >&2
+    exit 1
 fi
 
 echo "Uploading files to space: $SPACE_REPO"

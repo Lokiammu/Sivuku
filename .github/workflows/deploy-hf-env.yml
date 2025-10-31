@@ -37,7 +37,7 @@ on:
         default: ''
 
 env:
-  HF_USERNAME: openenv
+  HF_USERNAME: openenv-testing
 
 jobs:
   # Job to determine which environments to deploy
