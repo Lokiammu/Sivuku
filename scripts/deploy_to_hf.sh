@@ -564,11 +564,11 @@ if [ "$PRIVATE" = true ]; then
 fi
 
 echo "Creating space: $SPACE_REPO"
-echo "Command: hf repo create $SPACE_REPO --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"}"
+echo "Command: hf repo create $SPACE_REPO --repo-type space --space-sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"}"
 # create the space if it doesn't exist
 # Temporarily disable exit-on-error for this command
 set +e
-CREATE_OUTPUT=$(hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} 2>&1)
+CREATE_OUTPUT=$(hf repo create "$SPACE_REPO" --repo-type space --space-sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} 2>&1)
 CREATE_EXIT_CODE=$?
 set -e
 if [ $CREATE_EXIT_CODE -ne 0 ]; then
