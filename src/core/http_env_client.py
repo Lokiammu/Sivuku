@@ -46,6 +46,7 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         cls: Type[EnvClientT],
         image: str,
         provider: Optional["ContainerProvider"] = None,
+        **kwargs: Any,
     ) -> EnvClientT:
         """
         Create an environment client by spinning up a Docker container locally.
@@ -61,6 +62,8 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         Args:
             image: Docker image name to run (e.g., "echo-env:latest")
             provider: Container provider to use (defaults to LocalDockerProvider)
+            **kwargs: Additional arguments to pass to provider.start_container()
+                     (e.g., env_vars, port)
 
         Returns:
             An instance of the client class connected to the running container
@@ -71,6 +74,12 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
             >>>
             >>> # Create environment from image
             >>> env = CodingEnv.from_docker_image("coding-env:latest")
+            >>>
+            >>> # Create environment with custom env vars
+            >>> env = CodingEnv.from_docker_image(
+            ...     "coding-env:latest",
+            ...     env_vars={"MY_VAR": "value"}
+            ... )
             >>>
             >>> # Use the environment
             >>> result = env.reset()
@@ -87,8 +96,8 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         if provider is None:
             provider = LocalDockerProvider()
 
-        # 1. Start container
-        base_url = provider.start_container(image)
+        # 1. Start container with optional kwargs (e.g., env_vars, port)
+        base_url = provider.start_container(image, **kwargs)
 
         # 2. Wait for server to be ready
         provider.wait_for_ready(base_url)

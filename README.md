@@ -3,7 +3,19 @@
 An e2e framework for creating, deploying and using isolated execution environments for agentic RL training, built using Gymnasium style simple APIs.
 
 [![PyPI](https://img.shields.io/pypi/v/openenv-core?color=blue)](https://pypi.org/project/openenv-core/)
+[![Discord](https://img.shields.io/badge/Discord-OpenEnv-7289da?style=flat&logo=discord&logoColor=white)](https://discord.gg/YsTYBh6PD9)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meta-pytorch/OpenEnv/blob/main/examples/OpenEnv_Tutorial.ipynb) **← Try the Interactive Tutorial!**
+
+---
+
+**🚀 Featured Example:** Train LLMs to play BlackJack using [torchforge](https://github.com/meta-pytorch/torchforge) (PyTorch's agentic RL framework): [`examples/grpo_blackjack/`](examples/grpo_blackjack/)
+
+## OpenEnv on partner platforms:
+
+- [Lightning AI Studio](https://lightning.ai/environments?section=featured)
+- [TRL example](https://huggingface.co/docs/trl/main/en/openenv)
+- [Unsloth Google Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb)
+- [ART example](https://art.openpipe.ai/integrations/openenv-integration)
 
 ## Overview
 
@@ -171,19 +183,22 @@ client.close()  # Stops and removes container
 - smolagents (for coding environment)
 
 ## Supported RL Tools
-The goal of this project is to support a broad set of open and closed tools to help standardize the agentic RL community. If you have a project that supports OpenEnv environments, please put up a PR to add your tool name along with a link to your documentation. 
+The goal of this project is to support a broad set of open and closed tools to help standardize the agentic RL community. If you have a project that supports OpenEnv environments, please put up a PR to add your tool name along with a link to your documentation.
 
 ### torchforge
-(coming soon)
+See GRPO BlackJack training example: [`examples/grpo_blackjack/`](examples/grpo_blackjack/)
 
 ### TRL
-(coming soon} 
+See the [TRL example](https://huggingface.co/docs/trl/main/en/openenv) on how to integrate OpenEnv environments with GRPO training.
 
 ### Unsloth
-(coming soon)
+See the 2048 game example based on gpt-oss: [Colab notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb)
 
 ### SkyRL
-(coming soon)
+See the [SkyRL example](https://skyrl.readthedocs.io/en/latest/examples/openenv.html) on how to train on OpenEnv environments with SkyRL.
+
+### ART
+See the [ART example](https://art.openpipe.ai/integrations/openenv-integration) on how OpenEnv environments can be used to train models with ART.
 
 ## Example Environments
 
@@ -204,10 +219,10 @@ Executes arbitrary Python code in a sandboxed environment. Features:
 
 See: [`src/envs/coding_env/README.md`](src/envs/coding_env/README.md)
 
-## Community support & Acknowledgments 
+## Community Support & Acknowledgments 
 This is an open and community centric project. If you would like to add your name here, please put up a pull request and tag @jspisak for review. Ty!!
 
-Supporters include: Meta-PyTorch, Hugging Face, [Surge AI](https://surgehq.ai), Unsloth AI, Reflection AI, vLLM, SkyRL (UC-Berkeley), LightningAI, Axolotl AI, ..
+Supporters include: Meta-PyTorch, Hugging Face, [Patronus AI](https://patronus.ai), [Surge AI](https://surgehq.ai), [LastMile AI](https://www.lastmileai.dev), Unsloth AI, Reflection AI, vLLM, SkyRL (UC-Berkeley), LightningAI, Axolotl AI, Stanford Scaling Intelligence Lab, Mithril, [OpenMined](https://openmined.org/) ..
 
 And we'd also like to acknowledge the team at Farama Foundation as the OpenEnv API was heavily inspired by the work you all have done on Gymnasium. Cheers!
 
