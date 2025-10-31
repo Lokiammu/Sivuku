@@ -124,7 +124,7 @@ jobs:
       - name: Deploy to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_NAMESPACE: ${{ env.HF_USERNAME }}
+          HF_NAMESPACE: ${{ github.event.inputs.hf_namespace || env.HF_USERNAME }}
         run: |
           chmod +x scripts/deploy_to_hf.sh
           if [ -n "${{ github.event.inputs.base_image_sha }}" ]; then
@@ -156,7 +156,7 @@ jobs:
       - name: Deploy to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_NAMESPACE: ${{ env.HF_USERNAME }}
+          HF_NAMESPACE: ${{ github.event.inputs.hf_namespace || env.HF_USERNAME }}
         run: |
           chmod +x scripts/deploy_to_hf.sh
           if [ -n "${{ github.event.inputs.base_image_sha }}" ]; then
