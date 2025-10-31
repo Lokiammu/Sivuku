@@ -505,47 +505,47 @@ fi
 
 echo "🔑 Ensuring Hugging Face authentication..."
 
-# In GitHub Actions, explicitly authenticate with token
+# Set up authentication based on environment
+TOKEN_ARGS=()
 if [ "$IS_GITHUB_ACTIONS" = true ]; then
     if [ -z "${HF_TOKEN:-}" ]; then
         echo "Error: HF_TOKEN secret is required in GitHub Actions" >&2
         echo "Please set the HF_TOKEN secret in repository settings" >&2
         exit 1
     fi
-    echo "Authenticating with HF_TOKEN..."
-    LOGIN_OUTPUT=$(hf auth login --token "$HF_TOKEN" 2>&1)
-    LOGIN_EXIT_CODE=$?
-    if [ $LOGIN_EXIT_CODE -ne 0 ]; then
-        echo "Error: Failed to authenticate with HF_TOKEN" >&2
-        echo "$LOGIN_OUTPUT" >&2
+    echo "Using HF_TOKEN from GitHub Actions environment"
+    # In CI, pass token directly to commands via --token flag
+    TOKEN_ARGS=(--token "$HF_TOKEN")
+elif [ -n "${HF_TOKEN:-}" ]; then
+    # If HF_TOKEN is set locally, use it
+    echo "Using HF_TOKEN environment variable"
+    TOKEN_ARGS=(--token "$HF_TOKEN")
+else
+    # Interactive mode: check if user is authenticated
+    if ! hf auth whoami >/dev/null 2>&1; then
+        echo "Not authenticated. Please login to Hugging Face..."
+        hf auth login
+        if ! hf auth whoami >/dev/null 2>&1; then
+            echo "Error: Hugging Face authentication failed" >&2
+            exit 1
+        fi
+    fi
+fi
+
+# Verify authentication works (skip in CI if using token directly)
+if [ ${#TOKEN_ARGS[@]} -eq 0 ]; then
+    if ! hf auth whoami >/dev/null 2>&1; then
+        echo "Error: Not authenticated with Hugging Face" >&2
+        echo "Run 'hf auth login' or set HF_TOKEN environment variable" >&2
         exit 1
     fi
-elif [ -n "${HF_TOKEN:-}" ]; then
-    # In local environment, try to use HF_TOKEN if set
-    hf auth login --token "$HF_TOKEN" --add-to-git-credential >/dev/null 2>&1 || true
-fi
-
-# In interactive mode (not CI), ask user to login if needed
-if [ "$IS_GITHUB_ACTIONS" != true ] && ! hf auth whoami >/dev/null 2>&1; then
-    echo "Not authenticated. Please login to Hugging Face..."
-    hf auth login
-fi
-
-# Verify authentication
-if ! hf auth whoami >/dev/null 2>&1; then
-    echo "Error: Hugging Face authentication failed" >&2
-    if [ "$IS_GITHUB_ACTIONS" = true ]; then
-        echo "Ensure HF_TOKEN secret is set in GitHub Actions" >&2
-    else
-        echo "Run 'hf auth login' or set HF_TOKEN environment variable" >&2
+    CURRENT_USER=$(hf auth whoami | head -n1 | tr -d '\n')
+    echo "✅ Authenticated as: $CURRENT_USER"
+    if [ "$CURRENT_USER" != "$HF_NAMESPACE" ]; then
+        echo "⚠️  Deploying to namespace '$HF_NAMESPACE' (different from your user '$CURRENT_USER')"
     fi
-    exit 1
-fi
-
-CURRENT_USER=$(hf auth whoami | head -n1 | tr -d '\n')
-if [ "$CURRENT_USER" != "$HF_NAMESPACE" ] && ! hf auth whoami | grep -qw "$HF_NAMESPACE" 2>/dev/null; then
-    echo "Warning: Your account ($CURRENT_USER) may not have direct access to namespace '$HF_NAMESPACE'." >&2
-    echo "Get the correct access token from https://huggingface.co/settings/tokens and set if with 'hf auth login' " >&2
+else
+    echo "✅ Token configured for deployment"
 fi
 
 SPACE_REPO="${HF_NAMESPACE}/${ENV_NAME}${SPACE_SUFFIX}"
@@ -558,9 +558,10 @@ if [ "$PRIVATE" = true ]; then
 fi
 
 # create the space if it doesn't exist
-hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG --quiet >/dev/null 2>&1 || true
+hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} --quiet >/dev/null 2>&1 || true
+
 # upload the staged content (if repo doesn't exist, it will be created with the privacy setting)
-SPACE_UPLOAD_RESULT=$(hf upload --repo-type=space $PRIVATE_FLAG --quiet "$SPACE_REPO" "$CURRENT_STAGING_DIR_ABS")
+SPACE_UPLOAD_RESULT=$(hf upload --repo-type=space $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} --quiet "$SPACE_REPO" "$CURRENT_STAGING_DIR_ABS" 2>&1)
 if [ $? -ne 0 ]; then
     echo "❌ Upload failed: $SPACE_UPLOAD_RESULT" >&2
     exit 1
