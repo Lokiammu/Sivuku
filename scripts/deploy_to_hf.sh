@@ -505,14 +505,21 @@ fi
 
 echo "🔑 Ensuring Hugging Face authentication..."
 
-# In GitHub Actions, HF CLI automatically uses HF_TOKEN env var
+# In GitHub Actions, explicitly authenticate with token
 if [ "$IS_GITHUB_ACTIONS" = true ]; then
     if [ -z "${HF_TOKEN:-}" ]; then
         echo "Error: HF_TOKEN secret is required in GitHub Actions" >&2
         echo "Please set the HF_TOKEN secret in repository settings" >&2
         exit 1
     fi
-    echo "Using HF_TOKEN from GitHub Actions environment"
+    echo "Authenticating with HF_TOKEN..."
+    LOGIN_OUTPUT=$(hf auth login --token "$HF_TOKEN" 2>&1)
+    LOGIN_EXIT_CODE=$?
+    if [ $LOGIN_EXIT_CODE -ne 0 ]; then
+        echo "Error: Failed to authenticate with HF_TOKEN" >&2
+        echo "$LOGIN_OUTPUT" >&2
+        exit 1
+    fi
 elif [ -n "${HF_TOKEN:-}" ]; then
     # In local environment, try to use HF_TOKEN if set
     hf auth login --token "$HF_TOKEN" --add-to-git-credential >/dev/null 2>&1 || true
