@@ -563,6 +563,8 @@ if [ "$PRIVATE" = true ]; then
     PRIVATE_FLAG="--private"
 fi
 
+echo "Creating space: $SPACE_REPO"
+echo "Command: hf repo create $SPACE_REPO --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"}"
 # create the space if it doesn't exist
 CREATE_OUTPUT=$(hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} 2>&1)
 CREATE_EXIT_CODE=$?
@@ -572,6 +574,8 @@ if [ $CREATE_EXIT_CODE -ne 0 ]; then
     # Continue anyway - space might already exist
 fi
 
+echo "Uploading files to space: $SPACE_REPO"
+echo "Command: hf upload --repo-type=space $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} $SPACE_REPO $CURRENT_STAGING_DIR_ABS"
 # upload the staged content (if repo doesn't exist, it will be created with the privacy setting)
 SPACE_UPLOAD_RESULT=$(hf upload --repo-type=space $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} "$SPACE_REPO" "$CURRENT_STAGING_DIR_ABS" 2>&1)
 UPLOAD_EXIT_CODE=$?
