@@ -1,20 +1,3 @@
----
-title: BrowserGym Environment Server
-emoji: 🌐
-colorFrom: '#00C9FF'
-colorTo: '#1B2845'
-sdk: docker
-pinned: false
-app_port: 8000
-base_path: /web
-tags:
-  - openenv
-  - browsergym
-  - miniwob
-  - webarena
-  - web-agents
-  - browser-automation
----
 
 # BrowserGym Environment
 
@@ -374,18 +357,6 @@ browsergym_env/
     ├── Dockerfile           # Container specification
     └── requirements.txt     # Python dependencies
 ```
-
-## Performance Comparison
-
-| Metric | MiniWoB | WebArena |
-|--------|---------|----------|
-| **Setup Time** | 0 minutes | 30-60 minutes |
-| **Tasks** | 100+ | 812 |
-| **Episode Length** | 5-20 steps | 10-100 steps |
-| **Reset Time** | <1 second | 1-3 seconds |
-| **Infrastructure** | None needed | 7 services |
-| **Reward Signal** | Dense | Sparse |
-| **Best For** | Training | Evaluation |
 
 ## References
 
