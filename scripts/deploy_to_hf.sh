@@ -549,6 +549,12 @@ else
 fi
 
 SPACE_REPO="${HF_NAMESPACE}/${ENV_NAME}${SPACE_SUFFIX}"
+
+# Get absolute path to staging directory
+if [ ! -d "$CURRENT_STAGING_DIR" ]; then
+    echo "Error: Staging directory not found: $CURRENT_STAGING_DIR" >&2
+    exit 1
+fi
 CURRENT_STAGING_DIR_ABS=$(cd "$CURRENT_STAGING_DIR" && pwd)
 
 # Determine privacy flag (only add --private if needed, default is public)
@@ -573,6 +579,12 @@ if [ $UPLOAD_EXIT_CODE -ne 0 ]; then
     echo "❌ Upload failed with exit code $UPLOAD_EXIT_CODE" >&2
     echo "Error output:" >&2
     echo "$SPACE_UPLOAD_RESULT" >&2
+    echo "" >&2
+    echo "Debug info:" >&2
+    echo "  Space: $SPACE_REPO" >&2
+    echo "  Staging dir: $CURRENT_STAGING_DIR_ABS" >&2
+    echo "  Files to upload:" >&2
+    ls -la "$CURRENT_STAGING_DIR_ABS" >&2 || true
     exit 1
 fi
 # print the URL of the deployed space
