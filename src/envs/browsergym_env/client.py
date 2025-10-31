@@ -82,7 +82,9 @@ class BrowserGymEnv(HTTPEnvClient[BrowserGymAction, BrowserGymObservation]):
             "metadata": action.metadata,
         }
 
-    def _parse_result(self, payload: Dict[str, Any]) -> StepResult[BrowserGymObservation]:
+    def _parse_result(
+        self, payload: Dict[str, Any]
+    ) -> StepResult[BrowserGymObservation]:
         """Parse the server response into a StepResult."""
         obs_data = payload.get("observation", {})
 
