@@ -14,8 +14,9 @@ Required arguments:
 
 Optional arguments:
   --base-sha <sha|tag>       Override openenv-base image reference (defaults to :latest)
-  --hf-namespace <user>      Hugging Face username/organization (defaults to HF_USERNAME/HF_USER or meta-openenv)
+  --hf-namespace <user>      Hugging Face username/organization (defaults to HF_USERNAME or meta-openenv)
   --staging-dir <path>       Output directory for staging (defaults to hf-staging)
+  --space-suffix <suffix>    Suffix to add to space name (e.g., "-test" for test spaces)
   --dry-run                  Prepare files without pushing to Hugging Face Spaces
   -h, --help                 Show this help message
 
@@ -43,22 +44,27 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 cd "$REPO_ROOT"
 
-if ! command -v hf >/dev/null 2>&1; then
-    echo "Error: huggingface-hub CLI 'hf' not found in PATH. hf is required to deploy to Hugging Face Spaces." >&2
-    echo "Install the HF CLI: curl -LsSf https://hf.co/cli/install.sh | sh" >&2
-    exit 1
+# Detect if we're running in GitHub Actions
+IS_GITHUB_ACTIONS=false
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    IS_GITHUB_ACTIONS=true
 fi
 
-HF_USERNAME=$(hf auth whoami | head -n1 | tr -d '\n')
-
-if [ -z "${HF_NAMESPACE:-}" ]; then
-    echo "🙋 Using default namespace: $HF_USERNAME. You can override the namespace with --hf-namespace"
-    HF_NAMESPACE="${HF_USERNAME:-}"
+# Check for hf CLI - but allow dry-run mode to work without it
+if ! command -v hf >/dev/null 2>&1; then
+    echo "Warning: huggingface-hub CLI 'hf' not found in PATH." >&2
+    echo "Install the HF CLI: curl -LsSf https://hf.co/cli/install.sh | sh" >&2
+    if [ "${1:-}" != "--dry-run" ] && [ "${2:-}" != "--dry-run" ]; then
+        echo "Error: hf is required for deployment (use --dry-run to skip deployment)" >&2
+        exit 1
+    fi
 fi
 
 ENV_NAME=""
 BASE_IMAGE_SHA=""
+HF_NAMESPACE="${HF_NAMESPACE:-}"  # Initialize from env var if set, otherwise empty
 STAGING_DIR="hf-staging"
+SPACE_SUFFIX=""
 DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
@@ -71,12 +77,16 @@ while [[ $# -gt 0 ]]; do
             BASE_IMAGE_SHA="$2"
             shift 2
             ;;
-        --hf-namespace|--hf-user|--hf-username)
+        --namespace|--hf-namespace|--hf-user|--hf-username)
             HF_NAMESPACE="$2"
             shift 2
             ;;
         --staging-dir)
             STAGING_DIR="$2"
+            shift 2
+            ;;
+        --suffix|--space-suffix)
+            SPACE_SUFFIX="$2"
             shift 2
             ;;
         --dry-run)
@@ -127,15 +137,21 @@ if [ ! -d "src/envs/$ENV_NAME" ]; then
     exit 1
 fi
 
+# Try to get HF_USERNAME, but handle failures gracefully (especially in CI before auth)
+if command -v hf >/dev/null 2>&1; then
+    HF_USERNAME=$(hf auth whoami 2>/dev/null | head -n1 | tr -d '\n' || echo "")
+fi
+
 if [ -z "$HF_NAMESPACE" ]; then
+    # Check HF_USERNAME (env var or detected from CLI)
     if [ -n "${HF_USERNAME:-}" ]; then
-        HF_NAMESPACE="$HF_USERNAME"
-    elif [ -n "${HF_USER:-}" ]; then
-        HF_NAMESPACE="$HF_USER"
+        HF_NAMESPACE="${HF_USERNAME}"
     else
         HF_NAMESPACE="meta-openenv"
     fi
 fi
+
+echo "🙋 Using namespace: $HF_NAMESPACE. You can override with --hf-namespace"
 
 # Set base image reference (using GHCR)
 if [ -n "$BASE_IMAGE_SHA" ]; then
@@ -483,30 +499,41 @@ fi
 
 echo "🔑 Ensuring Hugging Face authentication..."
 
-# just get the env token if it's set
-if [ -n "${HF_TOKEN:-}" ]; then
+# In GitHub Actions, always use HF_TOKEN if provided
+if [ "$IS_GITHUB_ACTIONS" = true ] && [ -n "${HF_TOKEN:-}" ]; then
+    echo "Using HF_TOKEN from GitHub Actions environment"
+    hf auth login --token "$HF_TOKEN" --add-to-git-credential >/dev/null 2>&1 || {
+        echo "Warning: Failed to authenticate with HF_TOKEN, continuing anyway..." >&2
+    }
+elif [ -n "${HF_TOKEN:-}" ]; then
+    # In local environment, try to use HF_TOKEN if set
     hf auth login --token "$HF_TOKEN" --add-to-git-credential >/dev/null 2>&1 || true
 fi
 
-# ask the user to login if they're not authenticated
-if ! hf auth whoami >/dev/null 2>&1; then
+# In interactive mode (not CI), ask user to login if needed
+if [ "$IS_GITHUB_ACTIONS" != true ] && ! hf auth whoami >/dev/null 2>&1; then
+    echo "Not authenticated. Please login to Hugging Face..."
     hf auth login
 fi
 
+# Verify authentication
 if ! hf auth whoami >/dev/null 2>&1; then
     echo "Error: Hugging Face authentication failed" >&2
+    if [ "$IS_GITHUB_ACTIONS" = true ]; then
+        echo "Ensure HF_TOKEN secret is set in GitHub Actions" >&2
+    else
+        echo "Run 'hf auth login' or set HF_TOKEN environment variable" >&2
+    fi
     exit 1
 fi
 
-# ensure hf authentication on the namespace
-# Check if the user has access to the target HF_NAMESPACE/org
-if ! hf auth whoami | grep -qw "$HF_NAMESPACE"; then
-    echo "Error: Your account does not have access to the Hugging Face namespace '$HF_NAMESPACE'." >&2
+CURRENT_USER=$(hf auth whoami | head -n1 | tr -d '\n')
+if [ "$CURRENT_USER" != "$HF_NAMESPACE" ] && ! hf auth whoami | grep -qw "$HF_NAMESPACE" 2>/dev/null; then
+    echo "Warning: Your account ($CURRENT_USER) may not have direct access to namespace '$HF_NAMESPACE'." >&2
     echo "Get the correct access token from https://huggingface.co/settings/tokens and set if with 'hf auth login' " >&2
-    exit 1
 fi
 
-SPACE_REPO="${HF_NAMESPACE}/${ENV_NAME}-test"
+SPACE_REPO="${HF_NAMESPACE}/${ENV_NAME}${SPACE_SUFFIX}"
 CURRENT_STAGING_DIR_ABS=$(cd "$CURRENT_STAGING_DIR" && pwd)
 
 # create the space if it doesn't exist
@@ -520,7 +547,7 @@ fi
 # print the URL of the deployed space
 echo "✅ Upload completed for https://huggingface.co/spaces/$SPACE_REPO"
 
-# safely cleanup the staging directory
+# Cleanup the staging directory after successful deployment
 if [ -d "$CURRENT_STAGING_DIR_ABS" ]; then
     rm -rf "$CURRENT_STAGING_DIR_ABS"
 fi
