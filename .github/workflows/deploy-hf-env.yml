@@ -15,6 +15,11 @@ on:
           - 'chat_env'
           - 'atari_env'
           - 'openspiel_env'
+      custom_environment:
+        description: 'Custom environment to deploy (leave empty for none)'
+        required: false
+        type: string
+        default: ''
       base_image_sha:
         description: 'SHA for openenv-base image (leave empty for latest)'
         required: false
