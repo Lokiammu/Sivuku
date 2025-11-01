@@ -1,9 +1,5 @@
 """Unit tests for BrowserGym models."""
 
-import os
-import sys
-
-
 from envs.browsergym_env.models import (
     BrowserGymAction,
     BrowserGymObservation,
