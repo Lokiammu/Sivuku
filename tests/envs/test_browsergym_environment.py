@@ -71,6 +71,7 @@ def server():
         try:
             server_process.kill()
         except ProcessLookupError:
+            # The process is already dead; nothing to clean up.
             pass
         pytest.skip("Server failed to start - BrowserGym may not be installed")
 
