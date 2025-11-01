@@ -182,5 +182,3 @@ jobs:
             fi
             exit 1
           fi
-
->>>>>>> gh-action-deploy-test
