@@ -138,7 +138,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x scripts/deploy_to_hf.sh
-          ./scripts/deploy_to_hf.sh --env "${{ matrix.environment }}" --space-suffix "${SPACE_SUFFIX}"
+          ./scripts/deploy_to_hf.sh --env "${{ matrix.environment }}" --space-suffix "${SPACE_SUFFIX}" --hub-tag "openenv-pr"
 
       - name: Wait for deployment to stabilize
         shell: bash
