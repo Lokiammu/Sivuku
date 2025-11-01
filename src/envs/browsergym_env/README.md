@@ -348,6 +348,33 @@ if obs.last_action_error:
 # Episode status
 print(obs.done)          # True if episode ended
 print(obs.reward)        # Reward for the step
+
+# Access full BrowserGym data (includes timestamps, etc.)
+print(obs.metadata["browsergym_obs"])  # Full observation dict from BrowserGym
+print(obs.metadata["browsergym_info"]) # Full info dict (timestamps, page state, etc.)
+```
+
+#### Advanced: Accessing Raw BrowserGym Data
+
+For VisualWebArena or custom training, you may need additional data like timestamps or browser state. The full BrowserGym observation and info dicts are preserved in `metadata`:
+
+```python
+result = env.step(action)
+
+# Access timestamps (if available)
+info = result.observation.metadata["browsergym_info"]
+if "timestamp" in info:
+    print(f"Action timestamp: {info['timestamp']}")
+
+# Access additional observation fields
+obs_dict = result.observation.metadata["browsergym_obs"]
+if "dom_object" in obs_dict:
+    dom = obs_dict["dom_object"]
+    # Work with raw DOM object
+
+# Access page performance data
+if "performance" in info:
+    print(f"Page load time: {info['performance']}")
 ```
 
 ### State

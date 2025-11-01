@@ -219,6 +219,13 @@ class BrowserGymEnvironment(Environment):
         axtree_txt = obs.get("axtree_txt", "") if isinstance(obs, dict) else ""
         pruned_html = obs.get("pruned_html", "") if isinstance(obs, dict) else ""
 
+        # Store full BrowserGym observation and info in metadata
+        # This preserves timestamps, additional fields, and any future extensions
+        browsergym_metadata = {
+            "browsergym_obs": obs if isinstance(obs, dict) else {},
+            "browsergym_info": info,
+        }
+
         return BrowserGymObservation(
             text=text,
             url=url,
@@ -230,6 +237,7 @@ class BrowserGymEnvironment(Environment):
             last_action_error=False,
             done=done,
             reward=reward,
+            metadata=browsergym_metadata,
         )
 
     @property
