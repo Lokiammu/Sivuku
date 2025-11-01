@@ -5,13 +5,23 @@ BrowserGym is a unified framework for web-based agent tasks that provides access
 
 ## Why BrowserGym?
 
-**Complete Pipeline**: Train on MiniWoB++ → Evaluate on WebArena/VisualWebArena
-- **MiniWoB++**: 100+ simple tasks for training (works immediately, no setup!)
-- **WebArena**: 812 realistic tasks for evaluation (requires backend setup)
-- **VisualWebArena**: Visual navigation tasks
-- **WorkArena**: Enterprise automation tasks
+BrowserGym provides a complete pipeline for developing web agents: train on simple tasks, then evaluate on realistic websites.
 
-**Key Advantage**: MiniWoB tasks work out-of-the-box with no external infrastructure needed!
+**What are these benchmarks?**
+
+- **MiniWoB++ (Training)**: 100+ synthetic web tasks like "click this button", "fill out this form", "select from dropdown". Each task is a simple webpage with a clear objective. Fast resets, randomized variations, dense rewards. Perfect for learning basic web navigation skills. **No external setup needed** - tasks run in isolated browser sessions.
+
+- **WebArena (Evaluation)**: 812 tasks on real websites (e-commerce, forums, GitLab, Wikipedia). Tasks like "find the cheapest laptop and add to cart" or "create a merge request for bug #123". Multi-step, requires reasoning, sparse rewards. Tests if your agent can handle actual websites. **Requires running 7 backend services** (shopping site, GitLab instance, etc).
+
+- **VisualWebArena**: Similar to WebArena but requires visual understanding - agents need to interpret images, identify UI elements visually, handle multimodal content.
+
+- **WorkArena**: Enterprise software tasks (CRM, project management, business workflows). Tests automation on corporate-style applications.
+
+**The training → evaluation pipeline:**
+1. Train on MiniWoB (simple, controlled, fast iterations)
+2. Evaluate on WebArena (complex, realistic, measures real-world capability)
+
+**Key advantage**: You can start training immediately with MiniWoB. No need to set up infrastructure just to test if your code works.
 
 ## Quick Start - Training (MiniWoB)
 
