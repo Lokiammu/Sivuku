@@ -8,7 +8,6 @@ with OpenEnv's Environment ABC. BrowserGym includes multiple benchmarks:
 - WorkArena: Enterprise task automation
 """
 
-import os
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
