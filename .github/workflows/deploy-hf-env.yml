@@ -15,6 +15,11 @@ on:
           - 'chat_env'
           - 'atari_env'
           - 'openspiel_env'
+      custom_environment:
+        description: 'Custom environment to deploy (leave empty for none)'
+        required: false
+        type: string
+        default: ''
       base_image_sha:
         description: 'SHA for openenv-base image (leave empty for latest)'
         required: false
@@ -35,9 +40,6 @@ on:
         required: false
         type: string
         default: ''
-
-env:
-  HF_USERNAME: openenv
 
 jobs:
   # Job to determine which environments to deploy
@@ -124,7 +126,8 @@ jobs:
       - name: Deploy to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_NAMESPACE: ${{ env.HF_USERNAME }}
+          HF_NAMESPACE: ${{ github.event.inputs.hf_namespace }}
+          HF_USERNAME: ${{ github.event.inputs.hf_namespace }}
         run: |
           chmod +x scripts/deploy_to_hf.sh
           if [ -n "${{ github.event.inputs.base_image_sha }}" ]; then
@@ -156,7 +159,8 @@ jobs:
       - name: Deploy to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_NAMESPACE: ${{ env.HF_USERNAME }}
+          HF_NAMESPACE: ${{ github.event.inputs.hf_namespace }}
+          HF_USERNAME: ${{ github.event.inputs.hf_namespace }}
         run: |
           chmod +x scripts/deploy_to_hf.sh
           if [ -n "${{ github.event.inputs.base_image_sha }}" ]; then

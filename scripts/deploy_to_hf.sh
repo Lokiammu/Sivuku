@@ -169,13 +169,17 @@ fi
 
 # Create staging directory
 CURRENT_STAGING_DIR="${STAGING_DIR}/${HF_NAMESPACE}/${ENV_NAME}"
+# Ensure clean staging directory
+rm -rf "$CURRENT_STAGING_DIR"
 mkdir -p "$CURRENT_STAGING_DIR/src/core"
 mkdir -p "$CURRENT_STAGING_DIR/src/envs/$ENV_NAME"
 
 # Copy core files
-cp -R src/core/ "$CURRENT_STAGING_DIR/src/core/"
+cp -R src/core/* "$CURRENT_STAGING_DIR/src/core/"
+
 # Copy environment files
-cp -R "src/envs/$ENV_NAME/" "$CURRENT_STAGING_DIR/src/envs/$ENV_NAME/"
+cp -R src/envs/$ENV_NAME/* "$CURRENT_STAGING_DIR/src/envs/$ENV_NAME/"
+
 echo "📁 Copied core and $ENV_NAME environment files to $CURRENT_STAGING_DIR"
 
 # Create environment-specific multi-stage Dockerfile
@@ -255,9 +259,6 @@ COPY src/core/ /app/src/core/
 
 # Copy OpenSpiel environment
 COPY src/envs/openspiel_env/ /app/src/envs/openspiel_env/
-
-# Copy README for web interface documentation
-COPY src/envs/openspiel_env/README.md /app/README.md
 
 # Extend Python path for OpenEnv (base image set PYTHONPATH=/app/src)
 # We prepend OpenSpiel paths
@@ -505,50 +506,56 @@ fi
 
 echo "🔑 Ensuring Hugging Face authentication..."
 
-# In GitHub Actions, explicitly authenticate with token
+# Set up authentication based on environment
+TOKEN_ARGS=()
 if [ "$IS_GITHUB_ACTIONS" = true ]; then
     if [ -z "${HF_TOKEN:-}" ]; then
         echo "Error: HF_TOKEN secret is required in GitHub Actions" >&2
         echo "Please set the HF_TOKEN secret in repository settings" >&2
         exit 1
     fi
-    echo "Authenticating with HF_TOKEN..."
-    LOGIN_OUTPUT=$(hf auth login --token "$HF_TOKEN" 2>&1)
-    LOGIN_EXIT_CODE=$?
-    if [ $LOGIN_EXIT_CODE -ne 0 ]; then
-        echo "Error: Failed to authenticate with HF_TOKEN" >&2
-        echo "$LOGIN_OUTPUT" >&2
+    echo "Using HF_TOKEN from GitHub Actions environment"
+    # In CI, pass token directly to commands via --token flag
+    TOKEN_ARGS=(--token "$HF_TOKEN")
+elif [ -n "${HF_TOKEN:-}" ]; then
+    # If HF_TOKEN is set locally, use it
+    echo "Using HF_TOKEN environment variable"
+    TOKEN_ARGS=(--token "$HF_TOKEN")
+else
+    # Interactive mode: check if user is authenticated
+    if ! hf auth whoami >/dev/null 2>&1; then
+        echo "Not authenticated. Please login to Hugging Face..."
+        hf auth login
+        if ! hf auth whoami >/dev/null 2>&1; then
+            echo "Error: Hugging Face authentication failed" >&2
+            exit 1
+        fi
+    fi
+fi
+
+# Verify authentication works (skip in CI if using token directly)
+if [ ${#TOKEN_ARGS[@]} -eq 0 ]; then
+    if ! hf auth whoami >/dev/null 2>&1; then
+        echo "Error: Not authenticated with Hugging Face" >&2
+        echo "Run 'hf auth login' or set HF_TOKEN environment variable" >&2
         exit 1
     fi
-elif [ -n "${HF_TOKEN:-}" ]; then
-    # In local environment, try to use HF_TOKEN if set
-    hf auth login --token "$HF_TOKEN" --add-to-git-credential >/dev/null 2>&1 || true
-fi
-
-# In interactive mode (not CI), ask user to login if needed
-if [ "$IS_GITHUB_ACTIONS" != true ] && ! hf auth whoami >/dev/null 2>&1; then
-    echo "Not authenticated. Please login to Hugging Face..."
-    hf auth login
-fi
-
-# Verify authentication
-if ! hf auth whoami >/dev/null 2>&1; then
-    echo "Error: Hugging Face authentication failed" >&2
-    if [ "$IS_GITHUB_ACTIONS" = true ]; then
-        echo "Ensure HF_TOKEN secret is set in GitHub Actions" >&2
-    else
-        echo "Run 'hf auth login' or set HF_TOKEN environment variable" >&2
+    CURRENT_USER=$(hf auth whoami | head -n1 | tr -d '\n')
+    echo "✅ Authenticated as: $CURRENT_USER"
+    if [ "$CURRENT_USER" != "$HF_NAMESPACE" ]; then
+        echo "⚠️  Deploying to namespace '$HF_NAMESPACE' (different from your user '$CURRENT_USER')"
     fi
-    exit 1
-fi
-
-CURRENT_USER=$(hf auth whoami | head -n1 | tr -d '\n')
-if [ "$CURRENT_USER" != "$HF_NAMESPACE" ] && ! hf auth whoami | grep -qw "$HF_NAMESPACE" 2>/dev/null; then
-    echo "Warning: Your account ($CURRENT_USER) may not have direct access to namespace '$HF_NAMESPACE'." >&2
-    echo "Get the correct access token from https://huggingface.co/settings/tokens and set if with 'hf auth login' " >&2
+else
+    echo "✅ Token configured for deployment"
 fi
 
 SPACE_REPO="${HF_NAMESPACE}/${ENV_NAME}${SPACE_SUFFIX}"
+
+# Get absolute path to staging directory
+if [ ! -d "$CURRENT_STAGING_DIR" ]; then
+    echo "Error: Staging directory not found: $CURRENT_STAGING_DIR" >&2
+    exit 1
+fi
 CURRENT_STAGING_DIR_ABS=$(cd "$CURRENT_STAGING_DIR" && pwd)
 
 # Determine privacy flag (only add --private if needed, default is public)
@@ -557,12 +564,35 @@ if [ "$PRIVATE" = true ]; then
     PRIVATE_FLAG="--private"
 fi
 
+echo "Creating space: $SPACE_REPO"
+echo "Command: hf repo create $SPACE_REPO --repo-type space --space-sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"}"
 # create the space if it doesn't exist
-hf repo create "$SPACE_REPO" --repo-type space --space_sdk docker --exist-ok $PRIVATE_FLAG --quiet >/dev/null 2>&1 || true
+# Temporarily disable exit-on-error for this command
+set +e
+CREATE_OUTPUT=$(hf repo create "$SPACE_REPO" --repo-type space --space-sdk docker --exist-ok $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} 2>&1)
+CREATE_EXIT_CODE=$?
+set -e
+if [ $CREATE_EXIT_CODE -ne 0 ]; then
+    echo "❌ Space creation failed with exit code $CREATE_EXIT_CODE" >&2
+    echo "Error output:" >&2
+    echo "$CREATE_OUTPUT" >&2
+    echo "" >&2
+fi
+
+echo "Uploading files to space: $SPACE_REPO"
+echo "Command: hf upload --repo-type=space $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} $SPACE_REPO $CURRENT_STAGING_DIR_ABS"
 # upload the staged content (if repo doesn't exist, it will be created with the privacy setting)
-SPACE_UPLOAD_RESULT=$(hf upload --repo-type=space $PRIVATE_FLAG --quiet "$SPACE_REPO" "$CURRENT_STAGING_DIR_ABS")
-if [ $? -ne 0 ]; then
-    echo "❌ Upload failed: $SPACE_UPLOAD_RESULT" >&2
+SPACE_UPLOAD_RESULT=$(hf upload --repo-type=space $PRIVATE_FLAG ${TOKEN_ARGS[@]+"${TOKEN_ARGS[@]}"} "$SPACE_REPO" "$CURRENT_STAGING_DIR_ABS" 2>&1)
+UPLOAD_EXIT_CODE=$?
+if [ $UPLOAD_EXIT_CODE -ne 0 ]; then
+    echo "❌ Upload failed with exit code $UPLOAD_EXIT_CODE" >&2
+    echo "Error output:" >&2
+    echo "$SPACE_UPLOAD_RESULT" >&2
+    echo "" >&2
+    echo "  Space: $SPACE_REPO" >&2
+    echo "  Staging dir: $CURRENT_STAGING_DIR_ABS" >&2
+    echo "  Files to upload:" >&2
+    ls -la "$CURRENT_STAGING_DIR_ABS" >&2 || true
     exit 1
 fi
 # print the URL of the deployed space
