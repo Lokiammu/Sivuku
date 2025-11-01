@@ -3,10 +3,6 @@
 import os
 import sys
 
-# Add src to path
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-SRC_PATH = os.path.join(ROOT_DIR, "src")
-sys.path.insert(0, SRC_PATH)
 
 from envs.browsergym_env.models import (
     BrowserGymAction,
