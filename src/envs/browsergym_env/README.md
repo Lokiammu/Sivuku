@@ -329,7 +329,7 @@ pytest tests/envs/test_browsergym_env.py
 
 ```bash
 # Install in development mode
-cd /home/hamidnazeri/OpenEnv
+cd /path/to/OpenEnv
 pip install -e .
 
 # Install BrowserGym
