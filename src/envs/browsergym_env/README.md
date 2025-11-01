@@ -48,21 +48,155 @@ for episode in range(1000):
 env.close()
 ```
 
-### Available MiniWoB Tasks (100+ total)
+### Available Tasks by Benchmark
 
-Popular training tasks:
-- **click-test**: Click on a specific button
-- **click-button**: Click buttons with specific text
-- **click-dialog**: Click buttons in dialogs
-- **click-checkboxes**: Select specific checkboxes
-- **click-link**: Click on links
-- **enter-text**: Type text into input fields
-- **navigate-tree**: Navigate through tree structures
-- **search-engine**: Use a search interface
-- **use-autocomplete**: Interact with autocomplete
-- **login-user**: Fill in login forms
+#### MiniWoB++ Tasks (Training - 100+ tasks)
 
-And many more! See [MiniWoB++ documentation](https://github.com/Farama-Foundation/miniwob-plusplus) for the full list.
+MiniWoB tasks are organized by difficulty and type. Here are the main categories:
+
+**Click Tasks** (Basic interaction)
+| Task Name | Description | Difficulty |
+|-----------|-------------|------------|
+| `click-test` | Click a single button | ⭐ Easy |
+| `click-button` | Click button with specific text | ⭐ Easy |
+| `click-button-sequence` | Click buttons in order | ⭐⭐ Medium |
+| `click-checkboxes` | Select specific checkboxes | ⭐⭐ Medium |
+| `click-checkboxes-soft` | Select checkboxes (multiple valid) | ⭐⭐ Medium |
+| `click-checkboxes-large` | Many checkboxes to select from | ⭐⭐ Medium |
+| `click-checkboxes-transfer` | Transfer learning variation | ⭐⭐ Medium |
+| `click-dialog` | Click correct button in dialog | ⭐ Easy |
+| `click-dialog-2` | More complex dialog | ⭐⭐ Medium |
+| `click-link` | Click on a link | ⭐ Easy |
+| `click-option` | Select from dropdown | ⭐⭐ Medium |
+| `click-pie` | Click on pie chart slice | ⭐⭐ Medium |
+| `click-scroll-list` | Click item in scrollable list | ⭐⭐⭐ Hard |
+| `click-shades` | Click on specific color shade | ⭐⭐ Medium |
+| `click-shape` | Click on specific shape | ⭐⭐ Medium |
+| `click-tab` | Switch between tabs | ⭐⭐ Medium |
+| `click-tab-2` | More complex tab switching | ⭐⭐⭐ Hard |
+| `click-widget` | Click on UI widget | ⭐⭐ Medium |
+
+**Text Entry Tasks** (Typing and forms)
+| Task Name | Description | Difficulty |
+|-----------|-------------|------------|
+| `enter-text` | Type text into input field | ⭐ Easy |
+| `enter-text-dynamic` | Dynamic text entry | ⭐⭐ Medium |
+| `enter-text-2` | Multiple text fields | ⭐⭐ Medium |
+| `enter-password` | Fill password field | ⭐ Easy |
+| `enter-date` | Enter a date | ⭐⭐ Medium |
+| `enter-time` | Enter a time | ⭐⭐ Medium |
+| `login-user` | Complete login form | ⭐⭐ Medium |
+| `login-user-popup` | Login via popup | ⭐⭐⭐ Hard |
+
+**Navigation Tasks** (Multi-step interaction)
+| Task Name | Description | Difficulty |
+|-----------|-------------|------------|
+| `navigate-tree` | Navigate through tree structure | ⭐⭐⭐ Hard |
+| `search-engine` | Use search interface | ⭐⭐ Medium |
+| `use-autocomplete` | Interact with autocomplete | ⭐⭐⭐ Hard |
+| `book-flight` | Book a flight (complex form) | ⭐⭐⭐⭐ Very Hard |
+| `choose-date` | Pick date from calendar | ⭐⭐⭐ Hard |
+| `choose-date-easy` | Simplified date picker | ⭐⭐ Medium |
+| `choose-date-medium` | Medium difficulty date picker | ⭐⭐⭐ Hard |
+| `choose-list` | Select from long list | ⭐⭐ Medium |
+
+**Visual/Spatial Tasks** (Requires visual understanding)
+| Task Name | Description | Difficulty |
+|-----------|-------------|------------|
+| `count-sides` | Count sides of shape | ⭐⭐ Medium |
+| `count-shape` | Count specific shapes | ⭐⭐ Medium |
+| `find-word` | Find word in text | ⭐⭐ Medium |
+| `focus-text` | Focus on text element | ⭐ Easy |
+| `focus-text-2` | More complex focus task | ⭐⭐ Medium |
+| `grid-coordinate` | Click grid coordinate | ⭐⭐ Medium |
+| `guess-number` | Guess a number game | ⭐⭐⭐ Hard |
+| `identify-shape` | Identify shape type | ⭐⭐ Medium |
+| `read-table` | Extract info from table | ⭐⭐⭐ Hard |
+| `read-table-2` | More complex table reading | ⭐⭐⭐ Hard |
+
+**Email/Social Tasks** (Realistic scenarios)
+| Task Name | Description | Difficulty |
+|-----------|-------------|------------|
+| `email-inbox` | Manage email inbox | ⭐⭐⭐⭐ Very Hard |
+| `email-inbox-forward` | Forward emails | ⭐⭐⭐⭐ Very Hard |
+| `email-inbox-nl` | Natural language email task | ⭐⭐⭐⭐ Very Hard |
+| `email-inbox-star-reply` | Star and reply to emails | ⭐⭐⭐⭐ Very Hard |
+| `social-media` | Social media interaction | ⭐⭐⭐⭐ Very Hard |
+| `social-media-some` | Partial social media task | ⭐⭐⭐ Hard |
+
+**Total:** 100+ tasks across all categories
+
+**Usage:**
+```python
+# Easy task for quick testing
+env = BrowserGymEnv(environment={"BROWSERGYM_TASK_NAME": "click-test"})
+
+# Medium difficulty for training
+env = BrowserGymEnv(environment={"BROWSERGYM_TASK_NAME": "click-checkboxes"})
+
+# Hard task for evaluation
+env = BrowserGymEnv(environment={"BROWSERGYM_TASK_NAME": "email-inbox"})
+```
+
+#### WebArena Tasks (Evaluation - 812 tasks)
+
+WebArena tasks are organized by website and difficulty. Tasks are numbered 0-811.
+
+**By Website:**
+| Website | Task Count | Description | Example Tasks |
+|---------|------------|-------------|---------------|
+| Shopping | ~200 | E-commerce site | Search products, add to cart, checkout |
+| Shopping Admin | ~150 | Admin panel | Manage products, orders, customers |
+| Reddit | ~150 | Forum/social | Post, comment, search discussions |
+| GitLab | ~200 | Code repository | Create issues, merge requests, review code |
+| Wikipedia | ~100 | Knowledge base | Search, read, extract information |
+| Map | ~12 | Location service | Find places, get directions |
+
+**By Difficulty:**
+| Difficulty | Task Count | Steps Required | Example |
+|------------|------------|----------------|---------|
+| Easy | ~200 | 1-5 steps | "Find the price of product X" |
+| Medium | ~400 | 5-15 steps | "Add cheapest laptop to cart" |
+| Hard | ~212 | 15+ steps | "Create merge request for bug fix" |
+
+**Usage:**
+```python
+# Task 0 (usually easy)
+env = BrowserGymEnv(environment={
+    "BROWSERGYM_BENCHMARK": "webarena",
+    "BROWSERGYM_TASK_NAME": "0",
+    "SHOPPING": "http://your-server:7770",
+    # ... other URLs
+})
+
+# Task 156 (GitLab merge request)
+env = BrowserGymEnv(environment={
+    "BROWSERGYM_BENCHMARK": "webarena",
+    "BROWSERGYM_TASK_NAME": "156",
+    # ... URLs
+})
+```
+
+**Note:** WebArena tasks require the full backend infrastructure. See [WebArena setup guide](https://github.com/web-arena-x/webarena/tree/main/environment_docker).
+
+#### VisualWebArena Tasks (910 tasks)
+
+Similar to WebArena but requires visual understanding. Tasks involve:
+- Image-based reasoning
+- Visual element identification
+- Multimodal interaction (text + images)
+
+#### WorkArena Tasks
+
+Enterprise software automation tasks:
+- CRM operations
+- Project management
+- Business workflows
+
+**Full task lists:**
+- [MiniWoB++ tasks](https://github.com/Farama-Foundation/miniwob-plusplus/tree/master/miniwob/environment)
+- [WebArena tasks](https://github.com/web-arena-x/webarena/blob/main/config_files/)
+- [BrowserGym documentation](https://github.com/ServiceNow/BrowserGym)
 
 ## Evaluation (WebArena)
 
