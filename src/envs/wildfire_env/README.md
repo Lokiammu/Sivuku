@@ -197,21 +197,20 @@ class WildfireState(State):
 ```
 
 ---
-## Sample rendering to see wildfree simulation
+## Sample rendering to see wildfire simulation
+
+**Note:** This example requires Jupyter notebook or IPython environment for the `clear_output` and `display` functions. For standalone Python scripts, see `examples/wildfire.py`.
+
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
-import time, sys
+import time
 
-from IPython.display import clear_output, display 
+from IPython.display import clear_output, display
 import matplotlib.colors as mcolors
-sys.path.append("/workspace/OpenEnv/src")
-from envs.wildfire_env import WildfireEnv, WildfireAction # Ensure these imports work
+from envs.wildfire_env import WildfireEnv, WildfireAction
 
-from envs.wildfire_env.server.wildfire_environment import WildfireEnvironment
-
-
-client = WildfireEnv("http://localhost:8020")
+client = WildfireEnv("http://localhost:8000")
 
 
 cmap = mcolors.ListedColormap([
@@ -267,7 +266,7 @@ for _ in range(100):
     time.sleep(0.3) 
 
    
-    res = client.step(WildfireAction(action="WAIT"))
+    res = client.step(WildfireAction(action="wait"))
     obs = res.observation
 
     if obs.burning_count == 0:

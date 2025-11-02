@@ -1,8 +1,7 @@
 
 import os
-import random, uuid
-from typing import List
-from dataclasses import replace
+import random
+import uuid
 
 from core.env_server import Environment
 from ..models import WildfireAction, WildfireObservation, WildfireState
