@@ -360,9 +360,10 @@ class WildfireEnvironment(Environment):
             burned_count=burned,
             reward_hint=reward_hint,
         )
-           # --- Required abstract property implementation ---
+
+    # --- Required abstract property implementation ---
     @property
     def state(self) -> WildfireState:
-     """Return the current environment state."""
-     return self._state
+        """Return the current environment state."""
+        return self._state
 
