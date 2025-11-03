@@ -289,9 +289,9 @@ class WildfireEnvironment(Environment):
                         ni = idx(nx, ny, self.w)
                         target = st.grid[ni]
 
-                        # Only fuel or damp can be candidates, but WATER IS IMMUNE during damp
+                        # Only fuel or water/damp can be candidates, but cells with code 4 (watered/damp) are immune to ignition
                         if target == 4:
-                            # Damp cells do not ignite at all while damp
+                            # Watered/damp cells (code 4) do not ignite at all while in this state
                             continue
                         if target != 1:
                             continue
