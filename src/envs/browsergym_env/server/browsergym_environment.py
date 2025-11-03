@@ -8,6 +8,7 @@ with OpenEnv's Environment ABC. BrowserGym includes multiple benchmarks:
 - WorkArena: Enterprise task automation
 """
 
+import importlib
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -65,6 +66,25 @@ class BrowserGymEnvironment(Environment):
             self.env_id = f"browsergym/{benchmark}.{task_name}"
         else:
             self.env_id = f"browsergym/{benchmark}"
+
+        # force import the benchmark module
+        benchmark_modules = {
+            "miniwob": "browsergym.envs.miniwob",
+            "webarena": "browsergym.envs.webarena",
+            "visualwebarena": "browsergym.envs.visualwebarena",
+            "workarena": "browsergym.envs.workarena",
+        }
+        module_path = benchmark_modules.get(benchmark)
+        try:
+            if module_path:
+                importlib.import_module(module_path)
+            else:
+                importlib.import_module("browsergym")
+        except ModuleNotFoundError as import_error:
+            raise ValueError(
+                f"Failed to import BrowserGym benchmark '{benchmark}': {import_error}\n"
+                f"Make sure the package browsergym-{benchmark} is installed."
+            ) from import_error
 
         # Create the BrowserGym environment
         try:
