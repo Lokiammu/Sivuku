@@ -279,7 +279,7 @@ print("Animation complete.")
 
 ```
 
-===
+---
 
 
 ## 🧪 Example Training Loop (GRPO/LLM)
