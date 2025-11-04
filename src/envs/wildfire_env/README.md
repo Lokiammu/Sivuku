@@ -445,8 +445,9 @@ This approach:
 # Build base image (first time only)
 docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
 
-# Build wildfire environment
-docker build -t wildfire-env:latest -f src/envs/wildfire_env/server/Dockerfile .
+# Build wildfire environment using the script
+cd src/envs/wildfire_env/server
+./build_docker.sh
 
 # Run container
 docker run -d -p 8000:8000 --name wildfire-env-container wildfire-env:latest
