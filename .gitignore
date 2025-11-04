@@ -95,3 +95,6 @@ Desktop.ini
 *claude*
 *Claude*
 *CLAUDE*
+
+# Local test scripts
+test_wildfire_docker.sh
