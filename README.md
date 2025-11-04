@@ -143,6 +143,66 @@ To use an environment:
 
 See example scripts in `examples/` directory.
 
+## CLI Commands
+
+OpenEnv provides a command-line interface for managing environments:
+
+### `openenv init`
+
+Initialize a new OpenEnv environment:
+
+```bash
+openenv init my_game_env
+openenv init my_env --output-dir /path/to/projects
+```
+
+Creates a new directory with all necessary files based on the OpenEnv template.
+
+### `openenv push`
+
+Push an OpenEnv environment to Hugging Face Spaces:
+
+```bash
+# From the environment directory (where openenv.yaml is located)
+openenv push
+
+# With options
+openenv push --repo-id my-org/my-env --private
+openenv push --base-image ghcr.io/meta-pytorch/openenv-base:latest
+```
+
+The `openenv push` command:
+1. Validates that the directory is an OpenEnv environment (checks for `openenv.yaml`)
+2. Prepares a custom build for Hugging Face Docker space (enables web interface)
+3. Uploads to Hugging Face (ensuring you're logged in)
+
+**Prerequisites:**
+- Authenticate with Hugging Face: Set `HF_TOKEN` environment variable or the command will prompt for login
+
+**Options:**
+- `--directory`, `-d`: Directory containing the OpenEnv environment (defaults to current directory)
+- `--repo-id`, `-r`: Repository ID in format 'username/repo-name' (defaults to 'username/env-name' from openenv.yaml)
+- `--base-image`, `-b`: Base Docker image to use (overrides Dockerfile FROM)
+- `--private`: Deploy the space as private (default: public)
+
+After deployment, your space will be available at:
+`https://huggingface.co/spaces/<repo-id>`
+
+The deployed space includes:
+- **Web Interface** at `/web` - Interactive UI for exploring the environment
+- **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
+- **Health Check** at `/health` - Container health monitoring
+
+### `openenv convert`
+
+Convert an existing environment to OpenEnv format:
+
+```bash
+openenv convert --env-path /path/to/env
+```
+
+See the [convert command documentation](src/openenv_cli/commands/convert.py) for more details.
+
 ## Design Principles
 
 1. **Separation of Concerns**: Clear client-server boundaries

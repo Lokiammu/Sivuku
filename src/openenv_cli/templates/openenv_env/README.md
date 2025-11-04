@@ -1,8 +1,8 @@
 ---
 title: __ENV_TITLE_NAME__ Environment Server
 emoji: 🔊
-colorFrom: '#00C9FF'
-colorTo: '#1B2845'
+colorFrom: red
+colorTo: yellow
 sdk: docker
 pinned: false
 app_port: 8000
@@ -59,6 +59,61 @@ Before using the environment, you need to build the Docker image:
 # From project root
 docker build -t __ENV_NAME__-env:latest -f server/Dockerfile .
 ```
+
+## Deploying to Hugging Face Spaces
+
+You can easily deploy your OpenEnv environment to Hugging Face Spaces using the `openenv push` command:
+
+```bash
+# From the environment directory (where openenv.yaml is located)
+openenv push
+
+# Or specify options
+openenv push --namespace my-org --private
+```
+
+The `openenv push` command will:
+1. Validate that the directory is an OpenEnv environment (checks for `openenv.yaml`)
+2. Prepare a custom build for Hugging Face Docker space (enables web interface)
+3. Upload to Hugging Face (ensuring you're logged in)
+
+### Prerequisites
+
+- Authenticate with Hugging Face: Set `HF_TOKEN` environment variable or the command will prompt for login
+
+### Options
+
+- `--directory`, `-d`: Directory containing the OpenEnv environment (defaults to current directory)
+- `--repo-id`, `-r`: Repository ID in format 'username/repo-name' (defaults to 'username/env-name' from openenv.yaml)
+- `--base-image`, `-b`: Base Docker image to use (overrides Dockerfile FROM)
+- `--private`: Deploy the space as private (default: public)
+
+### Examples
+
+```bash
+# Push to your personal namespace (defaults to username/env-name from openenv.yaml)
+openenv push
+
+# Push to a specific repository
+openenv push --repo-id my-org/my-env
+
+# Push with a custom base image
+openenv push --base-image ghcr.io/meta-pytorch/openenv-base:latest
+
+# Push as a private space
+openenv push --private
+
+# Combine options
+openenv push --repo-id my-org/my-env --base-image custom-base:latest --private
+```
+
+After deployment, your space will be available at:
+`https://huggingface.co/spaces/<repo-id>`
+
+The deployed space includes:
+- **Web Interface** at `/web` - Interactive UI for exploring the environment
+- **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
+- **Health Check** at `/health` - Container health monitoring
 
 ## Environment Details
 

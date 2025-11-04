@@ -17,6 +17,7 @@ import typer
 
 from openenv_cli.commands import convert
 from openenv_cli.commands import init
+from openenv_cli.commands import push
 
 # Create the main CLI app
 app = typer.Typer(
@@ -28,6 +29,7 @@ app = typer.Typer(
 # Register commands
 app.command(name="init", help="Initialize a new OpenEnv environment")(init.init)
 app.add_typer(convert.app, name="convert", help="Convert an existing environment to OpenEnv format")
+app.command(name="push", help="Push an OpenEnv environment to Hugging Face Spaces")(push.push)
 
 
 # Entry point for setuptools

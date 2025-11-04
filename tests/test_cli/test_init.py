@@ -300,9 +300,9 @@ def test_init_server_app_imports(tmp_path: Path) -> None:
     
     # Check imports use correct class names
     # For 'test_env', prefix is 'Test' (removes trailing '_env')
-    # Uses relative imports (from server subdirectory)
+    # Uses absolute imports from the env_name module
     assert f"from .{env_name}_environment import" in app_content
-    assert "from ..models import" in app_content
+    assert f"from {env_name}.models import" in app_content
     assert "TestEnvironment" in app_content  # Prefix is 'Test', not 'TestEnv'
     assert "TestAction" in app_content  # Prefix is 'Test', not 'TestEnv'
     assert "TestObservation" in app_content  # Prefix is 'Test', not 'TestEnv'
