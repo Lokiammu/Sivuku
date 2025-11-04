@@ -18,12 +18,12 @@ app = typer.Typer(help="Initialize a new OpenEnv environment")
 
 
 def _snake_to_pascal(snake_str: str) -> str:
-    """Convert snake_case to PascalCase (e.g., 'echo_env' -> 'EchoEnv')."""
+    """Convert snake_case to PascalCase (e.g., 'my_env' -> 'MyEnv')."""
     return "".join(word.capitalize() for word in snake_str.split("_"))
 
 
 def _get_env_prefix(env_name: str) -> str:
-    """Extract the prefix for class names (e.g., 'echo_env' -> 'Echo', 'test_env' -> 'Test')."""
+    """Extract the prefix for class names (e.g., 'my_env' -> 'My', 'test_env' -> 'Test')."""
     # Remove trailing '_env' if present
     if env_name.endswith("_env"):
         base = env_name[:-4]  # Remove '_env'
@@ -40,13 +40,13 @@ def _get_env_prefix(env_name: str) -> str:
 
 
 def _snake_to_camel(snake_str: str) -> str:
-    """Convert snake_case to camelCase (e.g., 'echo_env' -> 'echoEnv')."""
+    """Convert snake_case to camelCase (e.g., 'my_env' -> 'myEnv')."""
     parts = snake_str.split("_")
     return parts[0] + "".join(word.capitalize() for word in parts[1:])
 
 
 def _snake_to_title(snake_str: str) -> str:
-    """Convert snake_case to Title Case (e.g., 'echo_env' -> 'Echo Env')."""
+    """Convert snake_case to Title Case (e.g., 'my_env' -> 'My Env')."""
     return " ".join(word.capitalize() for word in snake_str.split("_"))
 
 
@@ -114,17 +114,12 @@ def _create_template_replacements(env_name: str) -> Dict[str, str]:
     - snake_case for module names, file paths
     """
     env_pascal = _snake_to_pascal(env_name)
-    env_prefix = _get_env_prefix(env_name)  # Prefix for class names (e.g., 'Echo' for 'echo_env')
+    env_prefix = _get_env_prefix(env_name)
     env_camel = _snake_to_camel(env_name)
     env_title = _snake_to_title(env_name)
     
     # Get random HF Space config values
     hf_config = _get_random_hf_space_config()
-    
-    # Source names (echo_env)
-    echo_env = "echo_env"
-    echo_prefix = "Echo"  # Prefix for echo_env classes
-    echo_camel = "echo"
     
     replacements = {
         # Template placeholders (MUST come first - full class names before partial)
@@ -143,37 +138,6 @@ def _create_template_replacements(env_name: str) -> Dict[str, str]:
         "__HF_EMOJI__": hf_config["emoji"],
         "__HF_COLOR_FROM__": hf_config["colorFrom"],
         "__HF_COLOR_TO__": hf_config["colorTo"],
-        
-        # Module/file path replacements (snake_case)
-        echo_env: env_name,
-        f"{echo_env}_environment": f"{env_name}_environment",
-        f"{echo_env}.environment": f"{env_name}.environment",
-        f"envs.{echo_env}": f"envs.{env_name}",
-        
-        # Class name replacements (PascalCase) - from echo_env source files
-        "EchoEnvironment": f"{env_prefix}Environment",
-        "EchoAction": f"{env_prefix}Action",
-        "EchoObservation": f"{env_prefix}Observation",
-        "EchoEnv": f"{env_prefix}Env",
-        
-        # Variable name replacements (snake_case)
-        "echo_environment": f"{env_name}_environment",
-        "echo_action": f"{env_name}_action",
-        "echo_observation": f"{env_name}_observation",
-        "echo_env": env_name,
-        
-        # Variable name replacements (camelCase) - if used
-        "echoEnv": env_camel,
-        "echoEnvironment": f"{env_camel}Environment",
-        
-        # Display name replacements (Title Case)
-        "Echo Environment": env_title,
-        "Echo environment": env_title,
-        "echo environment": env_title.lower(),
-        
-        # Additional specific replacements
-        "echo-env": env_name.replace("_", "-"),
-        "Echo Env": env_title,
     }
     
     return replacements
@@ -194,24 +158,10 @@ def _should_rename_file(filename: str, env_name: str) -> Tuple[bool, str]:
     
     Handles template placeholders in filenames like:
     - `__ENV_NAME___environment.py` → `<env_name>_environment.py`
-    - `echo_environment.py` → `<env_name>_environment.py`
     """
     # Check for template placeholder
     if "__ENV_NAME__" in filename:
         new_name = filename.replace("__ENV_NAME__", env_name)
-        return True, new_name
-    
-    # Check for echo_env patterns
-    if "echo_env" in filename:
-        new_name = filename.replace("echo_env", env_name)
-        return True, new_name
-    
-    if "echo_environment" in filename:
-        new_name = filename.replace("echo_environment", f"{env_name}_environment")
-        return True, new_name
-    
-    if filename == "echo.py":
-        new_name = f"{env_name}.py"
         return True, new_name
     
     return False, filename
@@ -316,7 +266,7 @@ def init(
     Initialize a new OpenEnv environment.
     
     Creates a new directory with the environment name and generates all necessary
-    files based on the echo_env template structure.
+    files based on the OpenEnv template structure.
     
     Example:
         $ openenv init my_game_env
@@ -348,7 +298,7 @@ def init(
         
         console.print(f"[bold cyan]Creating OpenEnv environment '{env_name}'...[/bold cyan]")
         
-        # Copy template files from echo_env structure
+        # Copy template files from template structure
         template_pkg = "openenv_cli.templates.openenv_env"
         created_files = _copy_template_directory(
             template_pkg,

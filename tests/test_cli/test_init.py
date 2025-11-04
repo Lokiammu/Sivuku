@@ -82,7 +82,7 @@ def test_init_replaces_template_placeholders(tmp_path: Path) -> None:
     assert "MyGameEnv" in client_content
     assert "MyGameAction" in client_content
     assert "MyGameObservation" in client_content
-    assert "echo_env" not in client_content.lower()
+    assert "__ENV_NAME__" not in client_content
     
     # Check __init__.py has correct exports
     init_content = (env_dir / "__init__.py").read_text()
@@ -95,7 +95,7 @@ def test_init_replaces_template_placeholders(tmp_path: Path) -> None:
     assert env_file.exists()
     env_content = env_file.read_text()
     assert "MyGameEnvironment" in env_content
-    assert "EchoEnvironment" not in env_content
+    assert "__ENV_CLASS_NAME__" not in env_content
 
 
 def test_init_generates_openenv_yaml(tmp_path: Path) -> None:
