@@ -371,31 +371,31 @@ def test_push_handles_missing_readme(tmp_path: Path) -> None:
         assert mock_api.upload_folder.called
 
 
-def test_push_uses_hf_token_from_env(tmp_path: Path) -> None:
-    """Test that push uses HF_TOKEN from environment if available."""
+def test_push_initializes_hf_api_without_token(tmp_path: Path) -> None:
+    """Test that push initializes HfApi without token parameter."""
     _create_test_openenv_env(tmp_path)
     
-    with patch.dict(os.environ, {"HF_TOKEN": "test-token-123"}):
-        with patch("openenv_cli.commands.push.whoami") as mock_whoami, \
-             patch("openenv_cli.commands.push.login") as mock_login, \
-             patch("openenv_cli.commands.push.HfApi") as mock_hf_api_class:
-            
-            mock_whoami.return_value = {"name": "testuser"}
-            mock_login.return_value = None  # Prevent actual login prompt
-            mock_api = MagicMock()
-            mock_hf_api_class.return_value = mock_api
-            
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(str(tmp_path))
-                result = runner.invoke(app, ["push"])
-            finally:
-                os.chdir(old_cwd)
-            
-            # Verify HfApi was initialized with token
-            mock_hf_api_class.assert_called_once()
-            call_args = mock_hf_api_class.call_args
-            assert call_args.kwargs.get("token") == "test-token-123"
+    with patch("openenv_cli.commands.push.whoami") as mock_whoami, \
+         patch("openenv_cli.commands.push.login") as mock_login, \
+         patch("openenv_cli.commands.push.HfApi") as mock_hf_api_class:
+        
+        mock_whoami.return_value = {"name": "testuser"}
+        mock_login.return_value = None  # Prevent actual login prompt
+        mock_api = MagicMock()
+        mock_hf_api_class.return_value = mock_api
+        
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(str(tmp_path))
+            result = runner.invoke(app, ["push"])
+        finally:
+            os.chdir(old_cwd)
+        
+        # Verify HfApi was initialized without token parameter
+        mock_hf_api_class.assert_called_once()
+        call_args = mock_hf_api_class.call_args
+        # Should not have token in kwargs
+        assert "token" not in (call_args.kwargs or {})
 
 
 def test_push_validates_repo_id_format(tmp_path: Path) -> None:

@@ -79,7 +79,7 @@ The `openenv push` command will:
 
 ### Prerequisites
 
-- Authenticate with Hugging Face: Set `HF_TOKEN` environment variable or the command will prompt for login
+- Authenticate with Hugging Face: The command will prompt for login if not already authenticated
 
 ### Options
 

@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -64,12 +63,9 @@ def _ensure_hf_authenticated() -> str:
     Returns:
         Username of authenticated user
     """
-    # Check for HF_TOKEN environment variable
-    token = os.getenv("HF_TOKEN")
-    
     try:
         # Try to get current user
-        user_info = whoami(token=token)
+        user_info = whoami()
         # Handle both dict and object return types
         if isinstance(user_info, dict):
             username = user_info.get("name") or user_info.get("fullname") or user_info.get("username")
@@ -84,14 +80,10 @@ def _ensure_hf_authenticated() -> str:
         return username
     except Exception:
         # Not authenticated, prompt for login
-        if token:
-            # Token might be invalid
-            console.print("[bold yellow]HF_TOKEN is set but invalid. Please login...[/bold yellow]")
-        else:
-            console.print("[bold yellow]Not authenticated with Hugging Face. Please login...[/bold yellow]")
+        console.print("[bold yellow]Not authenticated with Hugging Face. Please login...[/bold yellow]")
         
         try:
-            login(token=token)
+            login()
             # Verify login worked
             user_info = whoami()
             # Handle both dict and object return types
@@ -108,7 +100,7 @@ def _ensure_hf_authenticated() -> str:
         except Exception as e:
             raise typer.BadParameter(
                 f"Hugging Face authentication failed: {e}. "
-                "Please set HF_TOKEN environment variable or run login manually."
+                "Please run login manually."
             ) from e
 
 
@@ -353,8 +345,7 @@ def push(
         )
     
     # Initialize Hugging Face API
-    token = os.getenv("HF_TOKEN")
-    api = HfApi(token=token)
+    api = HfApi()
     
     # Prepare staging directory
     console.print("[bold cyan]Preparing files for Hugging Face deployment...[/bold cyan]")
