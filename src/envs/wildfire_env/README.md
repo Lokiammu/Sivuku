@@ -796,12 +796,14 @@ The wildfire environment includes a **built-in web interface** for interactive e
 
 ### Web Interface Features
 
-- **Visual grid display** - See the fire spread in real-time
-- **Action form** - Select action type and coordinates
-- **State observer** - View current observation and state
-- **Action history** - Log of all actions taken
+- **Action form** - Dynamic form to select action type and enter coordinates
+- **State observer** - View current observation and state (displayed as JSON)
+- **Action history** - Log of all actions taken with timestamps
 - **Reset button** - Start new episode
-- **WebSocket updates** - Real-time state updates
+- **WebSocket updates** - Real-time state updates via WebSocket connection
+- **Instructions panel** - Environment documentation and usage instructions
+
+**Note:** The grid is displayed as JSON data. For visual grid rendering, use the matplotlib examples in the [Examples](#-examples) section.
 
 ### Using the Web Interface
 
