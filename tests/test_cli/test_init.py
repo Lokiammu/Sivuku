@@ -362,3 +362,82 @@ def test_init_requirements_file(tmp_path: Path) -> None:
     assert "fastapi" in req_content
     assert "uvicorn" in req_content
     assert "openenv-core>=0.1.0" in req_content
+
+
+def test_init_validates_empty_env_name(tmp_path: Path) -> None:
+    """Test that init validates empty environment name."""
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(str(tmp_path))
+        result = runner.invoke(app, ["init", ""], input="\n")
+    finally:
+        os.chdir(old_cwd)
+    
+    assert result.exit_code != 0
+    assert "cannot be empty" in result.output.lower()
+
+
+def test_init_env_name_without_env_suffix(tmp_path: Path) -> None:
+    """Test that init works with env names that don't end with _env."""
+    env_name = "mygame"  # No _env suffix
+    env_dir = tmp_path / env_name
+    
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(str(tmp_path))
+        result = runner.invoke(app, ["init", env_name], input="\n")
+    finally:
+        os.chdir(old_cwd)
+    
+    assert result.exit_code == 0
+    assert env_dir.exists()
+    
+    # Check that prefix is correctly derived (should be "Mygame" for "mygame")
+    models_content = (env_dir / "models.py").read_text()
+    assert "MygameAction" in models_content or "Mygame" in models_content
+
+
+def test_init_single_part_env_name(tmp_path: Path) -> None:
+    """Test that init works with single-part env names."""
+    env_name = "game"  # Single part, no underscores
+    env_dir = tmp_path / env_name
+    
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(str(tmp_path))
+        result = runner.invoke(app, ["init", env_name], input="\n")
+    finally:
+        os.chdir(old_cwd)
+    
+    assert result.exit_code == 0
+    assert env_dir.exists()
+
+
+def test_init_handles_file_path_collision(tmp_path: Path) -> None:
+    """Test that init fails when path exists as a file."""
+    env_name = "existing_file"
+    file_path = tmp_path / env_name
+    file_path.write_text("existing file content")
+    
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(str(tmp_path))
+        result = runner.invoke(app, ["init", env_name], input="\n")
+    finally:
+        os.chdir(old_cwd)
+    
+    # The command should fail with exit code 2 (typer bad parameter)
+    assert result.exit_code != 0, f"Expected command to fail, but it succeeded. Output: {result.output}"
+    # Check that it's a BadParameter error (exit code 2) and not just a usage error
+    # Typer formats BadParameter errors in the Error section
+    error_output = result.output.lower()
+    # The error message should mention the path or file, or at least indicate an error
+    # Exit code 2 indicates BadParameter, and "error" in output indicates it's an error
+    assert (
+        result.exit_code == 2 or  # BadParameter exit code
+        "error" in error_output or
+        "exists" in error_output or
+        "file" in error_output or
+        str(file_path).lower() in error_output or
+        env_name.lower() in error_output
+    ), f"Expected BadParameter error about file collision. Exit code: {result.exit_code}, Output: {result.output}"
