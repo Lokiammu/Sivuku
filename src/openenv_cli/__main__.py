@@ -21,7 +21,7 @@ from openenv_cli.commands import push
 # Create the main CLI app
 app = typer.Typer(
     name="openenv",
-    help="OpenEnv - HTTP-based agentic environments CLI",
+    help="OpenEnv - An e2e framework for creating, deploying and using isolated execution environments for agentic RL training",
     no_args_is_help=True,
 )
 
