@@ -23,6 +23,8 @@ OpenEnv provides a standard for interacting with agentic execution environments 
 
 In addition to making it easier for researchers and RL framework writers, we also provide tools for environment creators making it easier for them to create richer environments and make them available over familar protocols like HTTP and packaged using canonical technologies like docker. Environment creators can use the OpenEnv framework to create environments that are isolated, secure, and easy to deploy and use.
 
+The OpenEnv CLI (`openenv`) provides commands to initialize new environments and deploy them to Hugging Face Spaces.
+
 > ⚠️ **Early Development Warning** OpenEnv is currently in an experimental
 > stage. You should expect bugs, incomplete features, and APIs that may change
 > in future versions. The project welcomes bugfixes, but to make sure things are
@@ -117,14 +119,21 @@ Type-safe data structures:
 
 ### For Environment Creators
 
-When building a new environment, create the following structure:
+Use the CLI to quickly scaffold a new environment:
+
+```bash
+openenv init my_env
+```
+
+This creates the following structure:
 
 ```
-src/envs/your_env/
+my_env/
 ├── __init__.py           # Export YourAction, YourObservation, YourEnv
 ├── models.py             # Define Action, Observation, State dataclasses
 ├── client.py             # Implement YourEnv(HTTPEnvClient)
 ├── README.md             # Document your environment
+├── openenv.yaml          # Environment manifest
 └── server/
     ├── your_environment.py  # Implement YourEnvironment(Environment)
     ├── app.py               # Create FastAPI app
@@ -145,53 +154,23 @@ See example scripts in `examples/` directory.
 
 ## CLI Commands
 
-OpenEnv provides a command-line interface for managing environments:
+The OpenEnv CLI provides commands to manage environments:
 
-### `openenv init`
+- **`openenv init <env_name>`** - Initialize a new environment from template
+- **`openenv push [--repo-id <repo>] [--private]`** - Deploy environment to Hugging Face Spaces
 
-Initialize a new OpenEnv environment:
+### Quick Start
 
 ```bash
+# Create a new environment
 openenv init my_game_env
-openenv init my_env --output-dir /path/to/projects
-```
 
-Creates a new directory with all necessary files based on the OpenEnv template.
-
-### `openenv push`
-
-Push an OpenEnv environment to Hugging Face Spaces:
-
-```bash
-# From the environment directory (where openenv.yaml is located)
+# Deploy to Hugging Face (will prompt for login if needed)
+cd my_game_env
 openenv push
-
-# With options
-openenv push --repo-id my-org/my-env --private
-openenv push --base-image ghcr.io/meta-pytorch/openenv-base:latest
 ```
 
-The `openenv push` command:
-1. Validates that the directory is an OpenEnv environment (checks for `openenv.yaml`)
-2. Prepares a custom build for Hugging Face Docker space (enables web interface)
-3. Uploads to Hugging Face (ensuring you're logged in)
-
-**Prerequisites:**
-- Authenticate with Hugging Face: Set `HF_TOKEN` environment variable or the command will prompt for login
-
-**Options:**
-- `--directory`, `-d`: Directory containing the OpenEnv environment (defaults to current directory)
-- `--repo-id`, `-r`: Repository ID in format 'username/repo-name' (defaults to 'username/env-name' from openenv.yaml)
-- `--base-image`, `-b`: Base Docker image to use (overrides Dockerfile FROM)
-- `--private`: Deploy the space as private (default: public)
-
-After deployment, your space will be available at:
-`https://huggingface.co/spaces/<repo-id>`
-
-The deployed space includes:
-- **Web Interface** at `/web` - Interactive UI for exploring the environment
-- **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
-- **Health Check** at `/health` - Container health monitoring
+For detailed options: `openenv init --help` and `openenv push --help`.
 
 ## Design Principles
 
