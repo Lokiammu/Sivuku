@@ -804,12 +804,6 @@ Then open: `http://localhost:8000/web`
 #### Local Testing (No Docker)
 
 ```bash
-# From the OpenEnv root directory
-./src/envs/wildfire_env/server/test_local.sh
-```
-
-Or manually:
-```bash
 # Enable web interface with flag
 ENABLE_WEB_INTERFACE=true PYTHONPATH=src uvicorn src.envs.wildfire_env.server.app:app --reload --host 0.0.0.0 --port 8000
 ```
