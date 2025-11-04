@@ -193,16 +193,6 @@ The deployed space includes:
 - **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
 - **Health Check** at `/health` - Container health monitoring
 
-### `openenv convert`
-
-Convert an existing environment to OpenEnv format:
-
-```bash
-openenv convert --env-path /path/to/env
-```
-
-See the [convert command documentation](src/openenv_cli/commands/convert.py) for more details.
-
 ## Design Principles
 
 1. **Separation of Concerns**: Clear client-server boundaries
