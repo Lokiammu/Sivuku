@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libasound2 \
     libxshmfence1 \
+    fonts-unifont \
+    fonts-noto-color-emoji \
     # Additional dependencies
     git \
     wget \
@@ -33,8 +35,7 @@ RUN pip install --no-cache-dir -r /tmp/browsergym_requirements.txt && \
     rm /tmp/browsergym_requirements.txt
 
 # Install Playwright browsers (Chromium by default)
-RUN playwright install chromium && \
-    playwright install-deps chromium
+RUN playwright install chromium
 
 # Copy OpenEnv core and browsergym_env code
 WORKDIR /app
