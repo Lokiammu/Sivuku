@@ -1,8 +1,8 @@
 ---
 title: __ENV_TITLE_NAME__ Environment Server
-emoji: 🔊
-colorFrom: red
-colorTo: yellow
+emoji: __HF_EMOJI__
+colorFrom: __HF_COLOR_FROM__
+colorTo: __HF_COLOR_TO__
 sdk: docker
 pinned: false
 app_port: 8000

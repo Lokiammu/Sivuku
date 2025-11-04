@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import random
 import shutil
 from pathlib import Path
 from typing import Annotated, Dict, List, Tuple
@@ -70,6 +71,39 @@ def _validate_env_name(name: str) -> str:
     return name
 
 
+def _get_random_hf_space_config() -> Dict[str, str]:
+    """
+    Get random Hugging Face Space configuration values.
+    
+    Returns:
+        Dictionary with 'emoji', 'colorFrom', and 'colorTo' keys
+    """
+    # Valid emojis (emoji-only characters)
+    emojis = [
+        "🎮", "🎯", "🚀", "🌟", "🎨", "🎪", "🎭", "🎬", "🎤", "🎧",
+        "🎵", "🎶", "🎸", "🎹", "🥁", "🎺", "🎻", "🎼", "🎯", "🎲",
+        "🎳", "🎰", "🎴", "🃏", "🀄", "🎴", "🎨", "🖼️", "🎬", "🎭",
+        "🎪", "🎤", "🎧", "🎵", "🎶", "🎸", "🎹", "🎺", "🎻", "🥁",
+        "🎯", "🎲", "🎳", "🎰", "🏀", "⚽", "🏈", "⚾", "🎾", "🏐",
+        "🏉", "🎱", "🏓", "🏸", "🥅", "🏒", "🏑", "🏏", "⛳", "🏹",
+        "🎣", "🥊", "🥋", "🎽", "🏅", "🎖️", "🏆", "🥇", "🥈", "🥉",
+        "🔊", "🔉", "🔈", "🔇", "📢", "📣", "📯", "🔔", "🔕", "📻",
+        "📡", "💻", "🖥️", "🖨️", "⌨️", "🖱️", "🖲️", "🕹️", "🗜️", "💾",
+        "💿", "📀", "📼", "📷", "📸", "📹", "🎥", "📽️", "🎞️", "📞",
+        "☎️", "📟", "📠", "📺", "📻", "🎙️", "🎚️", "🎛️", "⏱️", "⏲️",
+        "⏰", "🕰️", "⌚", "📱", "📲", "💻", "⌨️", "🖥️", "🖨️", "🖱️",
+    ]
+    
+    # Valid colors from HF Spaces config reference
+    colors = ["red", "yellow", "green", "blue", "indigo", "purple", "pink", "gray"]
+    
+    return {
+        "emoji": random.choice(emojis),
+        "colorFrom": random.choice(colors),
+        "colorTo": random.choice(colors),
+    }
+
+
 def _create_template_replacements(env_name: str) -> Dict[str, str]:
     """
     Create comprehensive template replacement dictionary.
@@ -83,6 +117,9 @@ def _create_template_replacements(env_name: str) -> Dict[str, str]:
     env_prefix = _get_env_prefix(env_name)  # Prefix for class names (e.g., 'Echo' for 'echo_env')
     env_camel = _snake_to_camel(env_name)
     env_title = _snake_to_title(env_name)
+    
+    # Get random HF Space config values
+    hf_config = _get_random_hf_space_config()
     
     # Source names (echo_env)
     echo_env = "echo_env"
@@ -101,6 +138,11 @@ def _create_template_replacements(env_name: str) -> Dict[str, str]:
         "__ENV_CLASS_NAME__": env_prefix,  # Use prefix, not full PascalCase
         "__ENV_TITLE_NAME__": env_title,
         "__ENV_CAMEL_NAME__": env_camel,
+        
+        # Hugging Face Space config placeholders
+        "__HF_EMOJI__": hf_config["emoji"],
+        "__HF_COLOR_FROM__": hf_config["colorFrom"],
+        "__HF_COLOR_TO__": hf_config["colorTo"],
         
         # Module/file path replacements (snake_case)
         echo_env: env_name,
