@@ -14,9 +14,13 @@ DIRS_8 = {
 }
 
 def idx(x: int, y: int, w: int) -> int:
+    # Defensive type conversion to ensure all parameters are integers
+    x, y, w = int(x), int(y), int(w)
     return y * w + x
 
 def in_bounds(x: int, y: int, w: int, h: int) -> bool:
+    # Defensive type conversion to ensure all parameters are integers
+    x, y, w, h = int(x), int(y), int(w), int(h)
     return 0 <= x < w and 0 <= y < h
 
 
@@ -59,9 +63,9 @@ class WildfireEnvironment(Environment):
         humidity  = float(os.environ.get("WILDFIRE_HUMIDITY", humidity))
         forced_wind = os.environ.get("WILDFIRE_WIND", None)
 
-        # Store config
-        self.w = width
-        self.h = height
+        # Store config (ensure integers)
+        self.w = int(width)
+        self.h = int(height)
         self.base_ignite_prob = base_ignite_prob
         self.wind_bias = wind_bias
         self.diag_factor = diag_factor
@@ -81,8 +85,11 @@ class WildfireEnvironment(Environment):
     # --- Core API ---
 
     def reset(self) -> WildfireObservation:
+        # Ensure w and h are integers (defensive type conversion)
+        w, h = int(self.w), int(self.h)
+        
         # Start with all fuel
-        grid = [1] * (self.w * self.h)
+        grid = [1] * (w * h)
 
         # Wind (forced if provided)
         if self.forced_wind and self.forced_wind in DIRS_8:
@@ -95,9 +102,12 @@ class WildfireEnvironment(Environment):
 
         # Place initial fires
         for _ in range(self.init_sources):
-            x = self.rng.randrange(self.w)
-            y = self.rng.randrange(self.h)
-            grid[idx(x, y, self.w)] = 2
+            x = self.rng.randrange(w)
+            y = self.rng.randrange(h)
+            i = idx(x, y, w)
+            # Safety check: ensure index is within grid bounds
+            if 0 <= i < len(grid):
+                grid[i] = 2
 
         self._state = WildfireState(
             episode_id=str(uuid.uuid4()),
@@ -105,8 +115,8 @@ class WildfireEnvironment(Environment):
             total_burned=0,
             total_extinguished=0,
             last_action="reset",
-            width=self.w,
-            height=self.h,
+            width=w,
+            height=h,
             wind_dir=wind_dir,
             humidity=humidity,
             remaining_water=self.init_water,
@@ -115,7 +125,7 @@ class WildfireEnvironment(Environment):
         )
 
         # per-cell burn timers (persist across steps)
-        self._state.burn_timers = [0] * (self.w * self.h)
+        self._state.burn_timers = [0] * (w * h)
 
         obs = self._make_observation(reward_hint=0.0)
         return obs
@@ -198,6 +208,8 @@ class WildfireEnvironment(Environment):
 
     def _apply_water(self, x: int, y: int) -> float:
         st = self._state
+        # Ensure x and y are integers (defensive type conversion)
+        x, y = int(x), int(y)
         if not in_bounds(x, y, self.w, self.h):
             return -0.05
 
@@ -206,6 +218,10 @@ class WildfireEnvironment(Environment):
             return -0.5
 
         i = idx(x, y, self.w)
+        # Safety check: ensure index is within grid bounds
+        if i < 0 or i >= len(st.grid):
+            return -0.05
+        
         reward = 0.0
 
         if st.grid[i] == 2:
@@ -229,9 +245,15 @@ class WildfireEnvironment(Environment):
 
     def _apply_break(self, x: int, y: int) -> float:
         st = self._state
+        # Ensure x and y are integers (defensive type conversion)
+        x, y = int(x), int(y)
         if not in_bounds(x, y, self.w, self.h):
             return -0.05
         i = idx(x, y, self.w)
+        # Safety check: ensure index is within grid bounds
+        if i < 0 or i >= len(st.grid):
+            return -0.05
+        
         reward = 0.0
 
         if st.grid[i] in (1, 4):
@@ -263,6 +285,9 @@ class WildfireEnvironment(Environment):
         new_grid = st.grid[:]
         newly_burned = 0
 
+        # Ensure w and h are integers (defensive type conversion)
+        w, h = int(self.w), int(self.h)
+
         # 8-neighbor model
         neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1),
                      (-1, -1), (1, -1), (-1, 1), (1, 1)]
@@ -271,12 +296,15 @@ class WildfireEnvironment(Environment):
         base = self.base_ignite_prob
         humidity_factor = (1.0 - st.humidity)
 
-        ignite_flags = [False] * (self.w * self.h)
+        ignite_flags = [False] * (w * h)
 
         # First pass: evaluate ignitions, increment burn timers
-        for y in range(self.h):
-            for x in range(self.w):
-                i = idx(x, y, self.w)
+        for y in range(h):
+            for x in range(w):
+                i = idx(x, y, w)
+                # Safety check: ensure index is within grid bounds
+                if i < 0 or i >= len(st.grid):
+                    continue
                 cell = st.grid[i]
 
                 if cell == 2:  # burning
@@ -284,9 +312,12 @@ class WildfireEnvironment(Environment):
 
                     for dx, dy in neighbors:
                         nx, ny = x + dx, y + dy
-                        if not in_bounds(nx, ny, self.w, self.h):
+                        if not in_bounds(nx, ny, w, h):
                             continue
-                        ni = idx(nx, ny, self.w)
+                        ni = idx(nx, ny, w)
+                        # Safety check: ensure neighbor index is within grid bounds
+                        if ni < 0 or ni >= len(st.grid):
+                            continue
                         target = st.grid[ni]
 
                         # Only fuel or water/damp can be candidates, but cells with code 4 (watered/damp) are immune to ignition
@@ -310,10 +341,16 @@ class WildfireEnvironment(Environment):
                         p = base * humidity_factor * wind_mult * diag_mult
                         p = max(0.0, min(1.0, p))
                         if self.rng.random() < p:
-                            ignite_flags[ni] = True
+                            # Safety check: ensure ni is within ignite_flags bounds
+                            if 0 <= ni < len(ignite_flags):
+                                ignite_flags[ni] = True
 
         # Second pass: apply transitions
         for i, cell in enumerate(st.grid):
+            # Safety check: ensure index is within bounds for all arrays
+            if i < 0 or i >= len(new_grid) or i >= len(st.burn_timers):
+                continue
+            
             if cell == 2:
                 # burns for burn_lifetime ticks before turning to ash
                 if st.burn_timers[i] >= self.burn_lifetime:
@@ -321,7 +358,7 @@ class WildfireEnvironment(Environment):
                     newly_burned += 1
                 else:
                     new_grid[i] = 2  # keep burning
-            elif ignite_flags[i] and new_grid[i] == 1:
+            elif i < len(ignite_flags) and ignite_flags[i] and new_grid[i] == 1:
                 new_grid[i] = 2
                 st.burn_timers[i] = 0
             elif cell == 4:
