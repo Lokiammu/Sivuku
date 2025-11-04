@@ -58,15 +58,6 @@ This makes WildfireEnv a **fast, controllable**, and **open benchmark** for appl
 ### Using Docker (Recommended)
 
 ```bash
-# From the OpenEnv root directory
-./run_wildfire_docker.sh
-```
-
-**Note:** The web interface can be enabled with `ENABLE_WEB_INTERFACE=true`. Access it at `http://localhost:8000/web` when enabled.
-
-Or manually:
-
-```bash
 # Build base image (first time only)
 docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
 
@@ -74,8 +65,10 @@ docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
 docker build -t wildfire-env:latest -f src/envs/wildfire_env/server/Dockerfile .
 
 # Run container
-docker run -p 8000:8000 wildfire-env:latest
+docker run -p 8000:8000 -e ENABLE_WEB_INTERFACE=true wildfire-env:latest
 ```
+
+**Note:** The web interface can be enabled with `ENABLE_WEB_INTERFACE=true`. Access it at `http://localhost:8000/web` when enabled.
 
 ### Basic Python Client
 
@@ -409,11 +402,18 @@ docker run -p 8000:8000 \
   wildfire-env:latest
 ```
 
-### Using the Run Script
+### Custom Configuration
 
 ```bash
-# Custom configuration
-WILDFIRE_WIDTH=64 WILDFIRE_HEIGHT=64 WILDFIRE_HUMIDITY=0.5 ./run_wildfire_docker.sh
+# Build and run with custom configuration
+docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+docker build -t wildfire-env:latest -f src/envs/wildfire_env/server/Dockerfile .
+docker run -p 8000:8000 \
+  -e ENABLE_WEB_INTERFACE=true \
+  -e WILDFIRE_WIDTH=64 \
+  -e WILDFIRE_HEIGHT=64 \
+  -e WILDFIRE_HUMIDITY=0.5 \
+  wildfire-env:latest
 ```
 
 ---
@@ -422,18 +422,25 @@ WILDFIRE_WIDTH=64 WILDFIRE_HEIGHT=64 WILDFIRE_HUMIDITY=0.5 ./run_wildfire_docker
 
 ### Option 1: Docker (Recommended)
 
-**Using the convenience script:**
+**Manual setup:**
 ```bash
-./run_wildfire_docker.sh
+# Build base image (first time only)
+docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+
+# Build wildfire environment
+docker build -t wildfire-env:latest -f src/envs/wildfire_env/server/Dockerfile .
+
+# Run container
+docker run -p 8000:8000 -e ENABLE_WEB_INTERFACE=true wildfire-env:latest
 ```
 
-This script:
+This approach:
 - Builds the base image if needed
 - Rebuilds the wildfire image
 - Starts the container
 - Shows logs in real-time
 
-**Manual Docker setup:**
+**Alternative: Using build_docker.sh script:**
 ```bash
 # Build base image (first time only)
 docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
@@ -795,8 +802,14 @@ The Wildfire Environment includes a **custom web interface** with visual grid di
 #### Using Docker
 
 ```bash
-# From the OpenEnv root directory
-./run_wildfire_docker.sh
+# Build base image (first time only)
+docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+
+# Build wildfire environment
+docker build -t wildfire-env:latest -f src/envs/wildfire_env/server/Dockerfile .
+
+# Run container
+docker run -p 8000:8000 -e ENABLE_WEB_INTERFACE=true wildfire-env:latest
 ```
 
 Then open: `http://localhost:8000/web`
