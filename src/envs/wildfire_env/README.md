@@ -62,6 +62,8 @@ This makes WildfireEnv a **fast, controllable**, and **open benchmark** for appl
 ./run_wildfire_docker.sh
 ```
 
+**Note:** The web interface can be enabled with `ENABLE_WEB_INTERFACE=true`. Access it at `http://localhost:8000/web` when enabled.
+
 Or manually:
 
 ```bash
@@ -786,34 +788,91 @@ env.close()
 
 ## 🌐 Web Interface
 
-The wildfire environment includes a **built-in web interface** for interactive exploration.
+The Wildfire Environment includes a **custom web interface** with visual grid display and wildfire-specific features.
 
 ### Accessing the Web Interface
 
-1. **Start the server** (Docker or local)
-2. **Open browser** to: `http://localhost:8000/web`
-3. **Interact** with the environment visually
+#### Using Docker
+
+```bash
+# From the OpenEnv root directory
+./run_wildfire_docker.sh
+```
+
+Then open: `http://localhost:8000/web`
+
+#### Local Testing (No Docker)
+
+```bash
+# From the OpenEnv root directory
+./src/envs/wildfire_env/server/test_local.sh
+```
+
+Or manually:
+```bash
+# Enable web interface with flag
+ENABLE_WEB_INTERFACE=true PYTHONPATH=src uvicorn src.envs.wildfire_env.server.app:app --reload --host 0.0.0.0 --port 8000
+```
 
 ### Web Interface Features
 
-- **Action form** - Dynamic form to select action type and enter coordinates
-- **State observer** - View current observation and state (displayed as JSON)
-- **Action history** - Log of all actions taken with timestamps
-- **Reset button** - Start new episode
-- **WebSocket updates** - Real-time state updates via WebSocket connection
-- **Instructions panel** - Environment documentation and usage instructions
+#### Left Pane: Action Interface
+- **Wildfire-specific action form**
+  - Action dropdown: Water (Extinguish Fire), Break (Create Firebreak), Wait (Do Nothing)
+  - Coordinate inputs (X, Y) - auto-populated when clicking grid cells
+  - Coordinates show/hide based on action type
+- **Environment stats display**
+  - Step count
+  - Water remaining
+  - Breaks remaining
+  - Burning cells count
+- **Current state display**
+  - Status (Reset/Running)
+  - Episode ID
+  - Wind direction
+  - Humidity
+- **Control buttons**
+  - Reset Environment
+  - Get State
 
-**Note:** The grid is displayed as JSON data. For visual grid rendering, use the matplotlib examples in the [Examples](#-examples) section.
+#### Right Pane: Visual Grid & Logs
+- **Visual 2D Grid Display** 🔥
+  - 16×16 grid rendered as color-coded cells
+  - **Color coding:**
+    - 🟩 **Green** = Fuel (safe, value 1)
+    - 🔥 **Orange/Red** = Burning (fire, value 2)
+    - ⬛ **Dark Gray** = Ash (burned, value 0)
+    - 🟫 **Brown** = Firebreak (value 3)
+    - 🟦 **Blue** = Watered/Damp (value 4)
+  - **Interactive:** Click cells to set coordinates for water/break actions
+  - **Auto-updates:** Grid refreshes automatically via WebSocket
+- **Legend**
+  - Color-coded legend explaining all cell types
+- **Action history**
+  - Log of all actions with timestamps
+  - Shows action, observation, reward, and done status
+
+#### Additional Features
+- **WebSocket connection** - Real-time state updates without page refresh
+- **Instructions panel** - Collapsible environment documentation
+- **Grid status indicator** - Shows grid dimensions and cell count
 
 ### Using the Web Interface
 
-1. Click **"Reset Environment"** to start
-2. Fill in action form:
-   - Select action: `water`, `break`, or `wait`
-   - Enter coordinates (x, y) for water/break actions
-3. Click **"Submit Action"**
-4. Observe the grid update and rewards
-5. Monitor resources (water, breaks) in the state panel
+1. **Start the server** (see above)
+2. **Open browser** to: `http://localhost:8000/web`
+3. **Click "Reset Environment"** to initialize and display the grid
+4. **Interact with the grid:**
+   - Click on a cell to set coordinates for water/break actions
+   - Or manually enter X, Y coordinates
+5. **Select action:**
+   - Choose `water`, `break`, or `wait` from the dropdown
+6. **Click "Execute Action"**
+7. **Watch the grid update in real-time:**
+   - Fire spreads automatically
+   - Cells change color based on state
+   - Stats update automatically
+8. **Monitor resources** in the stats panel (water, breaks, burning count)
 
 ---
 
