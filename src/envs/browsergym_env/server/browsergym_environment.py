@@ -68,9 +68,6 @@ class BrowserGymEnvironment(Environment):
         else:
             self.env_id = f"browsergym/{benchmark}"
 
-        if benchmark == "miniwob":
-            if "MINIWOB_URL" not in os.environ:
-                raise ValueError(_MINIWOB_URL_HELP)
 
         # force import the benchmark module
         benchmark_modules = {
