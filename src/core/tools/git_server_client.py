@@ -185,7 +185,7 @@ class GitServerClient:
         Args:
             repo_name: Name of repository to clone
             target_dir: Target directory name (defaults to repo_name)
-            commit: Commit hash or branch to checkout
+            commit: Commit hash or branch to check out
 
         Returns:
             Path to cloned repository
