@@ -238,10 +238,10 @@ def convert(
         bool,
         typer.Option("--backup/--no-backup", help="Create backup before conversion"),
     ] = True,
-    generate_requirements: Annotated[
+    generate_lock: Annotated[
         bool,
         typer.Option(
-            "--generate-requirements/--no-generate-requirements",
+            "--generate-lock/--no-generate-lock",
             help="Generate uv.lock from pyproject.toml",
         ),
     ] = True,
@@ -260,7 +260,7 @@ def convert(
     Example:
         $ openenv convert src/envs/echo_env
         $ openenv convert src/envs/atari_env --no-backup
-        $ openenv convert ./my_env --no-generate-requirements
+        $ openenv convert ./my_env --no-generate-lock
     """
     env_dir = Path(env_path).resolve()
 
@@ -349,7 +349,7 @@ def convert(
         console.print("[green]✓[/green] Updated .gitignore")
 
         # Generate uv.lock if requested
-        if generate_requirements:
+        if generate_lock:
             console.print(
                 "\n[bold]Generating uv.lock from pyproject.toml...[/bold]"
             )

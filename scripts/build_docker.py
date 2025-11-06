@@ -2,10 +2,8 @@
 """
 Cross-platform Docker build script for OpenEnv environments.
 
-This script:
-1. Generates requirements.txt from pyproject.toml (if it exists)
-2. Builds the Docker image for the environment
-3. Optionally pushes to a registry
+This script builds Docker images for environments using their pyproject.toml
+and uv for dependency management.
 """
 
 import argparse
@@ -31,26 +29,7 @@ def run_command(cmd: list[str], cwd: Path | None = None, check: bool = True) -> 
         return e
 
 
-def generate_requirements(env_path: Path, output_path: Path | None = None) -> bool:
-    """Generate requirements.txt from pyproject.toml."""
-    pyproject = env_path / "pyproject.toml"
 
-    if not pyproject.exists():
-        print(f"No pyproject.toml found in {env_path}, skipping requirements generation")
-        return False
-
-    print(f"Generating requirements.txt from {pyproject}")
-
-    # Use the generate_requirements.py script
-    script_dir = Path(__file__).parent
-    generate_script = script_dir / "generate_requirements.py"
-
-    cmd = [sys.executable, str(generate_script), str(env_path)]
-    if output_path:
-        cmd.extend(["-o", str(output_path)])
-
-    result = run_command(cmd, check=False)
-    return result.returncode == 0
 
 
 def build_docker_image(
@@ -130,9 +109,6 @@ Examples:
 
   # Build without cache
   python scripts/build_docker.py src/envs/echo_env --no-cache
-
-  # Skip requirements generation
-  python scripts/build_docker.py src/envs/echo_env --no-generate-requirements
         """,
     )
 
@@ -143,12 +119,6 @@ Examples:
     parser.add_argument("-c", "--context", type=Path, help="Build context path (default: <env_path>/server)")
 
     parser.add_argument("-f", "--dockerfile", type=Path, help="Path to Dockerfile (default: <context>/Dockerfile)")
-
-    parser.add_argument(
-        "--no-generate-requirements",
-        action="store_true",
-        help="Skip generating requirements.txt from pyproject.toml",
-    )
 
     parser.add_argument("--no-cache", action="store_true", help="Build without using cache")
 
@@ -171,13 +141,6 @@ Examples:
 
     print(f"Building Docker image for: {args.env_path.name}")
     print("=" * 60)
-
-    # Generate requirements.txt if needed
-    if not args.no_generate_requirements:
-        success = generate_requirements(args.env_path)
-        if success:
-            print("✓ Requirements generated successfully")
-        print()
 
     # Parse build args
     build_args = {}
