@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "pydantic>=2.0.0",
     "uvicorn>=0.24.0",
+    "requests>=2.31.0",
     # Add your environment-specific dependencies here
     # Example:
     # "numpy",
@@ -25,10 +26,14 @@ dev = [
 ]
 
 [project.scripts]
-server = "__ENV_NAME__.server.app:main"
+server = "envs.__ENV_NAME___env.server.app:main"
 
 [tool.setuptools]
-packages = {find = {}}
+package-dir = {"" = "../.."}
+
+[tool.setuptools.packages.find]
+where = ["../.."]
+include = ["envs.__ENV_NAME___env*", "core*"]
 
 [tool.setuptools.package-data]
 "*" = ["**/*.yaml", "**/*.yml"]

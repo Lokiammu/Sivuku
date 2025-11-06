@@ -1,0 +1,143 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+"""
+Validation utilities for multi-mode deployment readiness.
+
+This module provides functions to check if environments are properly
+configured for multi-mode deployment (Docker, direct Python, notebooks, clusters).
+"""
+
+import tomllib
+from pathlib import Path
+
+
+def validate_multi_mode_deployment(env_path: Path) -> tuple[bool, list[str]]:
+    """
+    Validate that an environment is ready for multi-mode deployment.
+
+    Checks:
+    1. pyproject.toml exists
+    2. pyproject.toml has [project.scripts] with server entry point
+    3. server/app.py has a main() function
+    4. Required dependencies are present
+
+    Args:
+        env_path: Path to the environment directory
+
+    Returns:
+        Tuple of (is_valid, list of issues found)
+    """
+    issues = []
+
+    # Check pyproject.toml exists
+    pyproject_path = env_path / "pyproject.toml"
+    if not pyproject_path.exists():
+        issues.append("Missing pyproject.toml")
+        return False, issues
+
+    # Parse pyproject.toml
+    try:
+        with open(pyproject_path, "rb") as f:
+            pyproject = tomllib.load(f)
+    except Exception as e:
+        issues.append(f"Failed to parse pyproject.toml: {e}")
+        return False, issues
+
+    # Check [project.scripts] section
+    scripts = pyproject.get("project", {}).get("scripts", {})
+    if "server" not in scripts:
+        issues.append("Missing [project.scripts] server entry point")
+
+    # Check server entry point format
+    server_entry = scripts.get("server", "")
+    if server_entry and ":main" not in server_entry:
+        issues.append(
+            f"Server entry point should reference main function, got: {server_entry}"
+        )
+
+    # Check required dependencies
+    deps = pyproject.get("project", {}).get("dependencies", [])
+    required_deps = ["fastapi", "uvicorn", "pydantic", "requests"]
+    missing_deps = []
+    for required in required_deps:
+        if not any(required in dep for dep in deps):
+            missing_deps.append(required)
+
+    if missing_deps:
+        issues.append(f"Missing required dependencies: {', '.join(missing_deps)}")
+
+    # Check server/app.py exists
+    server_app = env_path / "server" / "app.py"
+    if not server_app.exists():
+        issues.append("Missing server/app.py")
+    else:
+        # Check for main() function
+        app_content = server_app.read_text(encoding="utf-8")
+        if "def main():" not in app_content:
+            issues.append("server/app.py missing main() function")
+
+        # Check if main() is callable
+        if "__name__" not in app_content or "main()" not in app_content:
+            issues.append(
+                "server/app.py main() function not callable (missing if __name__ == '__main__')"
+            )
+
+    return len(issues) == 0, issues
+
+
+def get_deployment_modes(env_path: Path) -> dict[str, bool]:
+    """
+    Check which deployment modes are supported by the environment.
+
+    Args:
+        env_path: Path to the environment directory
+
+    Returns:
+        Dictionary with deployment mode names and whether they're supported
+    """
+    modes = {
+        "docker": False,
+        "openenv_serve": False,
+        "uv_run": False,
+        "python_module": False,
+    }
+
+    # Check Docker
+    dockerfile = env_path / "server" / "Dockerfile"
+    modes["docker"] = dockerfile.exists()
+
+    # Check multi-mode deployment readiness
+    is_valid, _ = validate_multi_mode_deployment(env_path)
+    if is_valid:
+        modes["openenv_serve"] = True
+        modes["uv_run"] = True
+        modes["python_module"] = True
+
+    return modes
+
+
+def format_validation_report(env_name: str, is_valid: bool, issues: list[str]) -> str:
+    """
+    Format a validation report for display.
+
+    Args:
+        env_name: Name of the environment
+        is_valid: Whether validation passed
+        issues: List of issues found
+
+    Returns:
+        Formatted report string
+    """
+    if is_valid:
+        return f"[OK] {env_name}: Ready for multi-mode deployment"
+
+    report = [f"[FAIL] {env_name}: Not ready for multi-mode deployment", ""]
+    report.append("Issues found:")
+    for issue in issues:
+        report.append(f"  - {issue}")
+
+    return "\n".join(report)

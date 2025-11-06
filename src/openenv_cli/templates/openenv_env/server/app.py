@@ -36,10 +36,31 @@ from __ENV_NAME__.models import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Obse
 env = __ENV_CLASS_NAME__Environment()
 
 # Create the app with web interface and README integration
-app = create_app(env, __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Observation, env_name="__ENV_NAME__")
+app = create_app(
+    env,
+    __ENV_CLASS_NAME__Action,
+    __ENV_CLASS_NAME__Observation,
+    env_name="__ENV_NAME__",
+)
 
 
-if __name__ == "__main__":
+def main():
+    """
+    Entry point for direct execution via uv run or python -m.
+
+    This function enables running the server without Docker:
+        uv run --project . server
+        python -m server.app
+        openenv serve __ENV_NAME__
+
+    For production deployments, consider using uvicorn directly with
+    multiple workers:
+        uvicorn server.app:app --workers 4
+    """
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+if __name__ == "__main__":
+    main()

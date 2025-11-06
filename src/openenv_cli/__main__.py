@@ -15,7 +15,7 @@ import sys
 
 import typer
 
-from openenv_cli.commands import convert, init, push
+from openenv_cli.commands import convert, init, push, serve, validate
 
 # Create the main CLI app
 app = typer.Typer(
@@ -32,6 +32,12 @@ app.command(name="push", help="Push an OpenEnv environment to Hugging Face Space
 app.command(
     name="convert", help="Convert existing environment to standardized structure"
 )(convert.convert)
+app.command(name="serve", help="Start an OpenEnv environment server without Docker")(
+    serve.serve
+)
+app.command(name="validate", help="Validate environment for multi-mode deployment")(
+    validate.validate
+)
 
 
 # Entry point for setuptools

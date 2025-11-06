@@ -33,7 +33,20 @@ env = EchoEnvironment()
 app = create_app(env, EchoAction, EchoObservation, env_name="echo_env")
 
 
-if __name__ == "__main__":
+def main():
+    """
+    Entry point for direct execution via uv run or python -m.
+
+    This function enables running the server without Docker:
+        uv run --project . server
+        python -m envs.echo_env.server.app
+        openenv serve echo_env
+
+    """
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+if __name__ == "__main__":
+    main()
