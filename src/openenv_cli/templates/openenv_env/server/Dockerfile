@@ -11,8 +11,16 @@ FROM ${BASE_IMAGE}
 # Copy only what's needed for this environment
 COPY . /app/src/envs/__ENV_NAME__/
 
-# Install dependencies
-RUN pip install --no-cache-dir -r /app/src/envs/__ENV_NAME__/server/requirements.txt && rm /app/src/envs/__ENV_NAME__/server/requirements.txt
+# Install dependencies from requirements.txt (generated from pyproject.toml)
+# If requirements.txt doesn't exist, you can generate it with:
+#   uv pip compile pyproject.toml -o server/requirements.txt
+# Or use the script: python scripts/generate_requirements.py src/envs/__ENV_NAME__
+RUN if [ -f /app/src/envs/__ENV_NAME__/server/requirements.txt ]; then \
+    pip install --no-cache-dir -r /app/src/envs/__ENV_NAME__/server/requirements.txt && \
+    rm /app/src/envs/__ENV_NAME__/server/requirements.txt; \
+    else \
+    echo "Warning: requirements.txt not found. Skipping dependency installation."; \
+    fi
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

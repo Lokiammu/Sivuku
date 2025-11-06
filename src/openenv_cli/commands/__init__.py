@@ -6,7 +6,6 @@
 
 """OpenEnv CLI commands."""
 
-from openenv_cli.commands import init, push
+from openenv_cli.commands import convert, init, push
 
-__all__ = ["init", "push"]
-
+__all__ = ["convert", "init", "push"]

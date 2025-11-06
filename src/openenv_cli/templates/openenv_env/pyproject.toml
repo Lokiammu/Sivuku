@@ -28,8 +28,8 @@ dev = [
 server = "__ENV_NAME__.server.app:main"
 
 [tool.setuptools]
-packages = ["__ENV_NAME__"]
+packages = {find = {}}
 
 [tool.setuptools.package-data]
-__ENV_NAME__ = ["**/*.yaml", "**/*.yml"]
+"*" = ["**/*.yaml", "**/*.yml"]
 
