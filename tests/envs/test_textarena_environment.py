@@ -1,8 +1,3 @@
-import os
-import sys
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
-
 from envs.textarena_env.server.environment import TextArenaEnvironment
 from envs.textarena_env.models import TextArenaMessage
 
