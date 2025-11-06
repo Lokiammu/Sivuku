@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import random
 import shutil
+import subprocess
 from importlib import resources
 from pathlib import Path
 from typing import Annotated, Dict, List, Tuple
@@ -352,6 +353,40 @@ def _copy_template_directory(
     return created_files
 
 
+def _generate_uv_lock(env_dir: Path) -> bool:
+    """Generate uv.lock from pyproject.toml using uv."""
+    pyproject_path = env_dir / "pyproject.toml"
+
+    if not pyproject_path.exists():
+        return False
+
+    try:
+        cmd = [
+            "uv",
+            "lock",
+            "--directory",
+            str(env_dir),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+        if result.stdout:
+            console.print(result.stdout)
+
+        return True
+
+    except subprocess.CalledProcessError as e:
+        console.print(
+            f"[yellow]Warning: Could not generate uv.lock: {e.stderr}[/yellow]"
+        )
+        return False
+    except FileNotFoundError:
+        console.print(
+            "[yellow]Warning: 'uv' not found. Install it to generate uv.lock[/yellow]"
+        )
+        return False
+
+
 @app.command()
 def init(
     env_name: Annotated[
@@ -414,13 +449,28 @@ def init(
         )
 
         console.print(f"[bold green]✓[/bold green] Created {len(created_files)} files")
-        console.print(f"[bold green]Environment created successfully at: {env_dir}[/bold green]")
+        
+        # Generate uv.lock
+        console.print("\n[bold]Generating uv.lock...[/bold]")
+        if _generate_uv_lock(env_dir):
+            console.print("[green]✓[/green] Generated uv.lock")
+        else:
+            console.print(
+                "[yellow]⚠[/yellow] Could not generate uv.lock automatically"
+            )
+            console.print("    You can generate it manually with:")
+            console.print(f"    cd {env_dir} && uv lock")
+        
+        console.print(f"\n[bold green]Environment created successfully at: {env_dir}[/bold green]")
         console.print("\n[bold]Next steps:[/bold]")
         console.print(f"  cd {env_dir}")
         console.print(f"  # Edit your environment implementation in server/{env_name}_environment.py")
         console.print("  # Edit your models in models.py")
-        console.print(f"  # Build your docker environment: docker build -t {env_name}:latest -f server/Dockerfile .")
-        console.print(f"  # Run your image: docker run {env_name}:latest")
+        console.print("  # Install dependencies: uv sync")
+        console.print("\n  # To integrate into OpenEnv repo:")
+        console.print(f"  # 1. Copy this directory to <repo_root>/src/envs/{env_name}_env")
+        console.print(f"  # 2. Build from repo root: docker build -t {env_name}_env:latest -f src/envs/{env_name}_env/server/Dockerfile .")
+        console.print(f"  # 3. Run your image: docker run -p 8000:8000 {env_name}_env:latest")
 
     except Exception as e:
         # Cleanup on error

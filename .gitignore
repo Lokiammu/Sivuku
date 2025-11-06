@@ -104,6 +104,8 @@ outputs/
 # Generated requirements files from pyproject.toml
 **/server/requirements.txt.generated
 
-# UV lock files
-uv.lock
+# UV root lock file (env lock files should be committed)
+/uv.lock
 .uv/
+
+*.backup*/

@@ -11,6 +11,7 @@ This module provides functions to check if environments are properly
 configured for multi-mode deployment (Docker, direct Python, notebooks, clusters).
 """
 
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -21,9 +22,10 @@ def validate_multi_mode_deployment(env_path: Path) -> tuple[bool, list[str]]:
 
     Checks:
     1. pyproject.toml exists
-    2. pyproject.toml has [project.scripts] with server entry point
-    3. server/app.py has a main() function
-    4. Required dependencies are present
+    2. uv.lock exists and is up-to-date
+    3. pyproject.toml has [project.scripts] with server entry point
+    4. server/app.py has a main() function
+    5. Required dependencies are present
 
     Args:
         env_path: Path to the environment directory
@@ -38,6 +40,26 @@ def validate_multi_mode_deployment(env_path: Path) -> tuple[bool, list[str]]:
     if not pyproject_path.exists():
         issues.append("Missing pyproject.toml")
         return False, issues
+    
+    # Check uv.lock exists
+    lockfile_path = env_path / "uv.lock"
+    if not lockfile_path.exists():
+        issues.append("Missing uv.lock - run 'uv lock' to generate it")
+    else:
+        # Check if uv.lock is up-to-date (optional, can be expensive)
+        # We can add a check using `uv lock --check` if needed
+        try:
+            result = subprocess.run(
+                ["uv", "lock", "--check", "--directory", str(env_path)],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode != 0:
+                issues.append("uv.lock is out of date with pyproject.toml - run 'uv lock' to update")
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            # If uv is not available or times out, skip this check
+            pass
 
     # Parse pyproject.toml
     try:

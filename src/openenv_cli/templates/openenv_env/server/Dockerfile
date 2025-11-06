@@ -4,28 +4,47 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-# Use the standard openenv base image
-ARG BASE_IMAGE=ghcr.io/meta-pytorch/openenv-base:latest
+# Multi-stage build using openenv-base
+# Build from repo root: docker build -t __ENV_NAME___env:latest -f src/envs/__ENV_NAME___env/server/Dockerfile .
+ARG BASE_IMAGE=openenv-base:latest
+FROM ${BASE_IMAGE} AS builder
+
+WORKDIR /app
+
+# Copy core module (needed by __ENV_NAME___env)
+COPY src/core /app/src/core
+
+# Copy environment
+COPY src/envs/__ENV_NAME___env /app/src/envs/__ENV_NAME___env
+
+# Install dependencies using uv sync
+WORKDIR /app/src/envs/__ENV_NAME___env
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-install-project --no-editable
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-editable
+
+# Final runtime stage
 FROM ${BASE_IMAGE}
 
-# Copy only what's needed for this environment
-COPY . /app/src/envs/__ENV_NAME__/
+WORKDIR /app
 
-# Install dependencies from requirements.txt (generated from pyproject.toml)
-# If requirements.txt doesn't exist, you can generate it with:
-#   uv pip compile pyproject.toml -o server/requirements.txt
-# Or use the script: python scripts/generate_requirements.py src/envs/__ENV_NAME__
-RUN if [ -f /app/src/envs/__ENV_NAME__/server/requirements.txt ]; then \
-    pip install --no-cache-dir -r /app/src/envs/__ENV_NAME__/server/requirements.txt && \
-    rm /app/src/envs/__ENV_NAME__/server/requirements.txt; \
-    else \
-    echo "Warning: requirements.txt not found. Skipping dependency installation."; \
-    fi
+# Copy core module
+COPY --from=builder /app/src/core /app/src/core
+
+# Copy the virtual environment from builder
+COPY --from=builder /app/src/envs/__ENV_NAME___env/.venv /app/.venv
+
+# Copy the environment code
+COPY --from=builder /app/src/envs/__ENV_NAME___env /app/src/envs/__ENV_NAME___env
+
+# Set PATH to use the virtual environment
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the FastAPI server
-CMD ["uvicorn", "envs.__ENV_NAME__.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
-
+CMD ["uvicorn", "envs.__ENV_NAME___env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
