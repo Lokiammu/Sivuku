@@ -95,3 +95,15 @@ Desktop.ini
 *claude*
 *Claude*
 *CLAUDE*
+
+# OpenEnv-specific
+# Environment outputs (logs, evaluations, etc.)
+**/outputs/
+outputs/
+
+# Generated requirements files from pyproject.toml
+**/server/requirements.txt.generated
+
+# UV lock files
+uv.lock
+.uv/

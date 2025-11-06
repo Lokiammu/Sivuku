@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openenv-__ENV_NAME__"
+version = "0.1.0"
+description = "__ENV_TITLE_NAME__ environment for OpenEnv"
+requires-python = ">=3.10"
+dependencies = [
+    # Core OpenEnv dependencies
+    "fastapi>=0.115.0",
+    "pydantic>=2.0.0",
+    "uvicorn>=0.24.0",
+    # Add your environment-specific dependencies here
+    # Example:
+    # "numpy",
+    # "torch",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+server = "__ENV_NAME__.server.app:main"
+
+[tool.setuptools]
+packages = ["__ENV_NAME__"]
+
+[tool.setuptools.package-data]
+__ENV_NAME__ = ["**/*.yaml", "**/*.yml"]
+
