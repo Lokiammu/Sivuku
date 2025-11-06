@@ -187,6 +187,25 @@ class TextArenaEnvironment(Environment):
 
     def _convert_messages(self, messages: Iterable[Any]) -> List[TextArenaMessage]:
         converted: List[TextArenaMessage] = []
+        buffered_sender: int | None = None
+        buffered_category: str | None = None
+        buffered_content: List[str] = []
+
+        def flush_buffer() -> None:
+            nonlocal buffered_content, buffered_sender, buffered_category
+            if not buffered_content:
+                return
+            converted.append(
+                TextArenaMessage(
+                    sender_id=buffered_sender if buffered_sender is not None else -1,
+                    content="".join(buffered_content),
+                    category=buffered_category or "MESSAGE",
+                )
+            )
+            buffered_content = []
+            buffered_category = None
+            buffered_sender = None
+
         for entry in messages:
             if isinstance(entry, tuple) and len(entry) == 3:
                 sender, content, category = entry
@@ -197,13 +216,18 @@ class TextArenaEnvironment(Environment):
                 sender, content, category = -1, str(entry), "MESSAGE"
 
             category_name = getattr(category, "name", str(category))
-            converted.append(
-                TextArenaMessage(
-                    sender_id=int(sender) if isinstance(sender, (int, float)) else -1,
-                    content=str(content),
-                    category=category_name,
-                )
-            )
+            sender_id = int(sender) if isinstance(sender, (int, float)) else -1
+            text = str(content)
+
+            if buffered_content and buffered_category == category_name and buffered_sender == sender_id:
+                buffered_content.append(text)
+            else:
+                flush_buffer()
+                buffered_sender = sender_id
+                buffered_category = category_name
+                buffered_content = [text]
+
+        flush_buffer()
 
         return converted
 
@@ -249,4 +273,3 @@ class TextArenaEnvironment(Environment):
             for key, value in result.items():
                 aggregated[key] = float(value)
         return aggregated
-
