@@ -15,7 +15,7 @@ import sys
 
 import typer
 
-from openenv_cli.commands import convert, init, push, serve, validate
+from openenv_cli.commands import build, convert, init, push, serve, validate
 
 # Create the main CLI app
 app = typer.Typer(
@@ -37,6 +37,9 @@ app.command(name="serve", help="Start an OpenEnv environment server without Dock
 )
 app.command(name="validate", help="Validate environment for multi-mode deployment")(
     validate.validate
+)
+app.command(name="build", help="Build Docker images for OpenEnv environments")(
+    build.build
 )
 
 
