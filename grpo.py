@@ -12,10 +12,10 @@ Usage:
         VLLM_ENDPOINT=http://localhost:8000/generate/ \
         python grpo.py
         
+BROWSERGYM_BENCHMARK="miniwob" BROWSERGYM_TASK_NAME="click-test" MINIWOB_URL="http://localhost:8888/miniwob/" BROWSERGYM_PORT=8001 python app.py
 python -m http.server 8888
-BROWSERGYM_BENCHMARK="miniwob" BROWSERGYM_TASK_NAME="buy-ticket" MINIWOB_URL="http://localhost:8888/miniwob/" BROWSERGYM_PORT=8001 python app.py
-CUDA_VISIBLE_DEVICES=3 PYTHONPATH="/fsx/benjamin_burtenshaw/OpenEnv/src:${PYTHONPATH}" VLLM_ENDPOINT="http://localhost:8010/generate/" python grpo.py
-CUDA_VISIBLE_DEVICES=2 trl vllm-serve --model "Qwen/Qwen3-VL-2B-Instruct" --host 0.0.0.0 --port 8010
+CUDA_VISIBLE_DEVICES=0 trl vllm-serve --model "Qwen/Qwen3-VL-2B-Instruct" --host 0.0.0.0 --port 8010
+CUDA_VISIBLE_DEVICES=1 PYTHONPATH="/fsx/benjamin_burtenshaw/OpenEnv/src:${PYTHONPATH}" VLLM_ENDPOINT="http://localhost:8010/generate/" python grpo.py
 """
 
 from __future__ import annotations
@@ -23,9 +23,7 @@ from __future__ import annotations
 from datetime import datetime
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Set
-
-from itertools import zip_longest
+from typing import Dict, List, Optional
 
 import base64
 from io import BytesIO
@@ -54,41 +52,25 @@ NOW = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 MODEL_ID = os.getenv("MODEL_ID", "Qwen/Qwen3-VL-2B-Instruct")
 VLLM_ENDPOINT = os.getenv("VLLM_ENDPOINT", "http://localhost:8000/generate/")
 VLLM_SERVER_PORT = VLLM_ENDPOINT.split(":")[-1].split("/")[0]
-MAX_STEPS = int(os.getenv("MAX_STEPS", "1"))
+MAX_STEPS = int(os.getenv("MAX_STEPS", "8"))
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "16"))
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.5"))
 TOP_K = int(os.getenv("TOP_K", "10"))
-LEARNING_RATE = float(os.getenv("LEARNING_RATE", 1e-5))
+LEARNING_RATE = float(os.getenv("LEARNING_RATE", 1e-6))
 WEIGHT_DECAY = float(os.getenv("WEIGHT_DECAY", "0"))
-GRADIENT_ACCUMULATION_STEPS = int(os.getenv("GRAD_ACCUM_STEPS", "4"))
+GRADIENT_ACCUMULATION_STEPS = int(os.getenv("GRAD_ACCUM_STEPS", "8"))
 WARMUP_STEPS = int(os.getenv("WARMUP_STEPS", "20"))
 PER_DEVICE_BATCH_SIZE = int(os.getenv("PER_DEVICE_BATCH_SIZE", "1"))
-NUM_GENERATIONS = int(os.getenv("NUM_GENERATIONS", "4"))
+NUM_GENERATIONS = int(os.getenv("NUM_GENERATIONS", "8"))
 NUM_EPOCHS = int(os.getenv("NUM_EPOCHS", "1"))
-DATASET_SIZE = int(os.getenv("DATASET_SIZE", "1000"))
-SAVE_INTERVAL = int(os.getenv("SAVE_INTERVAL", "100"))   
+DATASET_SIZE = int(os.getenv("DATASET_SIZE", "100"))
+SAVE_INTERVAL = int(os.getenv("SAVE_INTERVAL", "50"))   
 OUTPUT_DIR = f"outputs/browsergym-grpo-{MODEL_ID.replace('/', '-')}-{NOW}"
 RUN_ID = f"run-{NOW}"
 PROJECT_ID = f"browsergym-{MODEL_ID.replace('/', '-')}"
-SPACE_ID = "BrowserGym-GRPO"
-
-STEP_DENSE_WEIGHT = float(os.getenv("STEP_DENSE_WEIGHT", "0.2"))
-SHAPING_NOOP_PENALTY = float(os.getenv("SHAPING_NOOP_PENALTY", "0.05"))
-SHAPING_ERROR_PENALTY = float(os.getenv("SHAPING_ERROR_PENALTY", "0.1"))
-SHAPING_REPEAT_ACTION_PENALTY = float(
-    os.getenv("SHAPING_REPEAT_ACTION_PENALTY", "0.05")
-)
-SHAPING_NOVEL_CLICK_BONUS = float(os.getenv("SHAPING_NOVEL_CLICK_BONUS", "0.05"))
-SHAPING_REPEAT_CLICK_PENALTY = float(
-    os.getenv("SHAPING_REPEAT_CLICK_PENALTY", "0.02")
-)
-SHAPING_NOVEL_TEXT_BONUS = float(os.getenv("SHAPING_NOVEL_TEXT_BONUS", "0.05"))
-SHAPING_REPEAT_TEXT_PENALTY = float(
-    os.getenv("SHAPING_REPEAT_TEXT_PENALTY", "0.02")
-)
+SPACE_ID = "BrowserGym-GRPO-vlm"
 
 BROWSERGYM_BASE_URL = os.getenv("BROWSERGYM_BASE_URL", "http://localhost:8001")
-MAX_DOM_CHARS = int(os.getenv("MAX_DOM_CHARS", "3500"))
 FALLBACK_ACTION = os.getenv("FALLBACK_ACTION", "noop()")
 
 ACTION_PREFIX_RE = re.compile(r"^(action|next action)\s*[:\-]\s*", re.IGNORECASE)
@@ -170,13 +152,7 @@ def extract_clickable_elements(observation) -> List[Dict[str, str]]:
 
 
 def build_user_prompt(step: int, observation, history: List[str]) -> str:
-    doc = (
-        observation.axtree_txt
-        or observation.pruned_html
-        or observation.text
-        or ""
-    )
-    doc = truncate_text(doc, MAX_DOM_CHARS)
+
     goal = observation.goal or "(not provided)"
     url = observation.url or "(unknown)"
     error_note = "Yes" if observation.last_action_error else "No"
@@ -198,11 +174,7 @@ def build_user_prompt(step: int, observation, history: List[str]) -> str:
         {build_history_lines(history)}
         Last action error: {error_note}
 
-        Available clickable element IDs:
-{actions_hint}
-
-        Page snapshot (truncated):
-        {doc}
+        Available clickable element IDs: {actions_hint}
 
         Reply with exactly one BrowserGym action string.
         """
@@ -233,59 +205,6 @@ def parse_model_action(response_text: str) -> str:
         return action
 
     return FALLBACK_ACTION
-
-
-def compute_dense_step_reward(
-    action_str: str,
-    observation,
-    extrinsic_reward: float,
-    seen_click_ids: Set[str],
-    seen_text_fields: Set[str],
-    previous_action: Optional[str],
-) -> float:
-    """Compute dense shaping reward for a single step."""
-
-    reward = 0.0
-    normalized_action = (action_str or "").strip()
-    if not normalized_action:
-        return reward
-
-    if previous_action and previous_action == normalized_action:
-        reward -= SHAPING_REPEAT_ACTION_PENALTY
-
-    lowered_action = normalized_action.lower()
-
-    if lowered_action.startswith("noop"):
-        reward -= SHAPING_NOOP_PENALTY
-
-    if getattr(observation, "last_action_error", False):
-        reward -= SHAPING_ERROR_PENALTY
-
-    click_match = CLICK_ACTION_RE.search(normalized_action)
-    if click_match:
-        click_id = click_match.group(1).strip()
-        if click_id:
-            if click_id not in seen_click_ids:
-                reward += SHAPING_NOVEL_CLICK_BONUS
-                seen_click_ids.add(click_id)
-            else:
-                reward -= SHAPING_REPEAT_CLICK_PENALTY
-
-    text_match = TEXT_ENTRY_ACTION_RE.search(normalized_action)
-    if text_match:
-        field_selector = text_match.group(2).strip()
-        if field_selector:
-            if field_selector not in seen_text_fields:
-                reward += SHAPING_NOVEL_TEXT_BONUS
-                seen_text_fields.add(field_selector)
-            else:
-                reward -= SHAPING_REPEAT_TEXT_PENALTY
-
-    # Small positive reinforcement for receiving extrinsic reward.
-    if extrinsic_reward > 0:
-        reward += min(extrinsic_reward, 1.0) * 0.05
-
-    return reward
 
 
 def pil_to_base64(image: Image.Image) -> str:
@@ -335,6 +254,11 @@ def request_vllm_completion(
     }
 
 
+# ---------------------------------------------------------------------------
+# Rollout function
+# ---------------------------------------------------------------------------
+
+
 def rollout_once(
     env: BrowserGymEnv,
     processor: AutoProcessor,
@@ -351,10 +275,6 @@ def rollout_once(
     logprobs: List[float] = []
     history: List[str] = []
     step_rewards: List[float] = []
-    dense_step_rewards: List[float] = []
-    seen_click_ids: Set[str] = set()
-    seen_text_fields: Set[str] = set()
-    previous_action: Optional[str] = None
 
     tokenizer_inner = getattr(processor, "tokenizer", None)
     if tokenizer_inner is None:
@@ -399,50 +319,23 @@ def rollout_once(
         reward = float(result.reward or 0.0)
         step_rewards.append(reward)
 
-        dense_reward = compute_dense_step_reward(
-            action_str,
-            result.observation,
-            reward,
-            seen_click_ids,
-            seen_text_fields,
-            previous_action,
-        )
-        dense_step_rewards.append(dense_reward)
-
         observation = result.observation
         history_line = f"Step {step}: {action_str} -> reward {reward:+.2f}"
         if observation.last_action_error:
             history_line += " ERROR"
         history.append(history_line)
 
-        previous_action = action_str
-
-        if DEBUG:
-            print("=" * 100)
-            print(f"Prompt:\n{user_prompt}")
-            print(f"Action: {action_str}")
-            print(f"Reward: {reward}")
-            print(f"Done: {result.done}")
-            print("=" * 100)
-
         if result.done:
             break
 
-    episode_reward = float(sum(step_rewards))
+    
 
     return {
         "prompt_ids": prompt_ids,
         "completion_ids": completion_ids,
         "logprobs": logprobs,
-        "episode_reward": episode_reward,
         "step_rewards": step_rewards,
-        "dense_step_rewards": dense_step_rewards,
     }
-
-
-# ---------------------------------------------------------------------------
-# Rollout function
-# ---------------------------------------------------------------------------
 
 
 def rollout_func(
@@ -451,9 +344,7 @@ def rollout_func(
     all_prompt_ids: List[List[int]] = []
     all_completion_ids: List[List[int]] = []
     all_logprobs: List[List[float]] = []
-    episode_rewards: List[float] = []
     per_step_rewards: List[List[float]] = []
-    per_dense_rewards: List[List[float]] = []
     num_generations = args.num_generations or NUM_GENERATIONS
 
     for _ in range(num_generations):
@@ -462,17 +353,13 @@ def rollout_func(
             all_prompt_ids.append(rollout_stats["prompt_ids"])
             all_completion_ids.append(rollout_stats["completion_ids"])
             all_logprobs.append(rollout_stats["logprobs"])
-            episode_rewards.append(rollout_stats["episode_reward"])
             per_step_rewards.append(rollout_stats.get("step_rewards", []))
-            per_dense_rewards.append(rollout_stats.get("dense_step_rewards", []))
 
     return {
         "prompt_ids": all_prompt_ids,
         "completion_ids": all_completion_ids,
         "logprobs": all_logprobs,
-        "episode_reward": episode_rewards,
         "step_rewards": per_step_rewards,
-        "dense_step_rewards": per_dense_rewards,
     }
 
 
@@ -480,28 +367,20 @@ def rollout_func(
 # Rewards
 # ---------------------------------------------------------------------------
 
+def reward_sum(completions: List[str], **kwargs: Optional[Dict]) -> List[float]:
+    rewards = (kwargs or {}).get("step_rewards") or []
+    rewards = [np.sum(reward) for reward in rewards]
+    return rewards
 
-def reward_env(completions: List[str], **kwargs: Optional[Dict]) -> List[float]:
-    base_rewards = (kwargs or {}).get("episode_reward") or []
-    dense_rewards = (kwargs or {}).get("dense_step_rewards") or []
+def reward_mean(completions: List[str], **kwargs: Optional[Dict]) -> List[float]:
+    rewards = (kwargs or {}).get("step_rewards") or []
+    rewards = [np.mean(reward) for reward in rewards]
+    return rewards
 
-    dense_sums = [sum(step_rewards or []) for step_rewards in dense_rewards]
-
-    shaped: List[float] = []
-    for base, dense_sum in zip_longest(base_rewards, dense_sums, fillvalue=0.0):
-        total = float(base) + STEP_DENSE_WEIGHT * float(dense_sum)
-        shaped.append(total)
-
-    if len(shaped) < len(completions):
-        shaped.extend([0.0] * (len(completions) - len(shaped)))
-
-    if not shaped:
-        return [0.0 for _ in completions]
-
-    mean_reward = float(np.mean(shaped))
-    normalized = [reward - mean_reward for reward in shaped]
-    return normalized
-
+def reward_max(completions: List[str], **kwargs: Optional[Dict]) -> List[float]:
+    rewards = (kwargs or {}).get("step_rewards") or []
+    rewards = [np.max(reward) for reward in rewards]
+    return rewards
 
 # ---------------------------------------------------------------------------
 # Main entrypoint
@@ -532,6 +411,7 @@ def main() -> None:
         trackio_space_id=SPACE_ID,
         run_name=RUN_ID,
         project=PROJECT_ID,
+        reward_weights=[1.0, 0.0, 0.0],
     )
 
     grpo_config.temperature = TEMPERATURE
@@ -543,7 +423,7 @@ def main() -> None:
     trainer = GRPOTrainer(
         model=MODEL_ID,
         processing_class=processor,
-        reward_funcs=[reward_env],
+        reward_funcs=[reward_sum, reward_mean, reward_max],
         train_dataset=train_dataset,
         args=grpo_config,
         rollout_func=rollout_func,
