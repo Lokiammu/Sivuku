@@ -11,10 +11,24 @@ Usage:
     BROWSERGYM_BASE_URL=http://localhost:8001 \
         VLLM_ENDPOINT=http://localhost:8000/generate/ \
         python grpo.py
-        
-BROWSERGYM_BENCHMARK="miniwob" BROWSERGYM_TASK_NAME="click-test" MINIWOB_URL="http://localhost:8888/miniwob/" BROWSERGYM_PORT=8001 python app.py
+
+# 0. Checkout the OpenEnv repository
+git clone https://github.com/ServiceNow/OpenEnv.git@add-browsergym-example
+cd OpenEnv
+uv sync
+
+# 1. clone the miniwob++ repository and start the server
+git clone https://github.com/ServiceNow/miniwob-plusplus.git
+cd miniwob-plusplus/miniwob/html/
 python -m http.server 8888
+
+# 2. start the BrowserGym server
+BROWSERGYM_BENCHMARK="miniwob" BROWSERGYM_TASK_NAME="click-test" MINIWOB_URL="http://localhost:8888/miniwob/" BROWSERGYM_PORT=8001 python app.py
+
+# 3. start the VLLM server
 CUDA_VISIBLE_DEVICES=0 trl vllm-serve --model "Qwen/Qwen3-VL-2B-Instruct" --host 0.0.0.0 --port 8010
+
+# 4. run the training script
 CUDA_VISIBLE_DEVICES=1 PYTHONPATH="/fsx/benjamin_burtenshaw/OpenEnv/src:${PYTHONPATH}" VLLM_ENDPOINT="http://localhost:8010/generate/" python grpo.py
 """
 
