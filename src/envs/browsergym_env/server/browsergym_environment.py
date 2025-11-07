@@ -23,6 +23,15 @@ from envs.browsergym_env.models import (
 )
 
 
+_MINIWOB_LOAD_HELP = (
+    "MiniWoB tasks require the MiniWoB HTML bundle to be served over HTTP. "
+    "Clone the MiniWoB++ repository, start a static server inside "
+    "`miniwob-plusplus/miniwob/html` (e.g. `python -m http.server 8888`), and "
+    "set the MINIWOB_URL environment variable to the served base URL such as "
+    "`http://localhost:8888/miniwob/`."
+)
+
+
 class BrowserGymEnvironment(Environment):
     """BrowserGym environment wrapper for OpenEnv.
 
