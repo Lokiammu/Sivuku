@@ -17,7 +17,7 @@ from typing import Any, Dict, Generic, Optional, Type, TYPE_CHECKING, TypeVar
 import requests
 
 from .client_types import StepResult
-from .containers.runtime import LocalDockerProvider
+from .containers.runtime import LocalDockerProvider, UVProvider
 
 if TYPE_CHECKING:
     from .containers.runtime import ContainerProvider
@@ -106,22 +106,70 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         return cls(base_url=base_url, provider=provider)
 
     @classmethod
-    def from_hub(cls: Type[EnvClientT], repo_id: str, provider: Optional["ContainerProvider"] = None, **kwargs: Any) -> EnvClientT:
+    def from_hub(
+        cls: Type[EnvClientT],
+        repo_id: str,
+        *,
+        use_docker: bool = False,
+        provider: Optional["ContainerProvider"] = None,
+        host: str = "0.0.0.0",
+        port: Optional[int] = None,
+        reload: bool = False,
+        timeout_s: float = 60.0,
+        runner: Optional[UVProvider] = None,
+        project_url: Optional[str] = None,
+        connect_host: Optional[str] = None,
+        extra_env: Optional[Dict[str, str]] = None,
+        **provider_kwargs: Any,
+    ) -> EnvClientT:
+        """Create a client from a Hugging Face Space.
+
+        Set ``use_docker=True`` to launch the registry image with a container
+        provider. The default ``use_docker=False`` runs the Space locally using
+        ``uv run`` through :class:`UVProvider`.
         """
-        Create an environment client by pulling from a Hugging Face model hub.
-        """
-        
-        if provider is None:
-            provider = LocalDockerProvider()
-        
-        if "tag" in kwargs:
-            tag = kwargs["tag"]
-        else:
-            tag = "latest"
-        
-        base_url = f"registry.hf.space/{repo_id.replace('/', '-')}:{tag}"
-        
-        return cls.from_docker_image(image=base_url, provider=provider)
+
+        if use_docker:
+            if provider is None:
+                provider = LocalDockerProvider()
+
+            tag = provider_kwargs.pop("tag", "latest")
+            image = provider_kwargs.pop(
+                "image",
+                f"registry.hf.space/{repo_id.replace('/', '-')}:" f"{tag}",
+            )
+
+            base_url = provider.start_container(image, **provider_kwargs)
+            provider.wait_for_ready(base_url, timeout_s=timeout_s)
+            return cls(base_url=base_url, provider=provider)
+
+        uv_runner = runner or UVProvider(
+            repo_id=repo_id,
+            host=host,
+            port=port,
+            reload=reload,
+            project_url=project_url,
+            connect_host=connect_host,
+            extra_env=extra_env,
+        )
+
+        non_docker_kwargs = dict(provider_kwargs)
+        env_vars = non_docker_kwargs.pop("env_vars", None)
+
+        base_url = uv_runner.start_container(
+            repo_id,
+            port=port,
+            env_vars=env_vars,
+            **non_docker_kwargs,
+        )
+
+        try:
+            uv_runner.wait_for_ready(base_url, timeout_s=timeout_s)
+        except Exception:
+            uv_runner.stop_container()
+            raise
+
+        return cls(base_url=base_url, provider=uv_runner)
 
     @abstractmethod
     def _step_payload(self, action: ActT) -> dict:
