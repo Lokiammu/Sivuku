@@ -83,10 +83,10 @@ def validate_multi_mode_deployment(env_path: Path) -> tuple[bool, list[str]]:
 
     # Check required dependencies
     deps = pyproject.get("project", {}).get("dependencies", [])
-    required_deps = ["fastapi", "uvicorn", "pydantic", "requests"]
+    required_deps = ["openenv-core", "fastapi", "uvicorn", "pydantic", "requests"]
     missing_deps = []
     for required in required_deps:
-        if not any(required in dep for dep in deps):
+        if not any(required in dep.lower() for dep in deps):
             missing_deps.append(required)
 
     if missing_deps:
@@ -97,9 +97,9 @@ def validate_multi_mode_deployment(env_path: Path) -> tuple[bool, list[str]]:
     if not server_app.exists():
         issues.append("Missing server/app.py")
     else:
-        # Check for main() function
+        # Check for main() function (flexible - with or without parameters)
         app_content = server_app.read_text(encoding="utf-8")
-        if "def main():" not in app_content:
+        if "def main(" not in app_content:
             issues.append("server/app.py missing main() function")
 
         # Check if main() is callable

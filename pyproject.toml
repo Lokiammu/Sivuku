@@ -21,6 +21,8 @@ dependencies = [
     "rich>=13.0.0",
     "pyyaml>=6.0",
     "huggingface_hub>=0.20.0",
+    "tomli>=2.3.0",
+    "tomli-w>=1.2.0",
 ]
 
 [project.scripts]
