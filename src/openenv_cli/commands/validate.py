@@ -23,64 +23,86 @@ from openenv_cli._validation import (
 
 
 def validate(
-    env_name: str = typer.Argument(
-        ..., help="Name of the environment to validate (e.g., 'echo_env')"
+    env_path: str | None = typer.Argument(
+        None, help="Path to the environment directory (default: current directory)"
     ),
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Show detailed information"
     ),
 ) -> None:
     """
-    Validate an environment for multi-mode deployment readiness.
+    Validate an environment for standardized structure and deployment readiness.
 
-    This command checks if an environment is properly configured to support
-    all deployment modes:
-    - Docker deployment
-    - Direct execution via openenv serve
-    - uv run server
+    This command checks if an environment is properly configured with:
+    - Required files (pyproject.toml, openenv.yaml, server/app.py, etc.)
+    - Docker deployment support
+    - uv run server capability
     - python -m module execution
 
     Examples:
-        # Validate echo_env
-        openenv validate echo_env
+        # Validate current directory (recommended)
+        $ cd my_env
+        $ openenv validate
 
         # Validate with detailed output
-        openenv validate echo_env --verbose
+        $ openenv validate --verbose
+        
+        # Validate specific environment
+        $ openenv validate src/envs/echo_env
     """
-    # Normalize environment name
-    if env_name.endswith("_env"):
-        base_name = env_name
+    # Determine environment path (default to current directory)
+    if env_path is None:
+        env_path_obj = Path.cwd()
     else:
-        base_name = f"{env_name}_env"
+        env_path_obj = Path(env_path)
 
-    # Find environment path
-    cwd = Path.cwd()
-    env_path = cwd / "src" / "envs" / base_name
-
-    if not env_path.exists():
-        typer.echo(f"Error: Environment '{env_name}' not found at {env_path}", err=True)
+    if not env_path_obj.exists():
+        typer.echo(f"Error: Path does not exist: {env_path_obj}", err=True)
+        raise typer.Exit(1)
+    
+    if not env_path_obj.is_dir():
+        typer.echo(f"Error: Path is not a directory: {env_path_obj}", err=True)
+        raise typer.Exit(1)
+    
+    # Check for openenv.yaml to confirm this is an environment directory
+    openenv_yaml = env_path_obj / "openenv.yaml"
+    if not openenv_yaml.exists():
+        typer.echo(
+            f"Error: Not an OpenEnv environment directory (missing openenv.yaml): {env_path_obj}",
+            err=True,
+        )
+        typer.echo(
+            "Hint: Run this command from the environment root directory or specify the path",
+            err=True,
+        )
         raise typer.Exit(1)
 
+    env_name = env_path_obj.name
+    if env_name.endswith("_env"):
+        base_name = env_name[:-4]
+    else:
+        base_name = env_name
+
     # Run validation
-    is_valid, issues = validate_multi_mode_deployment(env_path)
+    is_valid, issues = validate_multi_mode_deployment(env_path_obj)
 
     # Show validation report
-    report = format_validation_report(env_name, is_valid, issues)
+    report = format_validation_report(base_name, is_valid, issues)
     typer.echo(report)
 
     # Show deployment modes if verbose
     if verbose:
         typer.echo("\nSupported deployment modes:")
-        modes = get_deployment_modes(env_path)
+        modes = get_deployment_modes(env_path_obj)
         for mode, supported in modes.items():
             status = "[YES]" if supported else "[NO]"
             typer.echo(f"  {status} {mode}")
 
         if is_valid:
             typer.echo("\nUsage examples:")
-            typer.echo(f"  openenv serve {env_name}")
-            typer.echo(f"  cd src/envs/{base_name} && uv run server")
-            typer.echo(f"  python -m envs.{base_name}.server.app")
+            typer.echo(f"  cd {env_path_obj.name} && uv run server")
+            typer.echo(f"  cd {env_path_obj.name} && openenv build")
+            typer.echo(f"  cd {env_path_obj.name} && openenv push")
 
     if not is_valid:
         raise typer.Exit(1)

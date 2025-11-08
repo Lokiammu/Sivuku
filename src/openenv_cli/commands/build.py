@@ -107,9 +107,9 @@ def _push_docker_image(tag: str, registry: str | None = None) -> bool:
 @app.command()
 def build(
     env_path: Annotated[
-        str,
-        typer.Argument(help="Path to the environment directory"),
-    ],
+        str | None,
+        typer.Argument(help="Path to the environment directory (default: current directory)"),
+    ] = None,
     tag: Annotated[
         str | None,
         typer.Option(
@@ -167,26 +167,35 @@ def build(
     Build Docker images for OpenEnv environments.
 
     This command builds Docker images using the environment's pyproject.toml
-    and uv for dependency management.
+    and uv for dependency management. Run from the environment root directory.
 
     Examples:
-        # Build echo_env with default settings
-        $ openenv build src/envs/echo_env
+        # Build from environment root (recommended)
+        $ cd my_env
+        $ openenv build
 
         # Build with custom tag
-        $ openenv build src/envs/echo_env -t my-custom-tag
+        $ openenv build -t my-custom-tag
 
         # Build and push to registry
-        $ openenv build src/envs/echo_env --push --registry myregistry.io
+        $ openenv build --push --registry myregistry.io
 
         # Build without cache
-        $ openenv build src/envs/echo_env --no-cache
+        $ openenv build --no-cache
 
         # Build with custom build arguments
-        $ openenv build src/envs/echo_env --build-arg VERSION=1.0 --build-arg ENV=prod
+        $ openenv build --build-arg VERSION=1.0 --build-arg ENV=prod
+        
+        # Build from different directory
+        $ openenv build src/envs/echo_env
     """
+    # Determine environment path (default to current directory)
+    if env_path is None:
+        env_path_obj = Path.cwd()
+    else:
+        env_path_obj = Path(env_path)
+    
     # Validate environment path
-    env_path_obj = Path(env_path)
     if not env_path_obj.exists():
         console.print(
             f"[bold red]Error:[/bold red] Environment path does not exist: {env_path_obj}",
@@ -197,6 +206,19 @@ def build(
     if not env_path_obj.is_dir():
         console.print(
             f"[bold red]Error:[/bold red] Environment path is not a directory: {env_path_obj}",
+            file=sys.stderr,
+        )
+        raise typer.Exit(1)
+    
+    # Check for openenv.yaml to confirm this is an environment directory
+    openenv_yaml = env_path_obj / "openenv.yaml"
+    if not openenv_yaml.exists():
+        console.print(
+            f"[bold red]Error:[/bold red] Not an OpenEnv environment directory (missing openenv.yaml): {env_path_obj}",
+            file=sys.stderr,
+        )
+        console.print(
+            "[yellow]Hint:[/yellow] Run this command from the environment root directory or specify the path",
             file=sys.stderr,
         )
         raise typer.Exit(1)

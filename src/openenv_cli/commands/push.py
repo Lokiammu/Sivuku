@@ -12,7 +12,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import Annotated
-
+import sys
 import typer
 import yaml
 from huggingface_hub import HfApi, login, whoami
@@ -113,14 +113,15 @@ def _prepare_staging_directory(
     env_name: str,
     staging_dir: Path,
     base_image: str | None = None,
+    enable_interface: bool = True,
 ) -> None:
     """
-    Prepare files for Hugging Face deployment.
+    Prepare files for deployment.
 
     This includes:
     - Copying necessary files
-    - Modifying Dockerfile to enable web interface and update base image
-    - Ensuring README has proper HF frontmatter
+    - Modifying Dockerfile to optionally enable web interface and update base image
+    - Ensuring README has proper HF frontmatter (if interface enabled)
     """
     # Create staging directory structure
     staging_dir.mkdir(parents=True, exist_ok=True)
@@ -137,7 +138,7 @@ def _prepare_staging_directory(
         else:
             shutil.copy2(item, dest)
 
-    # Modify Dockerfile to enable web interface and optionally update base image
+    # Modify Dockerfile to optionally enable web interface and update base image
     dockerfile_path = staging_dir / "server" / "Dockerfile"
     if dockerfile_path.exists():
         dockerfile_content = dockerfile_path.read_text()
@@ -145,7 +146,7 @@ def _prepare_staging_directory(
         new_lines = []
         cmd_found = False
         base_image_updated = False
-        web_interface_enabled = "ENABLE_WEB_INTERFACE=true" in dockerfile_content
+        web_interface_env_exists = "ENABLE_WEB_INTERFACE" in dockerfile_content
 
         for line in lines:
             # Update base image if specified
@@ -155,20 +156,18 @@ def _prepare_staging_directory(
                 base_image_updated = True
                 continue
 
-            # Add ENABLE_WEB_INTERFACE=true before CMD
-            if line.strip().startswith("CMD") and not cmd_found:
+            # Add ENABLE_WEB_INTERFACE before CMD if requested
+            if line.strip().startswith("CMD") and not cmd_found and not web_interface_env_exists:
                 # Add ENV line before CMD
-                if not web_interface_enabled:
+                if enable_interface:
                     new_lines.append("ENV ENABLE_WEB_INTERFACE=true")
-                    web_interface_enabled = True
                 cmd_found = True
 
             new_lines.append(line)
 
-        # Add ENABLE_WEB_INTERFACE if CMD not found
-        if not cmd_found and not web_interface_enabled:
+        # Add ENABLE_WEB_INTERFACE if CMD not found and not already present
+        if not cmd_found and not web_interface_env_exists and enable_interface:
             new_lines.append("ENV ENABLE_WEB_INTERFACE=true")
-            web_interface_enabled = True
 
         # If base image was specified but FROM line wasn't found, add it at the beginning
         if base_image and not base_image_updated:
@@ -179,35 +178,36 @@ def _prepare_staging_directory(
         changes = []
         if base_image and base_image_updated:
             changes.append("updated base image")
-        if web_interface_enabled and "ENABLE_WEB_INTERFACE=true" not in dockerfile_content:
+        if enable_interface and not web_interface_env_exists:
             changes.append("enabled web interface")
         if changes:
             console.print(f"[bold green]✓[/bold green] Updated Dockerfile: {', '.join(changes)}")
     else:
         console.print("[bold yellow]⚠[/bold yellow] No Dockerfile found at server/Dockerfile")
 
-    # Ensure README has proper HF frontmatter
-    readme_path = staging_dir / "README.md"
-    if readme_path.exists():
-        readme_content = readme_path.read_text()
-        if "base_path: /web" not in readme_content:
-            # Check if frontmatter exists
-            if readme_content.startswith("---"):
-                # Add base_path to existing frontmatter
-                lines = readme_content.split("\n")
-                new_lines = []
-                _in_frontmatter = True
-                for i, line in enumerate(lines):
-                    new_lines.append(line)
-                    if line.strip() == "---" and i > 0:
-                        # End of frontmatter, add base_path before this line
-                        if "base_path:" not in "\n".join(new_lines):
-                            new_lines.insert(-1, "base_path: /web")
-                        _in_frontmatter = False
-                readme_path.write_text("\n".join(new_lines))
-            else:
-                # No frontmatter, add it
-                frontmatter = f"""---
+    # Ensure README has proper HF frontmatter (only if interface enabled)
+    if enable_interface:
+        readme_path = staging_dir / "README.md"
+        if readme_path.exists():
+            readme_content = readme_path.read_text()
+            if "base_path: /web" not in readme_content:
+                # Check if frontmatter exists
+                if readme_content.startswith("---"):
+                    # Add base_path to existing frontmatter
+                    lines = readme_content.split("\n")
+                    new_lines = []
+                    _in_frontmatter = True
+                    for i, line in enumerate(lines):
+                        new_lines.append(line)
+                        if line.strip() == "---" and i > 0:
+                            # End of frontmatter, add base_path before this line
+                            if "base_path:" not in "\n".join(new_lines):
+                                new_lines.insert(-1, "base_path: /web")
+                            _in_frontmatter = False
+                    readme_path.write_text("\n".join(new_lines))
+                else:
+                    # No frontmatter, add it
+                    frontmatter = f"""---
 title: {env_name.replace("_", " ").title()} Environment Server
 emoji: 🔊
 colorFrom: '#00C9FF'
@@ -221,10 +221,10 @@ tags:
 ---
 
 """
-                readme_path.write_text(frontmatter + readme_content)
-            console.print("[bold green]✓[/bold green] Updated README with HF Space frontmatter")
-    else:
-        console.print("[bold yellow]⚠[/bold yellow] No README.md found")
+                    readme_path.write_text(frontmatter + readme_content)
+                console.print("[bold green]✓[/bold green] Updated README with HF Space frontmatter")
+        else:
+            console.print("[bold yellow]⚠[/bold yellow] No README.md found")
 
 
 def _create_hf_space(
@@ -277,11 +277,7 @@ def _upload_to_hf_space(
 def push(
     directory: Annotated[
         str | None,
-        typer.Option(
-            "--directory",
-            "-d",
-            help="Directory containing the OpenEnv environment (defaults to current directory)",
-        ),
+        typer.Argument(help="Directory containing the OpenEnv environment (default: current directory)"),
     ] = None,
     repo_id: Annotated[
         str | None,
@@ -299,6 +295,27 @@ def push(
             help="Base Docker image to use (overrides Dockerfile FROM)",
         ),
     ] = None,
+    interface: Annotated[
+        bool,
+        typer.Option(
+            "--interface",
+            help="Enable web interface (default: True if no registry specified)",
+        ),
+    ] = None,
+    no_interface: Annotated[
+        bool,
+        typer.Option(
+            "--no-interface",
+            help="Disable web interface",
+        ),
+    ] = False,
+    registry: Annotated[
+        str | None,
+        typer.Option(
+            "--registry",
+            help="Custom registry URL (e.g., docker.io/username). Disables web interface by default.",
+        ),
+    ] = None,
     private: Annotated[
         bool,
         typer.Option(
@@ -308,18 +325,56 @@ def push(
     ] = False,
 ) -> None:
     """
-    Push an OpenEnv environment to Hugging Face Spaces.
+    Push an OpenEnv environment to Hugging Face Spaces or a custom registry.
 
     This command:
     1. Validates that the directory is an OpenEnv environment (openenv.yaml present)
-    2. Prepares a custom build for Hugging Face Docker space (enables web interface)
-    3. Uploads to Hugging Face (ensuring user is logged in)
+    2. Prepares a custom build for deployment (optionally enables web interface)
+    3. Uploads to Hugging Face or custom registry
+
+    The web interface is enabled by default when pushing to HuggingFace Spaces,
+    but disabled by default when pushing to a custom registry.
 
     Examples:
+        # Push from current directory with web interface (default)
+        $ cd my_env
         $ openenv push
+
+        # Push without web interface
+        $ openenv push --no-interface
+
+        # Push to custom registry (web interface disabled by default)
+        $ openenv push --registry docker.io/myuser
+
+        # Push to custom registry with web interface
+        $ openenv push --registry docker.io/myuser --interface
+
+        # Push to specific HuggingFace repo
         $ openenv push --repo-id my-org/my-env
+        
+        # Push with custom base image and private
         $ openenv push --private --base-image ghcr.io/meta-pytorch/openenv-base:latest
     """
+    # Handle interface flag logic
+    if no_interface and interface:
+        console.print(
+            "[bold red]Error:[/bold red] Cannot specify both --interface and --no-interface",
+            file=sys.stderr,
+        )
+        raise typer.Exit(1)
+    
+    # Determine if web interface should be enabled
+    if no_interface:
+        enable_interface = False
+    elif interface is not None:
+        enable_interface = interface
+    elif registry is not None:
+        # Custom registry: disable interface by default
+        enable_interface = False
+    else:
+        # HuggingFace: enable interface by default
+        enable_interface = True
+    
     # Determine directory
     if directory:
         env_dir = Path(directory).resolve()
@@ -328,13 +383,71 @@ def push(
 
     if not env_dir.exists() or not env_dir.is_dir():
         raise typer.BadParameter(f"Directory does not exist: {env_dir}")
+    
+    # Check for openenv.yaml to confirm this is an environment directory
+    openenv_yaml = env_dir / "openenv.yaml"
+    if not openenv_yaml.exists():
+        console.print(
+            f"[bold red]Error:[/bold red] Not an OpenEnv environment directory (missing openenv.yaml): {env_dir}",
+        )
+        console.print(
+            "[yellow]Hint:[/yellow] Run this command from the environment root directory",
+        )
+        raise typer.Exit(1)
 
     # Validate OpenEnv environment
     console.print(f"[bold cyan]Validating OpenEnv environment in {env_dir}...[/bold cyan]")
     env_name, manifest = _validate_openenv_directory(env_dir)
     console.print(f"[bold green]✓[/bold green] Found OpenEnv environment: {env_name}")
 
-    # Ensure authentication
+    # Handle custom registry push
+    if registry:
+        console.print("[bold cyan]Preparing files for custom registry deployment...[/bold cyan]")
+        if enable_interface:
+            console.print("[bold cyan]Web interface will be enabled[/bold cyan]")
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            staging_dir = Path(tmpdir) / "staging"
+            _prepare_staging_directory(
+                env_dir, env_name, staging_dir, 
+                base_image=base_image, 
+                enable_interface=enable_interface
+            )
+            
+            # Build Docker image from staging directory
+            tag = f"{registry}/{env_name}"
+            console.print(f"[bold cyan]Building Docker image: {tag}[/bold cyan]")
+            
+            # Use the build logic (could import from build.py or inline)
+            from .build import _build_docker_image
+            
+            success = _build_docker_image(
+                env_path=staging_dir,
+                tag=tag,
+                context_path=staging_dir / "server",
+            )
+            
+            if not success:
+                console.print("[bold red]✗ Docker build failed[/bold red]")
+                raise typer.Exit(1)
+            
+            console.print("[bold green]✓ Docker build successful[/bold green]")
+            
+            # Push to registry
+            console.print(f"[bold cyan]Pushing to registry: {registry}[/bold cyan]")
+            from .build import _push_docker_image
+            
+            success = _push_docker_image(tag, registry=None)  # Tag already includes registry
+            
+            if not success:
+                console.print("[bold red]✗ Docker push failed[/bold red]")
+                raise typer.Exit(1)
+            
+            console.print("\n[bold green]✓ Deployment complete![/bold green]")
+            console.print(f"Image: {tag}")
+        return
+
+    # Ensure authentication for HuggingFace
     username = _ensure_hf_authenticated()
 
     # Determine repo_id
@@ -349,10 +462,15 @@ def push(
     api = HfApi()
 
     # Prepare staging directory
-    console.print("[bold cyan]Preparing files for Hugging Face deployment...[/bold cyan]")
+    deployment_type = "with web interface" if enable_interface else "without web interface"
+    console.print(f"[bold cyan]Preparing files for Hugging Face deployment ({deployment_type})...[/bold cyan]")
     with tempfile.TemporaryDirectory() as tmpdir:
         staging_dir = Path(tmpdir) / "staging"
-        _prepare_staging_directory(env_dir, env_name, staging_dir, base_image=base_image)
+        _prepare_staging_directory(
+            env_dir, env_name, staging_dir, 
+            base_image=base_image,
+            enable_interface=enable_interface
+        )
 
         # Create/verify space
         _create_hf_space(repo_id, api, private=private)
