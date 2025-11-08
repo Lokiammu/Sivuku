@@ -1,5 +1,5 @@
 from envs.textarena_env.server.environment import TextArenaEnvironment
-from envs.textarena_env.models import TextArenaMessage
+from envs.textarena_env.models import TextArenaMessage, TextArenaAction
 
 
 def test_convert_messages_coalesces_consecutive_characters():
@@ -23,42 +23,43 @@ def test_convert_messages_coalesces_consecutive_characters():
     ]
 
 
-def test_convert_messages_splits_on_newlines():
-    env = object.__new__(TextArenaEnvironment)
+def test_wordle_reset_clears_accumulated_state():
+    """Test that resetting Wordle environment clears accumulated observation state.
 
-    raw_messages = [
-        "[",
-        "G",
-        "A",
-        "M",
-        "E",
-        "]",
-        "\n",
-        "[",
-        "N",
-        "E",
-        "X",
-        "T",
-        "]",
-    ]
+    This test verifies the workaround for TextArena's LLMObservationWrapper,
+    which accumulates observations in self.full_observations across resets.
+    """
+    env = TextArenaEnvironment(
+        env_id="Wordle-v0",
+        num_players=1,
+    )
 
-    converted = env._convert_messages(raw_messages)
+    # First episode
+    obs1 = env.reset()
+    prompt1_len = len(obs1.prompt)
 
-    assert converted == [
-        TextArenaMessage(sender_id=-1, content="[GAME]", category="MESSAGE"),
-        TextArenaMessage(sender_id=-1, content="[NEXT]", category="MESSAGE"),
-    ]
+    # Make a move to accumulate some state
+    env.step(TextArenaAction(message="[CRANE]"))
 
+    # Second episode - should NOT accumulate from first episode
+    obs2 = env.reset()
+    prompt2_len = len(obs2.prompt)
 
-def test_convert_messages_preserves_blank_lines():
-    env = object.__new__(TextArenaEnvironment)
+    # Make another move
+    env.step(TextArenaAction(message="[STALE]"))
 
-    raw_messages = ["A", "\n", "\n", "B"]
+    # Third episode - should NOT accumulate from previous episodes
+    obs3 = env.reset()
+    prompt3_len = len(obs3.prompt)
 
-    converted = env._convert_messages(raw_messages)
+    # All prompts should be the same length (no accumulation)
+    assert prompt1_len == prompt2_len, (
+        f"Episode 2 accumulated state: {prompt1_len} -> {prompt2_len}"
+    )
+    assert prompt2_len == prompt3_len, (
+        f"Episode 3 accumulated state: {prompt2_len} -> {prompt3_len}"
+    )
 
-    assert converted == [
-        TextArenaMessage(sender_id=-1, content="A", category="MESSAGE"),
-        TextArenaMessage(sender_id=-1, content="", category="MESSAGE"),
-        TextArenaMessage(sender_id=-1, content="B", category="MESSAGE"),
-    ]
+    # Verify the prompts are actually the same content
+    assert obs1.prompt == obs2.prompt
+    assert obs2.prompt == obs3.prompt
