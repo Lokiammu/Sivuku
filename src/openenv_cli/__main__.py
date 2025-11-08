@@ -15,7 +15,7 @@ import sys
 
 import typer
 
-from openenv_cli.commands import build, init, push, validate
+from openenv_cli.commands import build, init, push, serve, validate
 
 # Create the main CLI app
 app = typer.Typer(
@@ -34,6 +34,9 @@ app.command(name="validate", help="Validate environment structure and deployment
 )
 app.command(name="push", help="Push an OpenEnv environment to Hugging Face Spaces or custom registry")(
     push.push
+)
+app.command(name="serve", help="Serve environments locally (TODO: Phase 4)")(
+    serve.serve
 )
 
 
