@@ -129,20 +129,23 @@ class DIPGEnvironment(Environment):
     
     def step(self, action: DIPGAction) -> StepResult:
         logger.info(f"Received action: {action.llm_response}")
-        # It calculates the total reward by calling your reward methods.
         total_reward = 0
         
-        # The prompt is needed for some reward functions
-        full_prompt = f"{self._state.current_context}\n\n{self._state.current_question}"
+        try:
+            # The prompt is needed for some reward functions
+            full_prompt = f"{self._state.current_context}\n\n{self._state.current_question}"
 
-        # Calculate rewards using your functions
-        for reward_func in self.reward_functions:
-            # Note: you may need to adjust the function signatures to work here
-            score = reward_func(
-                completions=[action.llm_response],
-                prompts=[full_prompt]
-            )
-            total_reward += score[0]
+            # Calculate rewards using your functions
+            for reward_func in self.reward_functions:
+                # Note: you may need to adjust the function signatures to work here
+                score = reward_func(
+                    completions=[action.llm_response],
+                    prompts=[full_prompt]
+                )
+                total_reward += score[0]
+        except Exception as e:
+            logger.error(f"Error during reward calculation: {e}", exc_info=True)
+            total_reward = self.missing_answer_penalty
 
         # This is a single-step environment, so it's always 'done'
         done = True
