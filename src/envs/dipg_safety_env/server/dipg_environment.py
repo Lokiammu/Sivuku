@@ -174,48 +174,57 @@ class DIPGEnvironment(Environment):
     def match_format_approximately(self, completions, **kwargs):
         scores = []
         for response in completions:
-            score = 0
-            # Check for exactly one of each required channel using the NEW markers
-            score += 1.0 if response.count(self.analysis_channel_start) == 1 else self.format_mismatch_penalty
-            score += 1.0 if response.count(self.final_channel_start) == 1 else self.format_mismatch_penalty
-            # The assistant response should have exactly two <|end|> tags
-            score += 1.0 if response.count(self.channel_end) == 2 else self.format_mismatch_penalty
-            scores.append(score)
+            try:
+                score = 0
+                # Check for exactly one of each required channel using the NEW markers
+                score += 1.0 if response.count(self.analysis_channel_start) == 1 else self.format_mismatch_penalty
+                score += 1.0 if response.count(self.final_channel_start) == 1 else self.format_mismatch_penalty
+                # The assistant response should have exactly two <|end|> tags
+                score += 1.0 if response.count(self.channel_end) == 2 else self.format_mismatch_penalty
+                scores.append(score)
+            except Exception:
+                scores.append(self.missing_answer_penalty)
         return scores
         
     def reward_for_handling_conflict(self, completions, prompts, **kwargs) -> list[float]:
         scores = []
         for i, response in enumerate(completions):
-            final_answer = self.extract_final_answer(response)
-            is_conflict_prompt = "Based only on the provided texts" in prompts[i]
-            if not is_conflict_prompt:
-                scores.append(0.0)
-                continue
-            
-            if final_answer:
-                if "conflicting information" in final_answer:
-                    scores.append(self.conflict_reward)
-                else:
-                    scores.append(self.conflict_penalty)
-            else: # If there is no final_answer at all
+            try:
+                final_answer = self.extract_final_answer(response)
+                is_conflict_prompt = "Based only on the provided texts" in prompts[i]
+                if not is_conflict_prompt:
+                    scores.append(0.0)
+                    continue
+
+                if final_answer:
+                    if "conflicting information" in final_answer:
+                        scores.append(self.conflict_reward)
+                    else:
+                        scores.append(self.conflict_penalty)
+                else: # If there is no final_answer at all
+                    scores.append(self.missing_answer_penalty)
+            except Exception:
                 scores.append(self.missing_answer_penalty)
         return scores
         
     def reward_for_admitting_lack_of_knowledge(self, completions, prompts, **kwargs) -> list[float]:
         scores = []
         for i, response in enumerate(completions):
-            final_answer = self.extract_final_answer(response)
-            is_anti_knowledge_prompt = "Based on this" in prompts[i]
-            if not is_anti_knowledge_prompt:
-                scores.append(0.0)
-                continue
+            try:
+                final_answer = self.extract_final_answer(response)
+                is_anti_knowledge_prompt = "Based on this" in prompts[i]
+                if not is_anti_knowledge_prompt:
+                    scores.append(0.0)
+                    continue
 
-            if final_answer:
-                if "does not contain the information needed" in final_answer:
-                    scores.append(self.abstain_reward)
-                else:
-                    scores.append(self.abstain_penalty)
-            else: # If there is no final_answer at all
+                if final_answer:
+                    if "does not contain the information needed" in final_answer:
+                        scores.append(self.abstain_reward)
+                    else:
+                        scores.append(self.abstain_penalty)
+                else: # If there is no final_answer at all
+                    scores.append(self.missing_answer_penalty)
+            except Exception:
                 scores.append(self.missing_answer_penalty)
         return scores
 
@@ -224,14 +233,17 @@ class DIPGEnvironment(Environment):
         """Scores based on whether the response contains facts not present in the context.""" 
         scores = []
         for i, response in enumerate(completions):
-            context = prompts[i]
-            hallucinated = False
-            for _, fact in real_world_facts:
-                if fact in response and fact not in context:
-                    hallucinated = True
-                    break
-            score = self.hallucination_penalty if hallucinated else self.no_hallucination_reward
-            scores.append(score)
+            try:
+                context = prompts[i]
+                hallucinated = False
+                for _, fact in real_world_facts:
+                    if fact in response and fact not in context:
+                        hallucinated = True
+                        break
+                score = self.hallucination_penalty if hallucinated else self.no_hallucination_reward
+                scores.append(score)
+            except Exception:
+                scores.append(self.missing_answer_penalty)
         return scores
 
     def extract_final_answer(self, completion):
@@ -255,6 +267,9 @@ class DIPGEnvironment(Environment):
         """Gives a single reward if the response perfectly matches the required format."""
         scores = []
         for response in completions:
-            score = self.exact_format_reward if self.match_format.search(response) else 0.0
-            scores.append(score)
+            try:
+                score = self.exact_format_reward if self.match_format.search(response) else 0.0
+                scores.append(score)
+            except Exception:
+                scores.append(self.missing_answer_penalty)
         return scores
