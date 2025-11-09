@@ -60,22 +60,16 @@ def validate_env_structure(env_dir: Path, strict: bool = False) -> List[str]:
         if not (env_dir / file).exists():
             raise FileNotFoundError(f"Required file missing: {file}")
 
-    # Check for dependency management (pyproject.toml OR requirements.txt)
+    # Check for dependency management (pyproject.toml required)
     has_pyproject = (env_dir / "pyproject.toml").exists()
-    has_requirements = (env_dir / "server" / "requirements.txt").exists()
 
-    if not has_pyproject and not has_requirements:
+    if not has_pyproject:
         raise FileNotFoundError(
             "No dependency specification found. "
-            "Either 'pyproject.toml' (recommended) or 'server/requirements.txt' is required."
+            "'pyproject.toml' is required."
         )
 
     # Warnings for recommended structure
-    if has_requirements and not has_pyproject:
-        warnings.append(
-            "Using requirements.txt is deprecated. "
-            "Consider migrating to pyproject.toml"
-        )
 
     if not (env_dir / "outputs").exists():
         warnings.append("Recommended directory missing: outputs/")

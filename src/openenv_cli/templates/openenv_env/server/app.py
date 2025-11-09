@@ -25,8 +25,8 @@ try:
     from openenv_core.env_server.http_server import create_app
 except Exception as e:  # pragma: no cover
     raise ImportError(
-        "openenv_core is required for the web interface. Install template deps with '\n"
-        "    pip install -r server/requirements.txt\n'"
+        "openenv_core is required for the web interface. Install dependencies with '\n"
+        "    uv sync\n'"
     ) from e
 
 from .__ENV_NAME___environment import __ENV_CLASS_NAME__Environment
