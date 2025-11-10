@@ -33,7 +33,6 @@ def _poll_health(health_url: str, timeout_s: float) -> None:
 
 def _create_uv_command(
     repo_id: str,
-    host: str,
     port: int,
     reload: bool,
 ) -> list[str]:
@@ -46,7 +45,7 @@ def _create_uv_command(
         "--",
         "server",
         "--host",
-        host,
+        "0.0.0.0",
         "--port",
         str(port),
     ]
@@ -74,15 +73,13 @@ def _find_free_port() -> int:
 class UVProvider(RuntimeProvider):
     """
     RuntimeProvider implementation backed by ``uv run``.
-    
+
     Args:
         repo_id: The repository ID of the environment to run
-        host: The host to bind the environment to
-        port: The port to bind the environment to
         reload: Whether to reload the environment on code changes
         env_vars: Environment variables to pass to the environment
         context_timeout_s: The timeout to wait for the environment to become ready
-    
+
     Example:
         >>> provider = UVProvider(repo_id="burtenshaw/echo-cli")
         >>> base_url = provider.start()
@@ -94,16 +91,12 @@ class UVProvider(RuntimeProvider):
     def __init__(
         self,
         repo_id: str,
-        host: str = "0.0.0.0",
-        port: Optional[int] = None,
         reload: bool = False,
         env_vars: Optional[Dict[str, str]] = None,
         context_timeout_s: float = 60.0,
     ):
         """Initialize the UVProvider."""
         self.repo_id = repo_id
-        self.host = host
-        self.port = port
         self.reload = reload
         self.env_vars = env_vars
         self.context_timeout_s = context_timeout_s
@@ -119,25 +112,24 @@ class UVProvider(RuntimeProvider):
     ) -> str:
         """
         Start the environment via `uv run`.
-        
+
         Args:
             port: The port to bind the environment to
             env_vars: Environment variables to pass to the environment
-        
+
         Returns:
             The base URL of the environment
-        
+
         Raises:
             RuntimeError: If the environment is already running
         """
         if self._process is not None and self._process.poll() is None:
             raise RuntimeError("UVProvider is already running")
 
-        bind_port = port or self.port or _find_free_port()
+        bind_port = port or _find_free_port()
 
         command = _create_uv_command(
             repo_id=self.repo_id,
-            host=self.host,
             port=bind_port,
             reload=self.reload,
         )
@@ -154,18 +146,16 @@ class UVProvider(RuntimeProvider):
         except OSError as exc:
             raise RuntimeError(f"Failed to launch `uv run`: {exc}") from exc
 
-        client_host = "127.0.0.1" if self.host in {"0.0.0.0", "::"} else self.host
-        self._base_url = f"http://{client_host}:{bind_port}"
-        self.port = bind_port
+        self._base_url = f"http://localhost:{bind_port}"
         return self._base_url
 
     def wait_for_ready(self, timeout_s: float = 60.0) -> None:
         """
         Wait for the environment to become ready.
-        
+
         Args:
             timeout_s: The timeout to wait for the environment to become ready
-        
+
         Raises:
             RuntimeError: If the environment is not running
             TimeoutError: If the environment does not become ready within the timeout
@@ -179,7 +169,7 @@ class UVProvider(RuntimeProvider):
     def stop(self) -> None:
         """
         Stop the environment.
-        
+
         Raises:
             RuntimeError: If the environment is not running
         """
@@ -201,10 +191,10 @@ class UVProvider(RuntimeProvider):
     def base_url(self) -> str:
         """
         The base URL of the environment.
-        
+
         Returns:
             The base URL of the environment
-        
+
         Raises:
             RuntimeError: If the environment is not running
         """
