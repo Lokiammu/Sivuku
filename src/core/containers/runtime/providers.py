@@ -348,3 +348,17 @@ class RuntimeProvider(ABC):
         Wait for the runtime to be ready to accept requests.
         """
         pass
+
+    def __enter__(self) -> "RuntimeProvider":
+        """
+        Enter the runtime provider.
+        """
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        """
+        Exit the runtime provider.
+        """
+        self.stop()
+        return False
