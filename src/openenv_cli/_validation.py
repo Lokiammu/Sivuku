@@ -27,9 +27,6 @@ def validate_multi_mode_deployment(env_path: Path) -> tuple[bool, list[str]]:
     4. server/app.py has a main() function
     5. Required dependencies are present
 
-    Args:
-        env_path: Path to the environment directory
-
     Returns:
         Tuple of (is_valid, list of issues found)
     """
@@ -115,9 +112,6 @@ def get_deployment_modes(env_path: Path) -> dict[str, bool]:
     """
     Check which deployment modes are supported by the environment.
 
-    Args:
-        env_path: Path to the environment directory
-
     Returns:
         Dictionary with deployment mode names and whether they're supported
     """
@@ -145,11 +139,6 @@ def get_deployment_modes(env_path: Path) -> dict[str, bool]:
 def format_validation_report(env_name: str, is_valid: bool, issues: list[str]) -> str:
     """
     Format a validation report for display.
-
-    Args:
-        env_name: Name of the environment
-        is_valid: Whether validation passed
-        issues: List of issues found
 
     Returns:
         Formatted report string

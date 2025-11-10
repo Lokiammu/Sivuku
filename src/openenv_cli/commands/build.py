@@ -338,20 +338,6 @@ def build(
             help="Build arguments (can be used multiple times, format: KEY=VALUE)",
         ),
     ] = None,
-    push: Annotated[
-        bool,
-        typer.Option(
-            "--push",
-            help="Push image to registry after building",
-        ),
-    ] = False,
-    registry: Annotated[
-        str | None,
-        typer.Option(
-            "--registry",
-            help="Registry to push to (e.g., docker.io/username)",
-        ),
-    ] = None,
 ) -> None:
     """
     Build Docker images for OpenEnv environments.
@@ -366,9 +352,6 @@ def build(
 
         # Build with custom tag
         $ openenv build -t my-custom-tag
-
-        # Build and push to registry
-        $ openenv build --push --registry myregistry.io
 
         # Build without cache
         $ openenv build --no-cache
@@ -448,15 +431,4 @@ def build(
         raise typer.Exit(1)
 
     console.print("[bold green]✓ Docker build successful[/bold green]")
-
-    # Push if requested
-    if push:
-        console.print()
-        tag_to_push = tag or f"openenv-{env_path_obj.name.replace('_env', '')}"
-        success = _push_docker_image(tag_to_push, registry)
-        if not success:
-            print("✗ Docker push failed", file=sys.stderr)
-            raise typer.Exit(1)
-        console.print("[bold green]✓ Docker push successful[/bold green]")
-
     console.print("\n[bold green]Done![/bold green]")

@@ -325,34 +325,37 @@ def push(
     ] = False,
 ) -> None:
     """
-    Push an OpenEnv environment to Hugging Face Spaces or a custom registry.
+    Push an OpenEnv environment to Hugging Face Spaces or a custom Docker registry.
 
     This command:
     1. Validates that the directory is an OpenEnv environment (openenv.yaml present)
-    2. Prepares a custom build for deployment (optionally enables web interface)
-    3. Uploads to Hugging Face or custom registry
+    2. Builds and pushes to Hugging Face Spaces or custom Docker registry
+    3. Optionally enables web interface for deployment
 
     The web interface is enabled by default when pushing to HuggingFace Spaces,
-    but disabled by default when pushing to a custom registry.
+    but disabled by default when pushing to a custom Docker registry.
 
     Examples:
-        # Push from current directory with web interface (default)
+        # Push to HuggingFace Spaces from current directory (web interface enabled)
         $ cd my_env
         $ openenv push
 
-        # Push without web interface
+        # Push to HuggingFace without web interface
         $ openenv push --no-interface
 
-        # Push to custom registry (web interface disabled by default)
+        # Push to Docker Hub
         $ openenv push --registry docker.io/myuser
 
+        # Push to GitHub Container Registry
+        $ openenv push --registry ghcr.io/myorg
+
         # Push to custom registry with web interface
-        $ openenv push --registry docker.io/myuser --interface
+        $ openenv push --registry myregistry.io/path1/path2 --interface
 
         # Push to specific HuggingFace repo
         $ openenv push --repo-id my-org/my-env
         
-        # Push with custom base image and private
+        # Push privately with custom base image
         $ openenv push --private --base-image ghcr.io/meta-pytorch/openenv-base:latest
     """
     # Handle interface flag logic
@@ -402,49 +405,45 @@ def push(
 
     # Handle custom registry push
     if registry:
-        console.print("[bold cyan]Preparing files for custom registry deployment...[/bold cyan]")
+        console.print("[bold cyan]Preparing to push to custom registry...[/bold cyan]")
         if enable_interface:
             console.print("[bold cyan]Web interface will be enabled[/bold cyan]")
         
-        with tempfile.TemporaryDirectory() as tmpdir:
-            staging_dir = Path(tmpdir) / "staging"
-            _prepare_staging_directory(
-                env_dir, env_name, staging_dir, 
-                base_image=base_image, 
-                enable_interface=enable_interface
-            )
-            
-            # Build Docker image from staging directory
-            tag = f"{registry}/{env_name}"
-            console.print(f"[bold cyan]Building Docker image: {tag}[/bold cyan]")
-            
-            # Use the build logic (could import from build.py or inline)
-            from .build import _build_docker_image
-            
-            success = _build_docker_image(
-                env_path=staging_dir,
-                tag=tag,
-                context_path=staging_dir / "server",
-            )
-            
-            if not success:
-                console.print("[bold red]✗ Docker build failed[/bold red]")
-                raise typer.Exit(1)
-            
-            console.print("[bold green]✓ Docker build successful[/bold green]")
-            
-            # Push to registry
-            console.print(f"[bold cyan]Pushing to registry: {registry}[/bold cyan]")
-            from .build import _push_docker_image
-            
-            success = _push_docker_image(tag, registry=None)  # Tag already includes registry
-            
-            if not success:
-                console.print("[bold red]✗ Docker push failed[/bold red]")
-                raise typer.Exit(1)
-            
-            console.print("\n[bold green]✓ Deployment complete![/bold green]")
-            console.print(f"Image: {tag}")
+        # Import build functions
+        from .build import _build_docker_image, _push_docker_image
+        
+        # Prepare build args for custom registry deployment
+        build_args = {}
+        if enable_interface:
+            build_args["ENABLE_WEB_INTERFACE"] = "true"
+        
+        # Build Docker image from the environment directory
+        tag = f"{registry}/{env_name}"
+        console.print(f"[bold cyan]Building Docker image: {tag}[/bold cyan]")
+        
+        success = _build_docker_image(
+            env_path=env_dir,
+            tag=tag,
+            build_args=build_args if build_args else None,
+        )
+        
+        if not success:
+            console.print("[bold red]✗ Docker build failed[/bold red]")
+            raise typer.Exit(1)
+        
+        console.print("[bold green]✓ Docker build successful[/bold green]")
+        
+        # Push to registry
+        console.print(f"[bold cyan]Pushing to registry: {registry}[/bold cyan]")
+        
+        success = _push_docker_image(tag, registry=None)  # Tag already includes registry
+        
+        if not success:
+            console.print("[bold red]✗ Docker push failed[/bold red]")
+            raise typer.Exit(1)
+        
+        console.print("\n[bold green]✓ Deployment complete![/bold green]")
+        console.print(f"[bold]Image:[/bold] {tag}")
         return
 
     # Ensure authentication for HuggingFace

@@ -157,13 +157,14 @@ OpenEnv uses `pyproject.toml` as the primary dependency specification:
 
 ```bash
 # Install environment in editable mode
-pip install -e ./my_env
+cd my_env
+pip install -e .
 
 # Or using uv (faster)
-uv pip install -e ./my_env
+uv pip install -e .
 
 # Run server locally without Docker
-uv run --project ./my_env server --host 0.0.0.0 --port 8000
+uv run server --host 0.0.0.0 --port 8000
 ```
 
 **Benefits:**
