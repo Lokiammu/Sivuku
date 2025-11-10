@@ -13,23 +13,21 @@ import requests
 from .providers import RuntimeProvider
 
 
-def _poll_health(health_url: str, timeout_s: float) -> None:
-    """Poll a health endpoint until it returns HTTP 200 or times out."""
+def _check_uv_installed() -> None:
+    try:
+        subprocess.check_output(["uv", "--version"])
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "`uv` executable not found. Install uv from https://docs.astral.sh and ensure it is on PATH."
+        ) from exc
 
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        try:
-            timeout = max(0.0001, min(deadline - time.time(), 2.0))
-            response = requests.get(health_url, timeout=timeout)
-            if response.status_code == 200:
-                return
-        except requests.RequestException:
-            continue
 
-        time.sleep(0.5)
-
-    raise TimeoutError(f"Server did not become ready within {timeout_s:.1f} seconds")
-
+def _find_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("", 0))
+        sock.listen(1)
+        return sock.getsockname()[1]
+   
 
 def _create_uv_command(
     repo_id: str,
@@ -54,20 +52,22 @@ def _create_uv_command(
     return command
 
 
-def _check_uv_installed() -> None:
-    try:
-        subprocess.check_output(["uv", "--version"])
-    except FileNotFoundError as exc:
-        raise RuntimeError(
-            "`uv` executable not found. Install uv from https://docs.astral.sh and ensure it is on PATH."
-        ) from exc
+def _poll_health(health_url: str, timeout_s: float) -> None:
+    """Poll a health endpoint until it returns HTTP 200 or times out."""
 
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        try:
+            timeout = max(0.0001, min(deadline - time.time(), 2.0))
+            response = requests.get(health_url, timeout=timeout)
+            if response.status_code == 200:
+                return
+        except requests.RequestException:
+            continue
 
-def _find_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("", 0))
-        sock.listen(1)
-        return sock.getsockname()[1]
+        time.sleep(0.5)
+
+    raise TimeoutError(f"Server did not become ready within {timeout_s:.1f} seconds")
 
 
 class UVProvider(RuntimeProvider):
