@@ -28,9 +28,7 @@ def _poll_health(health_url: str, timeout_s: float) -> None:
 
         time.sleep(0.5)
 
-    raise TimeoutError(
-        f"Server did not become ready within {timeout_s:.1f} seconds"
-    )
+    raise TimeoutError(f"Server did not become ready within {timeout_s:.1f} seconds")
 
 
 def _create_uv_command(
@@ -43,7 +41,8 @@ def _create_uv_command(
     command = [
         "uv",
         "run",
-        "--project",
+        "--isolated",
+        "--with",
         project_url or f"git+https://huggingface.co/spaces/{repo_id}",
         "--",
         "server",
@@ -121,9 +120,7 @@ class UVProvider(ContainerProvider):
     def wait_for_ready(self, base_url: str, timeout_s: float = 60.0) -> None:
         if self._process and self._process.poll() is not None:
             code = self._process.returncode
-            raise RuntimeError(
-                f"uv process exited prematurely with code {code}"
-            )
+            raise RuntimeError(f"uv process exited prematurely with code {code}")
 
         _poll_health(f"{base_url}/health", timeout_s)
 
@@ -179,5 +176,3 @@ class UVProvider(ContainerProvider):
         if self._base_url is None:
             raise RuntimeError("UVProvider has not been started")
         return self._base_url
-
-
