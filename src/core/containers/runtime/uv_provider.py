@@ -20,11 +20,12 @@ def _poll_health(health_url: str, timeout_s: float) -> None:
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         try:
-            response = requests.get(health_url, timeout=2.0)
+            timeout = max(0.0001, min(deadline - time.time(), 2.0))
+            response = requests.get(health_url, timeout=timeout)
             if response.status_code == 200:
                 return
         except requests.RequestException:
-            pass
+            continue
 
         time.sleep(0.5)
 
