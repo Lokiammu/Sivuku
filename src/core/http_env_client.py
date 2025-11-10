@@ -111,10 +111,7 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         repo_id: str,
         *,
         use_docker: bool = True,
-        reload: bool = False,
-        timeout_s: float = 60.0,
         provider: Optional["ContainerProvider" | "RuntimeProvider"] = None,
-        env_vars: Optional[Dict[str, str]] = None,
         **provider_kwargs: Any,
     ) -> EnvClientT:
         """Create a client from a Hugging Face Space.
@@ -131,11 +128,10 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         else:
             provider: RuntimeProvider = UVProvider(
                 repo_id=repo_id,
-                reload=reload,
-                env_vars=env_vars,
-                context_timeout_s=timeout_s,
+                **provider_kwargs,
             )
             base_url = provider.start()
+            timeout_s = provider_kwargs.pop("timeout_s", 60.0)
             provider.wait_for_ready(base_url=provider.base_url, timeout_s=timeout_s)
 
             return cls(base_url=base_url, provider=provider)
