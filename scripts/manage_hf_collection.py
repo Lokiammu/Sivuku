@@ -117,7 +117,9 @@ def discover_openenv_spaces(api: HfApi) -> List[str]:
         # List all spaces with the openenv tag using search parameter
         spaces = list(list_spaces(
             search=TAG_FILTER,
-            full=False
+            full=False,
+            sort="trending_score",
+            direction=-1
         ))
         
         # Filter for Docker spaces with the openenv tag
