@@ -132,7 +132,8 @@ def discover_openenv_spaces(api: HfApi) -> List[str]:
                 space_info = api.space_info(space.id)
                 # Check if it's a Docker space and has the openenv tag
                 if (hasattr(space_info, 'sdk') and space_info.sdk == 'docker' and
-                    hasattr(space_info, 'tags') and TAG_FILTER in space_info.tags):
+                    hasattr(space_info, 'tags') and TAG_FILTER in space_info.tags and 
+                    space_info.runtime.stage != "RUNTIME_ERROR"):
                     docker_spaces_with_tag.append(space.id)
             except Exception as e:
                 logger.warning(f"Could not fetch info for space {space.id}: {e}")
