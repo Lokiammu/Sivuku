@@ -94,18 +94,13 @@ jobs:
           echo "new_envs_json=${NEW_ENVS_JSON}" >> "$GITHUB_OUTPUT"
 
   deploy-and-health-check:
-    name: Deploy and Validate New Environments
+    name: Validate New Environments
     needs: detect-new-envs
     if: needs.detect-new-envs.outputs.has_new_envs == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
         environment: ${{ fromJSON(needs.detect-new-envs.outputs.new_envs_json) }}
-    env:
-      HF_TOKEN: ${{ secrets.HF_PR_TOKEN }}
-      HF_PR_TOKEN: ${{ secrets.HF_PR_TOKEN }}
-      HF_NAMESPACE: ${{ vars.HF_PR_NAMESPACE }}
-      SPACE_SUFFIX: -pr-${{ github.event.number }}
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
@@ -114,19 +109,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Default Hugging Face namespace
-        if: env.HF_NAMESPACE == ''
-        shell: bash
-        run: echo "HF_NAMESPACE=openenv-testing" >> "$GITHUB_ENV"
-
-      - name: Verify Hugging Face token
-        shell: bash
-        run: |
-          if [ -z "${HF_TOKEN:-}" ]; then
-            echo "HF_TOKEN secret is required for deployment." >&2
-            exit 1
-          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -140,117 +122,71 @@ jobs:
           python -m pip install --upgrade pip
           pip install .
 
-      - name: Deploy environment with OpenEnv CLI
+      - name: Run openenv validate --verbose
+        id: validate
         shell: bash
         run: |
-          set -euo pipefail
-          repo_id="${HF_NAMESPACE}/${{ matrix.environment }}${SPACE_SUFFIX}"
+          set -u -o pipefail
           env_dir="src/envs/${{ matrix.environment }}"
 
           if [ ! -d "$env_dir" ]; then
             echo "Environment directory not found: $env_dir" >&2
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+            printf "details<<EOF\n%s\nEOF\n" "Environment directory not found" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
-          openenv push --directory "$env_dir" --repo-id "$repo_id"
+          cd "$env_dir"
+          echo "Running openenv validate --verbose in $(pwd)"
 
-      - name: Wait for deployment to stabilize
-        shell: bash
-        run: sleep 180
-
-      - name: Compute Space URLs
-        id: urls
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ -z "${HF_NAMESPACE:-}" ]; then
-            echo "HF_NAMESPACE is not configured; unable to compute space URLs." >&2
-            exit 1
+          output_file="$(mktemp)"
+          if openenv validate --verbose | tee "$output_file"; then
+            status="success"
+            exit_code=0
+          else
+            status="failure"
+            exit_code=$?
           fi
 
-          namespace_slug=$(echo "${HF_NAMESPACE}" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-          space_name="${{ matrix.environment }}${SPACE_SUFFIX}"
-          space_slug=$(echo "${space_name}" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-          health_url="https://${namespace_slug}-${space_slug}.hf.space/health"
-          live_url="https://${namespace_slug}-${space_slug}.hf.space"
-          space_repo_url="https://huggingface.co/spaces/${HF_NAMESPACE}/${space_name}"
-          space_repo_id="${HF_NAMESPACE}/${space_name}"
+          log_contents="$(cat "$output_file")"
+          rm -f "$output_file"
 
-          echo "namespace_slug=${namespace_slug}" >> "$GITHUB_OUTPUT"
-          echo "space_name=${space_name}" >> "$GITHUB_OUTPUT"
-          echo "space_slug=${space_slug}" >> "$GITHUB_OUTPUT"
-          echo "health_url=${health_url}" >> "$GITHUB_OUTPUT"
-          echo "live_url=${live_url}" >> "$GITHUB_OUTPUT"
-          echo "space_repo_url=${space_repo_url}" >> "$GITHUB_OUTPUT"
-          echo "space_repo_id=${space_repo_id}" >> "$GITHUB_OUTPUT"
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          printf "details<<EOF\n%s\nEOF\n" "$log_contents" >> "$GITHUB_OUTPUT"
 
-      - name: Perform environment health check
-        id: health_check
-        continue-on-error: true
-        shell: bash
-        env:
-          HEALTH_URL: ${{ steps.urls.outputs.health_url }}
-          SPACE_NAME: ${{ steps.urls.outputs.space_name }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "${HEALTH_URL:-}" ]; then
-            echo "HEALTH_URL not provided; cannot perform health check." >&2
-            exit 1
-          fi
-
-          echo "Checking health for ${SPACE_NAME} at ${HEALTH_URL}"
-
-          success=0
-          for attempt in {1..5}; do
-            status=$(curl -sS -o response.json -w "%{http_code}" "$HEALTH_URL" || echo "000")
-            if [ "$status" = "200" ]; then
-              echo "Health check passed for ${SPACE_NAME}"
-              cat response.json
-              success=1
-              break
-            fi
-            echo "Attempt ${attempt} returned status ${status}. Retrying in 30 seconds..."
-            sleep 30
-          done
-
-          if [ $success -ne 1 ]; then
-            echo "Health check failed for ${SPACE_NAME}" >&2
-            if [ -f response.json ]; then
-              echo "Last response payload:"
-              cat response.json
-            fi
-            exit 1
-          fi
+          exit "$exit_code"
 
       - name: Comment on PR with deployment status
         if: always()
         uses: actions/github-script@v7
         env:
-          HEALTH_CONCLUSION: ${{ steps.health_check.conclusion }}
-          SPACE_NAME: ${{ steps.urls.outputs.space_name }}
-          LIVE_URL: ${{ steps.urls.outputs.live_url }}
-          SPACE_REPO_URL: ${{ steps.urls.outputs.space_repo_url }}
-          SPACE_REPO_ID: ${{ steps.urls.outputs.space_repo_id }}
+          VALIDATION_STATUS: ${{ steps.validate.outputs.status }}
+          VALIDATION_LOG: ${{ steps.validate.outputs.details }}
           ENV_NAME: ${{ matrix.environment }}
           COMMENT_TAG: "<!-- openenv-pr-preview -->"
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const status = process.env.HEALTH_CONCLUSION || 'failure';
+            const status = (process.env.VALIDATION_STATUS || '').toLowerCase() === 'success' ? 'success' : 'failure';
             const envName = process.env.ENV_NAME;
             const marker = process.env.COMMENT_TAG;
 
             const header = status === 'success'
-              ? `✅ Deployment to Hugging Face succeeded for \`${envName}\``
-              : `⚠️ Deployment Hugging Face failed for \`${envName}\``;
+              ? `✅ Validation succeeded for \`${envName}\``
+              : `⚠️ Validation failed for \`${envName}\``;
 
             const summary = status === 'success'
-              ? 'Nice work! Wait for a code review and we\'re ready to go. You can test it with the CLI:'
-              : 'Please resolve your environment and test it with the CLI:';
+              ? 'Nice work! Validation passed. Re-run locally with:'
+              : 'Validation reported issues. Review the log and re-run locally:';
 
             const envDir = 'src/envs/' + envName;
+            const rawLog = process.env.VALIDATION_LOG || '';
+            const trimmedLog = rawLog.trim();
+            const maxLength = 6000;
+            let displayLog = trimmedLog;
+            if (displayLog.length > maxLength) {
+              displayLog = displayLog.slice(0, maxLength) + '\n... (truncated)';
+            }
 
             const bodyLines = [
               marker,
@@ -260,7 +196,9 @@ jobs:
               '',
               summary,
               '',
-              '- `openenv push --directory ' + envDir + ' --repo-id <your-username>/' + envName + '`',
+              '- `openenv validate --verbose ' + envDir + '`',
+              '',
+              '```\n' + displayLog + '\n```',
             ];
 
             const {owner, repo} = context.repo;
@@ -304,37 +242,3 @@ jobs:
                 body: bodyText,
               });
             }
-
-      - name: Delete preview space on Hugging Face
-        if: always()
-        continue-on-error: true
-        shell: bash
-        env:
-          SPACE_REPO_ID: ${{ steps.urls.outputs.space_repo_id }}
-        run: |
-          set -euo pipefail
-          if [ -z "${SPACE_REPO_ID:-}" ]; then
-            echo "No space repo id; skipping deletion"
-            exit 0
-          fi
-
-          TOKEN="${HF_TOKEN:-${HF_PR_TOKEN:-}}"
-          if [ -z "$TOKEN" ]; then
-            echo "HF token not available; cannot delete space"
-            exit 0
-          fi
-
-          set +e
-          hf repo delete "$SPACE_REPO_ID" --repo-type space --yes --token "$TOKEN"
-          status=$?
-          set -e
-
-          if [ $status -eq 0 ]; then
-            echo "Deleted preview space $SPACE_REPO_ID"
-          else
-            echo "Failed to delete space $SPACE_REPO_ID (exit $status)"
-          fi
-
-      - name: Fail job if health check failed
-        if: steps.health_check.conclusion == 'failure'
-        run: exit 1
