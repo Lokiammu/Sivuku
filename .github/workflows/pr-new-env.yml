@@ -199,6 +199,7 @@ jobs:
               '- `openenv validate --verbose ' + envDir + '`',
               '',
               '```\n' + displayLog + '\n```',
+              'You can deploy the environment to Hugging Face Spaces by running `openenv push`.'
             ];
 
             const {owner, repo} = context.repo;
