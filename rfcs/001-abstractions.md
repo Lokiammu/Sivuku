@@ -62,7 +62,7 @@ Our proposal takes elements from both and can easily convert into either.
 #### Proposed Abstractions
 This is the contract that we are proposing. We feel it strikes a good balance between supporting single-turn environments for LLM post-training (such as the GSM8K) while also extending to the more complex agentic tasks, such as [Tau-Bench](https://arxiv.org/abs/2406.12045). We are aiming for flexibility, so we know we may not get this right the first time. We encourage strong feedback to this RFC so that we can improve on it!
 
-These are the key abstractions that we expect. Note that in this project we only implement the "Environment" abstraction under the our meaning. You can map to other "agents" or "environment" abstractions by writing adapters to and from OpenEnvs.
+These are the key abstractions that we expect. Note that in this project we only implement the "Environment" abstraction under our meaning. You can map to other "agents" or "environment" abstractions by writing adapters to and from OpenEnvs.
 
 Key assumptions:
 1. We separate tasks from environments. While it is a good idea to package up a dataset with an environment and evals, we expect this wrapping to be done *outside* the env box. This allows for the reuse of environments across tasks.
@@ -442,7 +442,7 @@ for batch_of_tasks in dataloader:
 
 2. **Reward vs Eval**: Rewards are computed per-step by the environment (data-independent). Evals are computed per-episode by evaluation logic that has access to the dataset (data-dependent, aggregated). The specific abstractions for rewards and evals will be defined in separate RFCs.
 
-3. **PyTorch DataLoader compatibility**: `TaskDataset` follows the PyTorch `IterableDataset` interface (implements `__iter__`), making it seamlessly compatible with PyTorch's `DataLoader` for streaming data, multi-process loading, etc. This is ideal for sequential data access and large datasets.
+3. **PyTorch DataLoader compatibility**: `TaskDataset` follows the PyTorch `IterableDataset` interface (implements `__iter__`), making it seamlessly compatible with PyTorch's `DataLoader` for streaming data, multiprocess loading, etc. This is ideal for sequential data access and large datasets.
 
 4. **Flexibility**: Environments can support both traditional tool calling (where each tool call is a separate action) and CodeAct (where an action contains code that may call multiple tools). See RFC 004 for details on unified action interface and RFC 003 for MCP integration.
 

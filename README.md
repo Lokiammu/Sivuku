@@ -21,7 +21,9 @@ An e2e framework for creating, deploying and using isolated execution environmen
 
 OpenEnv provides a standard for interacting with agentic execution environments via simple Gymnasium style APIs - step(), reset(), state(). Users of agentic execution environments can interact with the environment during RL training loops using these simple APIs.
 
-In addition to making it easier for researchers and RL framework writers, we also provide tools for environment creators making it easier for them to create richer environments and make them available over familar protocols like HTTP and packaged using canonical technologies like docker. Environment creators can use the OpenEnv framework to create environments that are isolated, secure, and easy to deploy and use.
+In addition to making it easier for researchers and RL framework writers, we also provide tools for environment creators making it easier for them to create richer environments and make them available over familiar protocols like HTTP and packaged using canonical technologies like docker. Environment creators can use the OpenEnv framework to create environments that are isolated, secure, and easy to deploy and use.
+
+The OpenEnv CLI (`openenv`) provides commands to initialize new environments and deploy them to Hugging Face Spaces.
 
 > ⚠️ **Early Development Warning** OpenEnv is currently in an experimental
 > stage. You should expect bugs, incomplete features, and APIs that may change
@@ -117,19 +119,59 @@ Type-safe data structures:
 
 ### For Environment Creators
 
-When building a new environment, create the following structure:
+Use the CLI to quickly scaffold a new environment:
+
+```bash
+openenv init my_env
+```
+
+This creates the following structure:
 
 ```
-src/envs/your_env/
+my_env/
 ├── __init__.py           # Export YourAction, YourObservation, YourEnv
 ├── models.py             # Define Action, Observation, State dataclasses
 ├── client.py             # Implement YourEnv(HTTPEnvClient)
 ├── README.md             # Document your environment
+├── openenv.yaml          # Environment manifest
+├── pyproject.toml        # Dependencies and package configuration
+├── outputs/              # Runtime outputs (logs, evals) - gitignored
+│   ├── logs/
+│   └── evals/
 └── server/
     ├── your_environment.py  # Implement YourEnvironment(Environment)
     ├── app.py               # Create FastAPI app
+    ├── requirements.txt     # Dependencies for Docker (can be generated)
     └── Dockerfile           # Define container image
 ```
+
+#### Dependency Management
+
+OpenEnv uses `pyproject.toml` as the primary dependency specification:
+
+- **Environment-level `pyproject.toml`**: Each environment defines its own dependencies
+- **Root-level `pyproject.toml`**: Contains shared core dependencies (fastapi, pydantic, uvicorn)
+- **Server `requirements.txt`**: Can be auto-generated from `pyproject.toml` for Docker builds
+
+**Development Workflow:**
+
+```bash
+# Install environment in editable mode
+cd my_env
+pip install -e .
+
+# Or using uv (faster)
+uv pip install -e .
+
+# Run server locally without Docker
+uv run server --host 0.0.0.0 --port 8000
+```
+
+**Benefits:**
+- ✅ **Client-side extensions**: Modify client classes locally without repo changes
+- ✅ **Better dependency management**: Clear separation between environments
+- ✅ **Flexible workflows**: Use pip, uv, or Docker for different scenarios
+- ✅ **CI/CD ready**: Automated dependency generation and validation
 
 See [`src/envs/README.md`](src/envs/README.md) for a complete guide on building environments.
 
@@ -142,6 +184,26 @@ To use an environment:
 4. Cleanup: `client.close()`
 
 See example scripts in `examples/` directory.
+
+## CLI Commands
+
+The OpenEnv CLI provides commands to manage environments:
+
+- **`openenv init <env_name>`** - Initialize a new environment from template
+- **`openenv push [--repo-id <repo>] [--private]`** - Deploy environment to Hugging Face Spaces
+
+### Quick Start
+
+```bash
+# Create a new environment
+openenv init my_game_env
+
+# Deploy to Hugging Face (will prompt for login if needed)
+cd my_game_env
+openenv push
+```
+
+For detailed options: `openenv init --help` and `openenv push --help`.
 
 ## Design Principles
 
@@ -222,7 +284,7 @@ See: [`src/envs/coding_env/README.md`](src/envs/coding_env/README.md)
 ## Community Support & Acknowledgments 
 This is an open and community centric project. If you would like to add your name here, please put up a pull request and tag @jspisak for review. Ty!!
 
-Supporters include: Meta-PyTorch, Hugging Face, [Patronus AI](https://patronus.ai), [Surge AI](https://surgehq.ai), [LastMile AI](https://www.lastmileai.dev), Unsloth AI, Reflection AI, vLLM, SkyRL (UC-Berkeley), LightningAI, Axolotl AI, Stanford Scaling Intelligence Lab, Mithril, [OpenMined](https://openmined.org/) ..
+Supporters include: Meta-PyTorch, Hugging Face, [Patronus AI](https://patronus.ai), [Surge AI](https://surgehq.ai), [LastMile AI](https://www.lastmileai.dev), Unsloth AI, Reflection AI, vLLM, SkyRL (UC-Berkeley), LightningAI, Axolotl AI, Stanford Scaling Intelligence Lab, Mithril, [OpenMined](https://openmined.org/), [Fleet AI](https://fleetai.com) ..
 
 And we'd also like to acknowledge the team at Farama Foundation as the OpenEnv API was heavily inspired by the work you all have done on Gymnasium. Cheers!
 
