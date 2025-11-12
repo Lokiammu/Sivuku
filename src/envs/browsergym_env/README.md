@@ -11,7 +11,7 @@ BrowserGym provides a complete pipeline for developing web agents: train on simp
 
 - **MiniWoB++ (Training)**: 100+ synthetic web tasks like "click this button", "fill out this form", "select from dropdown". Each task is a simple webpage with a clear objective. Fast resets, randomized variations, dense rewards. Perfect for learning basic web navigation skills. **No external setup needed** - tasks run in isolated browser sessions.
 
-- **WebArena (Evaluation)**: 812 tasks on real websites (e-commerce, forums, GitLab, Wikipedia). Tasks like "find the cheapest laptop and add to cart" or "create a merge request for bug #123". Multi-step, requires reasoning, sparse rewards. Tests if your agent can handle actual websites. **Requires running 7 backend services** (shopping site, GitLab instance, etc).
+- **WebArena (Evaluation)**: 812 tasks on real websites (e-commerce, forums, GitLab, Wikipedia). Tasks like "find the cheapest laptop and add to cart" or "create a merge request for bug #123". Multistep, requires reasoning, sparse rewards. Tests if your agent can handle actual websites. **Requires running 7 backend services** (shopping site, GitLab instance, etc.).
 
 - **VisualWebArena**: Similar to WebArena but requires visual understanding - agents need to interpret images, identify UI elements visually, handle multimodal content.
 
@@ -536,4 +536,4 @@ browsergym_env/
 - [WebArena Paper](https://arxiv.org/abs/2307.13854)
 - [WebArena Website](https://webarena.dev/)
 - [VisualWebArena Paper](https://jykoh.com/vwa)
-- [OpenEnv Documentation](https://github.com/openenv/openenv)
+- [OpenEnv Documentation](https://github.com/meta-pytorch/OpenEnv)

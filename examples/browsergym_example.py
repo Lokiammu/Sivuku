@@ -1,7 +1,9 @@
 """BrowserGym MiniWoB example with Qwen deciding the next action.
 
-This script loops an OpenEnv BrowserGym environment and asks a Hugging Face
-hosted Qwen model (via the OpenAI client) which BrowserGym action to take next.
+This is an inference example for the BrowserGym environment. It uses the OpenAI 
+client and a vision language model to decide the next action. We use Hugging Face 
+Inference Providers API to access the model, but you can use any other provider that 
+is compatible with the OpenAI API.
 
 Prerequisites:
 - Clone the MiniWoB++ tasks repository.
@@ -18,27 +20,16 @@ Usage:
 
 import os
 import re
+import base64
 import textwrap
+from io import BytesIO
 from typing import List, Optional, Dict
 
-import os
-import re
-import base64
-from io import BytesIO
-
+from openai import OpenAI
 import numpy as np
 from PIL import Image
 
-
-
-try:
-    from envs.browsergym_env import BrowserGymAction, BrowserGymEnv
-except ImportError as exc:  # pragma: no cover
-    raise RuntimeError(
-        "Unable to import envs.browsergym_env. "
-        "Run this script from the repository root."
-    ) from exc
-
+from envs.browsergym_env import BrowserGymAction, BrowserGymEnv
 
 API_BASE_URL = "https://router.huggingface.co/v1"
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
@@ -74,12 +65,6 @@ SYSTEM_PROMPT = textwrap.dedent(
     Do not include explanations or additional text.
     """
 ).strip()
-
-
-def truncate_text(text: str, limit: int) -> str:
-    if len(text) <= limit:
-        return text
-    return text[: limit - 20] + "\n... [truncated]"
 
 
 def build_history_lines(history: List[str]) -> str:
@@ -125,13 +110,6 @@ def extract_clickable_elements(observation) -> List[Dict[str, str]]:
 
 
 def build_user_prompt(step: int, observation, history: List[str]) -> str:
-    doc = (
-        observation.axtree_txt
-        or observation.pruned_html
-        or observation.text
-        or ""
-    )
-    doc = truncate_text(doc, MAX_DOM_CHARS)
     goal = observation.goal or "(not provided)"
     url = observation.url or "(unknown)"
     error_note = "Yes" if observation.last_action_error else "No"
@@ -153,11 +131,7 @@ def build_user_prompt(step: int, observation, history: List[str]) -> str:
         {build_history_lines(history)}
         Last action error: {error_note}
 
-        Available clickable element IDs:
-{actions_hint}
-
-        Page snapshot (truncated):
-        {doc}
+        Available clickable element IDs: {actions_hint}
 
         Reply with exactly one BrowserGym action string.
         """
@@ -196,24 +170,15 @@ def parse_model_action(response_text: str) -> str:
 
 
 def main() -> None:
-    try:
-        from openai import OpenAI  # type: ignore import
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError(
-            "Missing optional dependency 'openai'. "
-            "Install it before running this script."
-        ) from exc
-
-    if not API_KEY:
-        raise RuntimeError(
-            "Missing HF_TOKEN or API_KEY environment variable for "
-            "Hugging Face Router access."
-        )
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
-    env = BrowserGymEnv(
-        base_url="http://localhost:8000",
+    env = BrowserGymEnv.from_docker_image(
+        image="browsergym-env:latest",
+        env_vars={
+            "BROWSERGYM_BENCHMARK": "miniwob",
+            "BROWSERGYM_TASK_NAME": "click-test-2",
+        },
     )
     
     history: List[str] = []
