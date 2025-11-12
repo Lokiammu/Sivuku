@@ -138,38 +138,64 @@ def _prepare_staging_directory(
         else:
             shutil.copy2(item, dest)
 
+    # Ensure Dockerfile is at repository root (required by Hugging Face)
+    dockerfile_server_path = staging_dir / "server" / "Dockerfile"
+    dockerfile_root_path = staging_dir / "Dockerfile"
+    dockerfile_path: Path | None = None
+
+    if dockerfile_server_path.exists():
+        if dockerfile_root_path.exists():
+            dockerfile_root_path.unlink()
+        dockerfile_server_path.rename(dockerfile_root_path)
+        console.print(
+            "[bold cyan]Moved Dockerfile to repository root for deployment[/bold cyan]"
+        )
+        dockerfile_path = dockerfile_root_path
+    elif dockerfile_root_path.exists():
+        dockerfile_path = dockerfile_root_path
+
     # Modify Dockerfile to optionally enable web interface and update base image
-    dockerfile_path = staging_dir / "server" / "Dockerfile"
-    if dockerfile_path.exists():
+    if dockerfile_path and dockerfile_path.exists():
         dockerfile_content = dockerfile_path.read_text()
         lines = dockerfile_content.split("\n")
         new_lines = []
         cmd_found = False
         base_image_updated = False
         web_interface_env_exists = "ENABLE_WEB_INTERFACE" in dockerfile_content
+        last_instruction = None
 
         for line in lines:
+            stripped = line.strip()
+            token = stripped.split(maxsplit=1)[0] if stripped else ""
+            current_instruction = token.upper()
+
+            is_healthcheck_continuation = last_instruction == "HEALTHCHECK"
+
             # Update base image if specified
-            if base_image and line.strip().startswith("FROM") and not base_image_updated:
-                # Replace the FROM line with new base image
+            if base_image and stripped.startswith("FROM") and not base_image_updated:
                 new_lines.append(f"FROM {base_image}")
                 base_image_updated = True
+                last_instruction = "FROM"
                 continue
 
-            # Add ENABLE_WEB_INTERFACE before CMD if requested
-            if line.strip().startswith("CMD") and not cmd_found and not web_interface_env_exists:
-                # Add ENV line before CMD
-                if enable_interface:
-                    new_lines.append("ENV ENABLE_WEB_INTERFACE=true")
+            if (
+                stripped.startswith("CMD")
+                and not cmd_found
+                and not web_interface_env_exists
+                and enable_interface
+                and not is_healthcheck_continuation
+            ):
+                new_lines.append("ENV ENABLE_WEB_INTERFACE=true")
                 cmd_found = True
 
             new_lines.append(line)
 
-        # Add ENABLE_WEB_INTERFACE if CMD not found and not already present
+            if current_instruction:
+                last_instruction = current_instruction
+
         if not cmd_found and not web_interface_env_exists and enable_interface:
             new_lines.append("ENV ENABLE_WEB_INTERFACE=true")
 
-        # If base image was specified but FROM line wasn't found, add it at the beginning
         if base_image and not base_image_updated:
             new_lines.insert(0, f"FROM {base_image}")
 

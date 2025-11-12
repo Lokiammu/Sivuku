@@ -30,7 +30,7 @@ except Exception as e:  # pragma: no cover
     ) from e
 
 from .__ENV_NAME___environment import __ENV_CLASS_NAME__Environment
-from __ENV_NAME__.models import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Observation
+from models import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Observation
 
 # Create the environment instance
 env = __ENV_CLASS_NAME__Environment()

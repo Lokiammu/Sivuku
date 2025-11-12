@@ -10,7 +10,7 @@
 # - Standalone environments (with openenv-core from pip)
 # The build script (openenv build) handles context detection and sets appropriate build args.
 
-ARG BASE_IMAGE=openenv-base:latest
+ARG BASE_IMAGE=ghcr.io/meta-pytorch/openenv-base:latest
 FROM ${BASE_IMAGE} AS builder
 
 WORKDIR /app
@@ -26,6 +26,13 @@ COPY . /app/env
 # For standalone builds, openenv-core will be installed from pip via pyproject.toml
 WORKDIR /app/env
 
+# Ensure uv is available (for local builds where base image lacks it)
+RUN if ! command -v uv >/dev/null 2>&1; then \
+        curl -LsSf https://astral.sh/uv/install.sh | sh && \
+        mv /root/.local/bin/uv /usr/local/bin/uv && \
+        mv /root/.local/bin/uvx /usr/local/bin/uvx; \
+    fi
+    
 # Install dependencies using uv sync
 # If uv.lock exists, use it; otherwise resolve on the fly
 RUN --mount=type=cache,target=/root/.cache/uv \
