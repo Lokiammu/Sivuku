@@ -25,7 +25,9 @@ from envs.browsergym_env.models import (
 
 _MINIWOB_LOAD_HELP = (
     "MiniWoB tasks require the MiniWoB HTML bundle to be served over HTTP. "
-    "Clone the MiniWoB++ repository, start a static server inside "
+    "The official BrowserGym Docker image handles this automatically by "
+    "serving the bundle on port 8888. For custom or non-Docker deployments, "
+    "clone the MiniWoB++ repository, start a static server inside "
     "`miniwob-plusplus/miniwob/html` (e.g. `python -m http.server 8888`), and "
     "set the MINIWOB_URL environment variable to the served base URL such as "
     "`http://localhost:8888/miniwob/`."
@@ -76,7 +78,6 @@ class BrowserGymEnvironment(Environment):
             self.env_id = f"browsergym/{benchmark}.{task_name}"
         else:
             self.env_id = f"browsergym/{benchmark}"
-
 
         # force import the benchmark module
         benchmark_modules = {
@@ -169,10 +170,7 @@ class BrowserGymEnvironment(Environment):
                 raise
         except Exception as err:  # noqa: BLE001 - browsergym
             message = str(err)
-            if (
-                self.benchmark == "miniwob"
-                and "core is not defined" in message
-            ):
+            if self.benchmark == "miniwob" and "core is not defined" in message:
                 raise ValueError(_MINIWOB_LOAD_HELP) from err
             raise
 
