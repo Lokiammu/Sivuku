@@ -176,7 +176,7 @@ jobs:
               : `⚠️ Validation failed for \`${envName}\``;
 
             const summary = status === 'success'
-              ? 'Nice work! Validation passed. Re-run locally with:'
+              ? 'Your env passes the vibe check. However, most environments should go straight to the hub, they will automatically be added to the official Env Hub collection on a nightly basis. Environments in the official specification repo are only meant to demonstrate usage of a specific spec feature for educational purposes. Re-run locally with:'
               : 'Validation reported issues. Review the log and re-run locally:';
 
             const envDir = 'src/envs/' + envName;
