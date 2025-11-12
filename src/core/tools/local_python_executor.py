@@ -4,102 +4,149 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-"""
-Local Python Executor.
+"""Local Python Executor (enhanced).
 
-This module provides functionality for executing Python code locally by wrapping
-the smolagents LocalPythonExecutor.
+This module provides a safer wrapper around smolagents.LocalPythonExecutor
+with improved exception handling and a few helpful tools registered with
+the executor to make debugging executed code easier.
+
+Key improvements:
+- Register a few helper utilities via send_tools so user code can use
+  them for reporting (e.g. `format_exc`).
+- More robust extraction of stdout/stderr/exit codes from the executor
+  result object, tolerant to different versions of smolagents.
+- Detailed stderr on unexpected exceptions including full traceback.
+- Structured logging for operational visibility.
 """
+
+from __future__ import annotations
+
+import json
+import logging
+import traceback
+from typing import Any
 
 from smolagents import LocalPythonExecutor
 
 from core.env_server.types import CodeExecResult
 
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
 
 class PyExecutor:
-    """
-    Wrapper around smolagents LocalPythonExecutor for executing Python code.
+    """Wrapper around smolagents LocalPythonExecutor.
 
-    This class provides a simple interface to execute Python code in a subprocess
-    and capture the results including stdout, stderr, and exit code.
-
-    Args:
-        additional_imports: List of additional module imports to authorize.
-                          For example: ["numpy", "pandas", "matplotlib"]
-                          These will be added to the base authorized imports.
-
-    Example:
-        >>> # Basic usage with default imports
-        >>> executor = PyExecutor()
-        >>> result = executor.run("print('Hello, World!')")
-        >>> print(result.stdout)  # "Hello, World!\n"
-        >>> print(result.exit_code)  # 0
-        >>>
-        >>> # Usage with additional imports
-        >>> executor = PyExecutor(additional_imports=["numpy", "pandas"])
-        >>> result = executor.run("import numpy as np\\nprint(np.array([1, 2, 3]))")
-        >>> print(result.stdout)  # "[1 2 3]\n"
+    The wrapper registers a few non-privileged helper tools to the
+    LocalPythonExecutor that can be used by the executed code to
+    format exceptions and to safely stringify results for improved
+    error reporting.
     """
 
     def __init__(self, additional_imports: list[str] | None = None):
-        """
-        Initialize the PyExecutor with a LocalPythonExecutor instance.
-
-        Args:
-            additional_imports: List of additional module names to authorize for import.
-                              Defaults to an empty list if not provided.
-        """
         if additional_imports is None:
             additional_imports = []
+
         self._executor = LocalPythonExecutor(
             additional_authorized_imports=additional_imports
         )
-        # Initialize tools to make BASE_PYTHON_TOOLS available (including print)
-        self._executor.send_tools({})
+
+        # Register helpful utilities exposed to the execution environment.
+        # These are intentionally small, read-only helpers.
+        tools = {
+            # Provide a small helper to format the current exception in the
+            # executed context. This is a *string formatting* helper only.
+            "format_exc": traceback.format_exc,
+            # Safe JSON dumps with a fallback for non-serializable objects.
+            "safe_json_dumps": lambda obj: json.dumps(obj, default=lambda o: repr(o)),
+        }
+
+        # `send_tools` is the public API on LocalPythonExecutor to make
+        # helper callables available to the sandboxed runtime. We don't
+        # provide any builtins that could change the environment.
+        try:
+            self._executor.send_tools(tools)
+        except Exception:
+            # If the LocalPythonExecutor implementation doesn't support
+            # send_tools or fails, log and continue — the executor is still usable.
+            logger.debug("LocalPythonExecutor.send_tools failed; continuing without extra tools", exc_info=True)
 
     def run(self, code: str) -> CodeExecResult:
-        """
-        Execute Python code and return the result.
+        """Execute Python code and return a CodeExecResult.
 
-        Args:
-            code: Python code string to execute
-
-        Returns:
-            CodeExecResult containing stdout, stderr, and exit_code
-
-        Example:
-            >>> executor = PyExecutor()
-            >>> result = executor.run("x = 5 + 3\\nprint(x)")
-            >>> print(result.stdout)  # "8\n"
-            >>> print(result.exit_code)  # 0
-            >>>
-            >>> # Error handling
-            >>> result = executor.run("1 / 0")
-            >>> print(result.exit_code)  # 1
-            >>> print(result.stderr)  # Contains error message
+        This method is intentionally defensive: it attempts to extract
+        meaningful stdout/stderr/exit_code information from a variety of
+        possible return shapes that different versions of smolagents
+        may provide.
         """
         try:
-            # Execute the code using LocalPythonExecutor
-            # LocalPythonExecutor returns a CodeOutput object with output, logs, is_final_answer
             exec_result = self._executor(code)
 
-            # Extract the logs (which contain print outputs) as stdout
-            # The output field contains the return value of the code
-            stdout = exec_result.logs
-            stderr = ""
-            exit_code = 0  # Success
+            # Default values
+            stdout_parts: list[str] = []
+            stderr_parts: list[str] = []
+            exit_code = 0
 
-            return CodeExecResult(
-                stdout=stdout,
-                stderr=stderr,
-                exit_code=exit_code,
-            )
+            # Extract logs/prints
+            try:
+                logs = getattr(exec_result, "logs", None)
+                if logs:
+                    stdout_parts.append(str(logs))
+            except Exception:
+                logger.debug("Failed to read exec_result.logs", exc_info=True)
+
+            # Extract the result / output value
+            try:
+                if hasattr(exec_result, "output"):
+                    out_val = exec_result.output
+                    # If the output is not None, stringify it in a safe way
+                    if out_val is not None:
+                        # Prefer JSON if possible, otherwise repr
+                        try:
+                            stdout_parts.append(json.dumps(out_val))
+                        except Exception:
+                            stdout_parts.append(repr(out_val))
+            except Exception:
+                logger.debug("Failed to read exec_result.output", exc_info=True)
+
+            # Some runtime implementations may put errors on `error` or `exception`
+            try:
+                err = getattr(exec_result, "error", None)
+                if err:
+                    stderr_parts.append(str(err))
+            except Exception:
+                logger.debug("Failed to read exec_result.error", exc_info=True)
+
+            try:
+                ex = getattr(exec_result, "exception", None)
+                if ex:
+                    stderr_parts.append(str(ex))
+            except Exception:
+                logger.debug("Failed to read exec_result.exception", exc_info=True)
+
+            # Determine exit code if provided
+            try:
+                if hasattr(exec_result, "exit_code"):
+                    exit_code = int(exec_result.exit_code) if exec_result.exit_code is not None else 0
+                elif hasattr(exec_result, "success"):
+                    # Some versions use `success` boolean
+                    exit_code = 0 if exec_result.success else 1
+                else:
+                    # Fallback: if there were any stderr parts, treat as non-zero
+                    exit_code = 1 if stderr_parts else 0
+            except Exception:
+                logger.debug("Failed to determine exec_result exit code", exc_info=True)
+                exit_code = 1 if stderr_parts else 0
+
+            # Compose the final stdout/stderr strings
+            stdout = "\n".join(part for part in stdout_parts if part is not None)
+            stderr = "\n".join(part for part in stderr_parts if part is not None)
+
+            return CodeExecResult(stdout=stdout, stderr=stderr, exit_code=exit_code)
 
         except Exception as e:
-            # LocalPythonExecutor raises InterpreterError for various issues
-            # (syntax errors, forbidden operations, runtime errors, etc.)
-            return CodeExecResult(
-                stdout="",
-                stderr=str(e),
-                exit_code=1,  # Non-zero indicates error
-            )
+            # Any unexpected exception from the LocalPythonExecutor is
+            # returned with a full traceback to make debugging easier.
+            tb = traceback.format_exc()
+            logger.exception("LocalPythonExecutor raised an exception during run")
+            return CodeExecResult(stdout="", stderr=tb, exit_code=1)
