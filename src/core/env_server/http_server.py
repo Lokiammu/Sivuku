@@ -13,62 +13,13 @@ over HTTP endpoints that HTTPEnvClient can consume.
 
 from __future__ import annotations
 
-import asyncio
 import os
 from dataclasses import asdict
-from datetime import datetime
-from functools import partial
 from typing import Any, Dict, Type
-from concurrent.futures import ThreadPoolExecutor
 
 from .interfaces import Environment
 from .types import Action, Observation
 from fastapi import Body, FastAPI
-
-try:
-    import numpy as np
-except ImportError:  # pragma: no cover - numpy optional at runtime
-    np = None  # type: ignore[assignment]
-
-
-def _json_safe(value: Any, *, depth: int = 5) -> Any:
-    """Recursively convert values into JSON-serializable structures."""
-
-    if depth <= 0:
-        return str(value)
-
-    if isinstance(value, dict):
-        return {
-            str(key): _json_safe(val, depth=depth - 1)
-            for key, val in value.items()
-        }
-
-    if isinstance(value, (list, tuple, set)):
-        return [_json_safe(item, depth=depth - 1) for item in value]
-
-    if np is not None:
-        ndarray_cls = getattr(np, "ndarray", tuple)
-        if isinstance(value, ndarray_cls):
-            return value.tolist()
-        generic_cls = getattr(np, "generic", tuple)
-        if isinstance(value, generic_cls):
-            return value.item()
-
-    if isinstance(value, (bytes, bytearray)):
-        try:
-            return value.decode("utf-8")
-        except UnicodeDecodeError:
-            import base64
-
-            return base64.b64encode(value).decode("utf-8")
-
-    if isinstance(value, datetime):
-        return value.isoformat()
-
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-
-    return str(value)
 
 class HTTPEnvServer:
     """
@@ -111,7 +62,6 @@ class HTTPEnvServer:
         self.env = env
         self.action_cls = action_cls
         self.observation_cls = observation_cls
-        self._executor = ThreadPoolExecutor(max_workers=1)
 
     def register_routes(self, app: Any) -> None:
         """
@@ -128,8 +78,7 @@ class HTTPEnvServer:
         async def reset(request: Dict[str, Any] = Body(default={})) -> Dict[str, Any]:
             """Reset endpoint - returns initial observation."""
             # TODO: Handle seed, episode_id from request if provided
-            loop = asyncio.get_running_loop()
-            observation = await loop.run_in_executor(self._executor, self.env.reset)
+            observation = self.env.reset()
             return self._serialize_observation(observation)
 
         @app.post("/step")
@@ -142,11 +91,8 @@ class HTTPEnvServer:
             action = self._deserialize_action(action_data)
 
             # Execute step
-            loop = asyncio.get_running_loop()
-            observation = await loop.run_in_executor(
-                self._executor, partial(self.env.step, action)
-            )
-    
+            observation = self.env.step(action)
+
             # Return serialized observation
             return self._serialize_observation(observation)
 
@@ -160,10 +106,6 @@ class HTTPEnvServer:
         async def health() -> Dict[str, str]:
             """Health check endpoint."""
             return {"status": "healthy"}
-
-        @app.on_event("shutdown")
-        async def shutdown_event() -> None:
-            self._executor.shutdown(wait=True)
 
 
     def _deserialize_action(self, action_data: Dict[str, Any]) -> Action:
@@ -203,20 +145,16 @@ class HTTPEnvServer:
             "done": bool,
         }
         """
-        obs_raw = asdict(observation)
+        obs_dict = asdict(observation)
 
         # Extract reward and done (these are part of StepResult on client side)
-        reward = obs_raw.pop("reward", None)
-        done = obs_raw.pop("done", False)
-        metadata = obs_raw.pop("metadata", None)
-
-        obs_json = _json_safe(obs_raw)
-        if metadata is not None:
-            obs_json["metadata"] = _json_safe(metadata)
+        reward = obs_dict.pop("reward", None)
+        done = obs_dict.pop("done", False)
+        obs_dict.pop("metadata", None)  # Remove metadata from observation
 
         # Return in HTTPEnvClient expected format
         return {
-            "observation": obs_json,
+            "observation": obs_dict,
             "reward": reward,
             "done": done,
         }
