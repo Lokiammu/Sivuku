@@ -26,6 +26,8 @@ We provide a script to automate most of the conversion process:
 ./scripts/convert_env.sh src/envs/my_env /path/to/new/my_env_standalone
 ```
 
+> **Note:** The converter requires `python3` on your PATH and works with the default Bash shipped on macOS. When prompted, answer `y` to proceed and leave the optional naming prompts blank to accept the defaults.
+
 This script will:
 1. Copy your environment to a new directory
 2. Convert `requirements.txt` to `pyproject.toml` (if needed)
@@ -33,6 +35,7 @@ This script will:
 4. Update Dockerfile for standalone builds
 5. Initialize a new git repository
 6. Create necessary configuration files
+7. Rewrite imports so the environment depends on `openenv-core` and installs as a proper Python package
 
 After running the script, jump to [Step 4: Testing Your Conversion](#step-4-testing-your-conversion).
 
@@ -107,7 +110,8 @@ dev = [
 server = "{env_name}.server.app:main"
 
 [tool.setuptools]
-packages = ["{env_name}"]
+packages = ["{env_name}", "{env_name}.server"]
+package-dir = { "{env_name}" = ".", "{env_name}.server" = "server" }
 
 [tool.setuptools.package-data]
 {env_name} = ["**/*.yaml", "**/*.yml"]
@@ -155,8 +159,9 @@ server = "my_env.server.app:main"
 [tool.setuptools]
 packages = ["my_env"]
 
-[tool.setuptools.package-data]
-my_env = ["**/*.yaml", "**/*.yml"]
+[tool.setuptools]
+packages = ["{env_name}", "{env_name}.server"]
+package-dir = { "{env_name}" = ".", "{env_name}.server" = "server" }    
 ```
 
 **Important**: Replace `my_env` with your actual environment name throughout the file.
