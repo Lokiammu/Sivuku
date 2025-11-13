@@ -15,6 +15,7 @@ description = "__ENV_TITLE_NAME__ environment for OpenEnv"
 requires-python = ">=3.10"
 dependencies = [
     # Core OpenEnv dependencies (required for server functionality)
+    # "openenv-core @ git+https://github.com/meta-pytorch/OpenEnv.git@main#subdirectory=src/core",
     "openenv-core>=0.1.0",
     "fastapi>=0.115.0",
     "pydantic>=2.0.0",
@@ -42,7 +43,8 @@ dev = [
 server = "__ENV_NAME__.server.app:main"
 
 [tool.setuptools]
-package-dir = {"" = "."}
+packages = ["__ENV_NAME__", "__ENV_NAME__.server"]
+package-dir = { "__ENV_NAME__" = ".", "__ENV_NAME__.server" = "server" }
 
 [tool.setuptools.packages.find]
 where = ["."]
