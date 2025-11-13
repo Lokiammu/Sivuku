@@ -1,6 +1,7 @@
 name: PR New Environment
 
 on:
+  workflow_dispatch:
   pull_request_target:
     types:
       - opened
@@ -177,7 +178,7 @@ jobs:
 
             const summary = status === 'success'
               ? 'Your env passes the vibe check. However, most environments should go straight to the hub, they will automatically be added to the official Env Hub collection on a nightly basis. Environments in the official specification repo are only meant to demonstrate usage of a specific spec feature for educational purposes. Re-run locally with:'
-              : 'Validation reported issues. Review the log and re-run locally:';
+              : 'Validation reported issues. Review the log and re-run locally with `openenv validate --verbose`. Please note, we recently changed the standard template, your environment might pre-date this standard, follow the conversion guide https://github.com/meta-pytorch/OpenEnv/blob/main/scripts/CONVERT.md to convert your environment to the new standard.';
 
             const envDir = 'src/envs/' + envName;
             const rawLog = process.env.VALIDATION_LOG || '';
