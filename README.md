@@ -263,6 +263,9 @@ See the [SkyRL example](https://skyrl.readthedocs.io/en/latest/examples/openenv.
 ### ART
 See the [ART example](https://art.openpipe.ai/integrations/openenv-integration) on how OpenEnv environments can be used to train models with ART.
 
+### Oumi
+See the [Oumi example](https://github.com/oumi-ai/oumi/blob/main/notebooks/Oumi%20-%20OpenEnv%20GRPO%20with%20trl.ipynb) on how OpenEnv environments can be used to train models with Oumi.
+
 ## Example Environments
 
 ### Echo Environment
