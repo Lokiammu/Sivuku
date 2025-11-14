@@ -7,9 +7,8 @@ Action/Observation types for the Coding environment.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
 
-from core.env_server import Action, Observation, State
+from openenv_core.env_server.interfaces import Action, Observation, State
 
 
 @dataclass
