@@ -16,6 +16,7 @@ An e2e framework for creating, deploying and using isolated execution environmen
 - [TRL example](https://huggingface.co/docs/trl/main/en/openenv)
 - [Unsloth Google Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb)
 - [ART example](https://art.openpipe.ai/integrations/openenv-integration)
+- [Oumi example](https://github.com/oumi-ai/oumi/blob/main/notebooks/Oumi%20-%20OpenEnv%20GRPO%20with%20trl.ipynb)
 
 ## Overview
 
