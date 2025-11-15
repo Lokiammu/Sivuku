@@ -41,6 +41,11 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         self._headers = default_headers or {}
         self._provider = provider
 
+    @property
+    def base_url(self) -> str:
+        """Base URL of the connected environment server."""
+        return self._base
+
     @classmethod
     def from_docker_image(
         cls: Type[EnvClientT],
