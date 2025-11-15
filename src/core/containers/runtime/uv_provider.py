@@ -33,6 +33,7 @@ def _create_uv_command(
     repo_id: str,
     port: int,
     reload: bool,
+    workers: int = 1,
 ) -> list[str]:
     command = [
         "uv",
@@ -41,11 +42,14 @@ def _create_uv_command(
         "--with",
         f"git+https://huggingface.co/spaces/{repo_id}",
         "--",
-        "server",
+        "uvicorn",
+        "server.app:app",
         "--host",
         "0.0.0.0",
         "--port",
         str(port),
+        "--workers",
+        str(workers),
     ]
     if reload:
         command.append("--reload")
@@ -108,6 +112,7 @@ class UVProvider(RuntimeProvider):
         self,
         port: Optional[int] = None,
         env_vars: Optional[Dict[str, str]] = None,
+        workers: int = 1,
         **_: Dict[str, str],
     ) -> str:
         """
@@ -116,6 +121,7 @@ class UVProvider(RuntimeProvider):
         Args:
             port: The port to bind the environment to
             env_vars: Environment variables to pass to the environment
+            workers: The number of workers to use
 
         Returns:
             The base URL of the environment
@@ -132,6 +138,7 @@ class UVProvider(RuntimeProvider):
             repo_id=self.repo_id,
             port=bind_port,
             reload=self.reload,
+            workers=workers,
         )
 
         env = os.environ.copy()
