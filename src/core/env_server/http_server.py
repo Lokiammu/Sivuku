@@ -22,7 +22,7 @@ from pydantic import ValidationError
 from fastapi import Body, FastAPI, HTTPException, status
 
 from .interfaces import Environment
-from .types import Action, Observation
+from .types import Action, Observation, State
 
 
 class HTTPEnvServer:
@@ -118,7 +118,7 @@ class HTTPEnvServer:
         @app.get("/state")
         async def get_state() -> Dict[str, Any]:
             """State endpoint - returns current environment state."""
-            state = self.env.state
+            state: State = self.env.state
             return state.model_dump()
 
         @app.get("/health")
