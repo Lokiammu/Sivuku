@@ -176,7 +176,7 @@ def main() -> None:
         image="browsergym-env:latest",
         env_vars={
             "BROWSERGYM_BENCHMARK": "miniwob",
-            "BROWSERGYM_TASK_NAME": "click-test-2",
+            "BROWSERGYM_TASK_NAME": "click-test",
         },
     )
 
