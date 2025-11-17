@@ -16,12 +16,14 @@ from __future__ import annotations
 import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict
-from typing import Any, Dict, Type
+from typing import Any, Dict, Type, Optional
+
+from pydantic import ValidationError
+from fastapi import Body, FastAPI, HTTPException, status
 
 from .interfaces import Environment
 from .types import Action, Observation
-from fastapi import Body, FastAPI
+
 
 class HTTPEnvServer:
     """
@@ -95,8 +97,14 @@ class HTTPEnvServer:
             action_data = request.get("action", request)
             # TODO: Handle timeout_s, request_id, episode_id from request if provided
 
-            # Deserialize action
-            action = self._deserialize_action(action_data)
+            # Deserialize action with Pydantic validation
+            try:
+                action = self._deserialize_action(action_data)
+            except ValidationError as e:
+                # Return HTTP 422 with detailed validation errors
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.errors()
+                )
 
             # Execute step in thread pool to avoid blocking asyncio loop
             loop = asyncio.get_event_loop()
@@ -111,17 +119,16 @@ class HTTPEnvServer:
         async def get_state() -> Dict[str, Any]:
             """State endpoint - returns current environment state."""
             state = self.env.state
-            return asdict(state)
+            return state.model_dump()
 
         @app.get("/health")
         async def health() -> Dict[str, str]:
             """Health check endpoint."""
             return {"status": "healthy"}
 
-
     def _deserialize_action(self, action_data: Dict[str, Any]) -> Action:
         """
-        Convert JSON dict to Action instance.
+        Convert JSON dict to Action instance using Pydantic validation.
 
         Args:
             action_data: Dictionary containing action data
@@ -129,19 +136,19 @@ class HTTPEnvServer:
         Returns:
             Action instance
 
+        Raises:
+            ValidationError: If action_data is invalid for the action class
+
         Note:
-            This is a simple implementation. Subclasses may need to override
-            for more complex deserialization logic.
+            This uses Pydantic's model_validate() for automatic validation.
         """
-        # Remove metadata if present (it will be set via kw_only field)
-        metadata = action_data.pop("metadata", {})
-        action = self.action_cls(**action_data)
-        action.metadata = metadata
+        # Pydantic handles validation automatically
+        action = self.action_cls.model_validate(action_data)
         return action
 
     def _serialize_observation(self, observation: Observation) -> Dict[str, Any]:
         """
-        Convert Observation instance to JSON-compatible dict.
+        Convert Observation instance to JSON-compatible dict using Pydantic.
 
         Args:
             observation: Observation instance
@@ -156,25 +163,18 @@ class HTTPEnvServer:
             "done": bool,
         }
         """
-        obs_dict = asdict(observation)
+        # Use Pydantic's model_dump() for serialization
+        obs_dict = observation.model_dump(
+            exclude={
+                "reward",
+                "done",
+                "metadata",
+            }  # Exclude these from observation dict
+        )
 
-        # Convert numpy arrays to lists for JSON serialization
-        def _convert_numpy(obj):
-            """Recursively convert numpy arrays to lists."""
-            if hasattr(obj, '__array__'):  # numpy array
-                return obj.tolist()
-            elif isinstance(obj, dict):
-                return {k: _convert_numpy(v) for k, v in obj.items()}
-            elif isinstance(obj, (list, tuple)):
-                return type(obj)(_convert_numpy(item) for item in obj)
-            return obj
-
-        obs_dict = _convert_numpy(obs_dict)
-
-        # Extract reward and done (these are part of StepResult on client side)
-        reward = obs_dict.pop("reward", None)
-        done = obs_dict.pop("done", False)
-        obs_dict.pop("metadata", None)  # Remove metadata from observation
+        # Extract reward and done directly from the observation
+        reward = observation.reward
+        done = observation.done
 
         # Return in HTTPEnvClient expected format
         return {
@@ -182,6 +182,7 @@ class HTTPEnvServer:
             "reward": reward,
             "done": done,
         }
+
 
 def create_app(
     env: Environment,
@@ -191,33 +192,36 @@ def create_app(
 ) -> Any:
     """
     Create a FastAPI application with or without web interface.
-    
+
     This function creates a FastAPI app with the web interface enabled by default,
     including README integration for better user experience.
-    
+
     Args:
         env: The Environment instance to serve
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         env_name: Optional environment name for README loading
-        
+
     Returns:
         FastAPI application instance with or without web interface and README integration
     """
     # Check if web interface should be enabled
     # This can be controlled via environment variable or build argument
-    enable_web = (
-        os.getenv("ENABLE_WEB_INTERFACE", "false").lower() in ("true", "1", "yes")
+    enable_web = os.getenv("ENABLE_WEB_INTERFACE", "false").lower() in (
+        "true",
+        "1",
+        "yes",
     )
 
     if enable_web:
         # Import web interface only when needed
         from .web_interface import create_web_interface_app
+
         return create_web_interface_app(env, action_cls, observation_cls, env_name)
     else:
         # Use standard FastAPI app without web interface
         return create_fastapi_app(env, action_cls, observation_cls)
-    
+
 
 def create_fastapi_app(
     env: Environment,
