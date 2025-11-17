@@ -62,17 +62,16 @@ def extract_feedback_counts(feedback: str) -> Tuple[int, int]:
         return (0, 0)
 
     segments = [
-        segment.strip() for segment in feedback.split("\n\n") if segment.strip()
+        segment.strip() for segment in feedback.split("\n") if segment.strip()
     ]
-    if not segments:
+    if len(segments) < 2:
         return (0, 0)
 
-    latest_segment = segments[-1]
-    lines = [line.strip() for line in latest_segment.splitlines() if line.strip()]
-    latest_line = lines[-1] if lines else latest_segment
+    marker_line = segments[1]
 
-    green_count = latest_line.count("G")
-    yellow_count = latest_line.count("Y")
+    green_count = marker_line.count("G")
+    yellow_count = marker_line.count("Y")
+
     return (green_count, yellow_count)
 
 
