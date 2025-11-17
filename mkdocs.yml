@@ -4,9 +4,6 @@ site_url: https://meta-pytorch.github.io/OpenEnv
 repo_url: https://github.com/meta-pytorch/OpenEnv
 repo_name: meta-pytorch/OpenEnv
 
-docs_dir: .
-site_dir: ../site
-
 theme:
   name: material
   font:
