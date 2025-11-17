@@ -14,8 +14,8 @@ A typical workflow looks like:
 4. Configure dependencies and the Dockerfile once.
 5. Use the CLI (`openenv build`, `openenv validate`, `openenv push`) to package and share your work.
 
-> [!NOTE]
-> These integrations are handled automatically by the `openenv` CLI when you run `openenv init`. 
+!!! note
+    These integrations are handled automatically by the `openenv` CLI when you run `openenv init`. 
 
 ### Prerequisites
 
