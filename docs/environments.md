@@ -11,7 +11,7 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
       </p>
     </div>
     <div class="environment-card__links">
-      <a class="environment-card__icon" href="/environments/echo/" aria-label="Echo docs">
+      <a class="environment-card__icon" href="/OpenEnv/environments/echo/" aria-label="Echo docs">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
@@ -30,7 +30,7 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
       </p>
     </div>
     <div class="environment-card__links">
-      <a class="environment-card__icon" href="/environments/coding/" aria-label="Coding docs">
+      <a class="environment-card__icon" href="/OpenEnv/environments/coding/" aria-label="Coding docs">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
@@ -49,7 +49,7 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
       </p>
     </div>
     <div class="environment-card__links">
-      <a class="environment-card__icon" href="/environments/chat/" aria-label="Chat docs">
+      <a class="environment-card__icon" href="/OpenEnv/environments/chat/" aria-label="Chat docs">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
@@ -68,7 +68,7 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
       </p>
     </div>
     <div class="environment-card__links">
-      <a class="environment-card__icon" href="/environments/atari/" aria-label="Atari docs">
+      <a class="environment-card__icon" href="/OpenEnv/environments/atari/" aria-label="Atari docs">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
@@ -87,7 +87,7 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
       </p>
     </div>
     <div class="environment-card__links">
-      <a class="environment-card__icon" href="/environments/openspiel/" aria-label="OpenSpiel docs">
+      <a class="environment-card__icon" href="/OpenEnv/environments/openspiel/" aria-label="OpenSpiel docs">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
@@ -106,13 +106,10 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
       </p>
     </div>
     <div class="environment-card__links">
-      <a class="environment-card__icon" href="/environments/sumo/" aria-label="SUMO-RL docs">
+      <a class="environment-card__icon" href="/OpenEnv/environments/sumo/" aria-label="SUMO-RL docs">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
-      </a>
-      <a class="environment-card__icon environment-card__icon--hf" href="https://huggingface.co/spaces/openenv/sumo_rl_env" target="_blank" rel="noreferrer noopener" aria-label="SUMO-RL on Hugging Face">
-        <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="" aria-hidden="true" />
       </a>
     </div>
   </div>
@@ -125,13 +122,10 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
       </p>
     </div>
     <div class="environment-card__links">
-      <a class="environment-card__icon" href="/environments/finrl/" aria-label="FinRL docs">
+      <a class="environment-card__icon" href="/OpenEnv/environments/finrl/" aria-label="FinRL docs">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
-      </a>
-      <a class="environment-card__icon environment-card__icon--hf" href="https://huggingface.co/spaces/openenv/finrl_env" target="_blank" rel="noreferrer noopener" aria-label="FinRL on Hugging Face">
-        <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="" aria-hidden="true" />
       </a>
     </div>
   </div>
@@ -144,12 +138,12 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
       </p>
     </div>
     <div class="environment-card__links">
-      <a class="environment-card__icon" href="/environments/textarena/" aria-label="TextArena docs">
+      <a class="environment-card__icon" href="/OpenEnv/environments/textarena/" aria-label="TextArena docs">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
       </a>
-      <a class="environment-card__icon environment-card__icon--hf" href="https://huggingface.co/spaces/openenv/textarena_env" target="_blank" rel="noreferrer noopener" aria-label="TextArena on Hugging Face">
+      <a class="environment-card__icon environment-card__icon--hf" href="https://huggingface.co/spaces/burtenshaw/textarena_env" target="_blank" rel="noreferrer noopener" aria-label="TextArena on Hugging Face">
         <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="" aria-hidden="true" />
       </a>
     </div>
@@ -163,13 +157,10 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
       </p>
     </div>
     <div class="environment-card__links">
-      <a class="environment-card__icon" href="/environments/git/" aria-label="Git docs">
+      <a class="environment-card__icon" href="/OpenEnv/environments/git/" aria-label="Git docs">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
-      </a>
-      <a class="environment-card__icon environment-card__icon--hf" href="https://huggingface.co/spaces/openenv/git_env" target="_blank" rel="noreferrer noopener" aria-label="Git on Hugging Face">
-        <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="" aria-hidden="true" />
       </a>
     </div>
   </div>
@@ -182,13 +173,10 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
       </p>
     </div>
     <div class="environment-card__links">
-      <a class="environment-card__icon" href="/environments/dipg/" aria-label="DIPG Safety docs">
+      <a class="environment-card__icon" href="/OpenEnv/environments/dipg/" aria-label="DIPG Safety docs">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
-      </a>
-      <a class="environment-card__icon environment-card__icon--hf" href="https://huggingface.co/spaces/openenv/dipg_safety_env" target="_blank" rel="noreferrer noopener" aria-label="DIPG Safety on Hugging Face">
-        <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="" aria-hidden="true" />
       </a>
     </div>
   </div>
