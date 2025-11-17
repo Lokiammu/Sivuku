@@ -1,4 +1,4 @@
-"""Providers for launching Hugging Face Spaces via ``uv run``."""
+"""Providers for launching ASGI applications via ``uv run``."""
 
 from __future__ import annotations
 
@@ -27,32 +27,36 @@ def _find_free_port() -> int:
         sock.bind(("", 0))
         sock.listen(1)
         return sock.getsockname()[1]
-   
+
 
 def _create_uv_command(
-    repo_id: str,
+    *,
+    host: str,
     port: int,
     reload: bool,
-    workers: int = 1,
+    workers: int,
+    app: str,
+    project_path: str,
 ) -> list[str]:
-    command = [
-        "uv",
-        "run",
-        "--isolated",
-        "--with",
-        f"git+https://huggingface.co/spaces/{repo_id}",
-        "--",
-        "uvicorn",
-        "server.app:app",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        str(port),
-        "--workers",
-        str(workers),
-    ]
+    command: list[str] = ["uv", "run", "--isolated", "--project", project_path]
+
+    command.append("--")
+    command.extend(
+        [
+            "uvicorn",
+            app,
+            "--host",
+            host,
+            "--port",
+            str(port),
+            "--workers",
+            str(workers),
+        ]
+    )
+
     if reload:
         command.append("--reload")
+
     return command
 
 
@@ -79,13 +83,15 @@ class UVProvider(RuntimeProvider):
     RuntimeProvider implementation backed by ``uv run``.
 
     Args:
-        repo_id: The repository ID of the environment to run
-        reload: Whether to reload the environment on code changes
-        env_vars: Environment variables to pass to the environment
-        context_timeout_s: The timeout to wait for the environment to become ready
+        project_path: Local path to a uv project (passed to ``uv run --project``)
+        app: ASGI application path for uvicorn (defaults to ``server.app:app``)
+        host: Host interface to bind to (defaults to ``0.0.0.0``)
+        reload: Whether to enable uvicorn's reload mode
+        env_vars: Environment variables to pass through to the spawned process
+        context_timeout_s: How long to wait for the environment to become ready
 
     Example:
-        >>> provider = UVProvider(repo_id="burtenshaw/echo-cli")
+        >>> provider = UVProvider(project_path="/path/to/env")
         >>> base_url = provider.start()
         >>> print(base_url)  # http://localhost:8000
         >>> # Use the environment via base_url
@@ -94,13 +100,18 @@ class UVProvider(RuntimeProvider):
 
     def __init__(
         self,
-        repo_id: str,
+        *,
+        project_path: str,
+        app: str = "server.app:app",
+        host: str = "0.0.0.0",
         reload: bool = False,
         env_vars: Optional[Dict[str, str]] = None,
         context_timeout_s: float = 60.0,
     ):
         """Initialize the UVProvider."""
-        self.repo_id = repo_id
+        self.project_path = os.path.abspath(project_path)
+        self.app = app
+        self.host = host
         self.reload = reload
         self.env_vars = env_vars
         self.context_timeout_s = context_timeout_s
@@ -135,10 +146,12 @@ class UVProvider(RuntimeProvider):
         bind_port = port or _find_free_port()
 
         command = _create_uv_command(
-            repo_id=self.repo_id,
+            host=self.host,
             port=bind_port,
             reload=self.reload,
             workers=workers,
+            app=self.app,
+            project_path=self.project_path,
         )
 
         env = os.environ.copy()
@@ -153,7 +166,8 @@ class UVProvider(RuntimeProvider):
         except OSError as exc:
             raise RuntimeError(f"Failed to launch `uv run`: {exc}") from exc
 
-        self._base_url = f"http://localhost:{bind_port}"
+        client_host = "127.0.0.1" if self.host in {"0.0.0.0", "::"} else self.host
+        self._base_url = f"http://{client_host}:{bind_port}"
         return self._base_url
 
     def wait_for_ready(self, timeout_s: float = 60.0) -> None:
