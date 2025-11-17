@@ -123,9 +123,7 @@ class LocalDockerProvider(ContainerProvider):
             FileNotFoundError,
             subprocess.TimeoutExpired,
         ):
-            raise RuntimeError(
-                "Docker is not available. Please install Docker Desktop or Docker Engine."
-            )
+            raise RuntimeError("Docker is not available. Please install Docker Desktop or Docker Engine.")
 
     def start_container(
         self,
@@ -248,9 +246,7 @@ class LocalDockerProvider(ContainerProvider):
 
             time.sleep(0.5)
 
-        raise TimeoutError(
-            f"Container at {base_url} did not become ready within {timeout_s}s"
-        )
+        raise TimeoutError(f"Container at {base_url} did not become ready within {timeout_s}s")
 
     def _find_available_port(self) -> int:
         """
@@ -311,11 +307,10 @@ class RuntimeProvider(ABC):
     for connecting to it.
 
     Example:
-        >>> provider = UVProvider()
-        >>> base_url = provider.start_container("echo-env:latest")
+        >>> provider = UVProvider(project_path="/path/to/env")
+        >>> base_url = provider.start()
         >>> print(base_url)  # http://localhost:8000
-        >>> # Use the environment via base_url
-        >>> provider.stop_container()
+        >>> provider.stop()
     """
 
     @abstractmethod
