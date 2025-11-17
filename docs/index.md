@@ -31,10 +31,6 @@ In addition to making it easier for researchers and RL framework writers, we als
 
 We welcome contributions from the community! If you find a bug, have a feature request, or want to contribute a new environment, please open an issue or submit a pull request. The repository is hosted on GitHub at [meta-pytorch/OpenEnv](https://github.com/meta-pytorch/OpenEnv).
 
-> ⚠️ **Early Development Warning** OpenEnv is currently in an experimental
-> stage. You should expect bugs, incomplete features, and APIs that may change
-> in future versions. The project welcomes bugfixes, but to make sure things are
-> well coordinated you should discuss any significant change before starting the
-> work. It's recommended that you signal your intention to contribute in the
-> issue tracker, either by filing a new issue or by claiming an existing one.
+!!! warning
+    OpenEnv is currently in an experimental stage. You should expect bugs, incomplete features, and APIs that may change in future versions. The project welcomes bugfixes, but to make sure things are well coordinated you should discuss any significant change before starting the work. It's recommended that you signal your intention to contribute in the issue tracker, either by filing a new issue or by claiming an existing one.
 
