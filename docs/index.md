@@ -4,11 +4,14 @@
     An e2e framework for creating, deploying and using isolated execution environments for agentic RL training, built using Gymnasium style simple APIs.
   </p>
   <div class="hero__actions">
-    <a class="hero__button hero__button--primary" href="environments/">
-      Explore Environments
+    <a class="hero__button hero__button--primary" href="quickstart/">
+      Quick Start
     </a>
     <a class="hero__button" href="environment-builder/">
-      Build Your Own
+      Build Your Own Environment
+    </a>
+    <a class="hero__button" href="environments/">
+      Explore Environments
     </a>
   </div>
   <div>
