@@ -121,23 +121,47 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
     ) -> EnvClientT:
         """Create a client from a Hugging Face Space.
 
-        Set ``use_docker=True`` to launch the registry image with a container
-        provider. The default ``use_docker=False`` runs the Space locally using
-        ``uv run`` through :class:`UVProvider`.
+        Args:
+            repo_id: Hugging Face space identifier ``{org}/{space}``.
+            use_docker: When ``True`` (default) pull from the HF registry and
+                launch via :class:`LocalDockerProvider`. When ``False`` run the
+                space locally with :class:`UVProvider`.
+            provider: Optional provider instance to reuse. Must be a
+                :class:`ContainerProvider` when ``use_docker=True`` and a
+                :class:`RuntimeProvider`` otherwise.
+            provider_kwargs: Additional keyword arguments forwarded to either the
+                container provider's ``start_container`` (docker) or to the
+                ``UVProvider`` constructor/start (uv). When ``use_docker=False``,
+                the ``project_path`` argument can be used to override the default
+                git URL (``git+https://huggingface.co/spaces/{repo_id}``).
         """
 
+        start_args = {}
+        for key in ("port", "env_vars", "workers"):
+            if key in provider_kwargs:
+                start_args[key] = provider_kwargs.pop(key)
+
         if use_docker:
+            docker_provider = provider or LocalDockerProvider()
             tag = provider_kwargs.pop("tag", "latest")
             image = f"registry.hf.space/{repo_id.replace('/', '-')}:{tag}"
-            return cls.from_docker_image(image, provider=provider, **provider_kwargs)
+            base_url = docker_provider.start_container(image, **start_args, **provider_kwargs)
+            docker_provider.wait_for_ready(base_url)
+            return cls(base_url=base_url, provider=docker_provider)
         else:
-            provider: RuntimeProvider = UVProvider(
-                repo_id=repo_id,
-                **provider_kwargs,
-            )
-            base_url = provider.start()
-            timeout_s = provider_kwargs.pop("timeout_s", 60.0)
-            provider.wait_for_ready(base_url=provider.base_url, timeout_s=timeout_s)
+            if provider is None:
+                uv_kwargs = dict(provider_kwargs)
+                project_path = uv_kwargs.pop("project_path", None)
+                if project_path is None:
+                    project_path = f"git+https://huggingface.co/spaces/{repo_id}"
+
+                provider = UVProvider(project_path=project_path, **uv_kwargs)
+            else:
+                if provider_kwargs:
+                    raise ValueError("provider_kwargs cannot be used when supplying a provider instance")
+
+            base_url = provider.start(**start_args)
+            provider.wait_for_ready()
 
             return cls(base_url=base_url, provider=provider)
 
