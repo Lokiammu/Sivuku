@@ -61,18 +61,18 @@ def extract_feedback_counts(feedback: str) -> Tuple[int, int]:
     if not feedback:
         return (0, 0)
 
-    segments = [
-        segment.strip() for segment in feedback.split("\n") if segment.strip()
-    ]
-    if len(segments) < 2:
+    lines = [line.strip() for line in feedback.split("\n") if line.strip()]
+    if len(lines) < 2:
         return (0, 0)
 
-    marker_line = segments[1]
+    for line in lines:
+        normalized = line.replace(" ", "")
+        if normalized and all(c in "GYX" for c in normalized):
+            green = normalized.count("G")
+            yellow = normalized.count("Y")
+            return (green, yellow)
 
-    green_count = marker_line.count("G")
-    yellow_count = marker_line.count("Y")
-
-    return (green_count, yellow_count)
+    return (0, 0)
 
 
 class _WordleRewardProvider:
