@@ -5,7 +5,7 @@ repo_url: https://github.com/meta-pytorch/OpenEnv
 repo_name: meta-pytorch/OpenEnv
 
 docs_dir: .
-site_dir: site
+site_dir: ../site
 
 theme:
   name: material
@@ -42,9 +42,6 @@ plugins:
           options:
             show_source: false
             members_order: source
-      watch:
-        - ../src/core
-        - ../src/openenv_cli
 
 markdown_extensions:
   - admonition
@@ -64,6 +61,10 @@ markdown_extensions:
         - name: important
         - name: warning
         - name: caution
+
+watch:
+  - ../src/core
+  - ../src/openenv_cli
 
 nav:
   - Get Started:
