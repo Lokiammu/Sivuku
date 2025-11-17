@@ -46,6 +46,3 @@ server = "__ENV_NAME__.server.app:main"
 packages = ["__ENV_NAME__", "__ENV_NAME__.server"]
 package-dir = { "__ENV_NAME__" = ".", "__ENV_NAME__.server" = "server" }
 
-[tool.setuptools.packages.find]
-where = ["."]
-
