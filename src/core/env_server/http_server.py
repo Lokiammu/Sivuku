@@ -126,6 +126,49 @@ class HTTPEnvServer:
             """Health check endpoint."""
             return {"status": "healthy"}
 
+        @app.get("/schema/action", tags=["Schema"])
+        async def get_action_schema() -> Dict[str, Any]:
+            """
+            Get JSON schema for actions accepted by this environment.
+
+            Returns the complete JSON schema definition for the Action model,
+            including all field types, constraints, and validation rules.
+            This schema can be used to validate actions before sending them
+            to the environment, or to generate forms in web interfaces.
+
+            Returns:
+                Dict containing JSON Schema
+            """
+            return self.action_cls.model_json_schema()
+
+        @app.get("/schema/observation", tags=["Schema"])
+        async def get_observation_schema() -> Dict[str, Any]:
+            """
+            Get JSON schema for observations returned by this environment.
+
+            Returns the complete JSON schema definition for the Observation model,
+            including all field types and nested structures. This schema describes
+            what observations the environment will return after actions are executed.
+
+            Returns:
+                Dict containing JSON Schema
+            """
+            return self.observation_cls.model_json_schema()
+
+        @app.get("/schema/state", tags=["Schema"])
+        async def get_state_schema() -> Dict[str, Any]:
+            """
+            Get JSON schema for environment state objects.
+
+            Returns the complete JSON schema definition for the State model.
+            This schema describes the internal state representation of the
+            environment, which can be queried via the /state endpoint.
+
+            Returns:
+                Dict containing JSON Schema
+            """
+            return State.model_json_schema()
+
     def _deserialize_action(self, action_data: Dict[str, Any]) -> Action:
         """
         Convert JSON dict to Action instance using Pydantic validation.
