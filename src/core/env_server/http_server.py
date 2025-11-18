@@ -96,11 +96,8 @@ class HTTPEnvServer:
         ) -> ResetResponse:
             """Reset endpoint - returns initial observation."""
             # Handle optional parameters
-            kwargs = {}
-            if request.seed is not None:
-                kwargs["seed"] = request.seed
-            if request.episode_id is not None:
-                kwargs["episode_id"] = request.episode_id
+            # Start with all fields from the request, including extra ones
+            kwargs = request.model_dump(exclude_unset=True)
 
             # Pass arguments only if environment accepts them
             sig = inspect.signature(self.env.reset)
@@ -132,9 +129,8 @@ class HTTPEnvServer:
                 )
 
             # Handle optional parameters
-            kwargs = {}
-            if request.timeout_s is not None:
-                kwargs["timeout_s"] = request.timeout_s
+            # Start with all fields from the request, including extra ones, but exclude 'action'
+            kwargs = request.model_dump(exclude_unset=True, exclude={'action'})
 
             # Pass arguments only if environment accepts them
             sig = inspect.signature(self.env.step)

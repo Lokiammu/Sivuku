@@ -56,7 +56,7 @@ class ResetRequest(BaseModel):
     """Request model for environment reset."""
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra="allow",  # Allow extra fields for custom reset parameters
         json_schema_extra={"examples": [{"seed": 42, "episode_id": "episode-001"}, {}]},
     )
 
@@ -87,7 +87,15 @@ class ResetResponse(BaseModel):
 class StepRequest(BaseModel):
     """Request model for environment step."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="allow",  # Allow extra fields for custom step parameters
+        json_schema_extra={
+            "examples": [
+                {"action": {"value": 1}, "timeout_s": 30.0},
+                {"action": {"value": 1}, "render": True, "verbose": False},
+            ]
+        },
+    )
 
     action: Dict[str, Any] = Field(
         ...,
