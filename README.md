@@ -20,7 +20,7 @@ An e2e framework for creating, deploying and using isolated execution environmen
 
 ## Overview
 
-OpenEnv provides a standard for interacting with agentic execution environments via simple Gymnasium style APIs - step(), reset(), state(). Users of agentic execution environments can interact with the environment during RL training loops using these simple APIs.
+OpenEnv provides a standard for interacting with agentic execution environments via simple Gymnasium style APIs - `step()`, `reset()`, `state()`. Users of agentic execution environments can interact with the environment during RL training loops using these simple APIs.
 
 In addition to making it easier for researchers and RL framework writers, we also provide tools for environment creators making it easier for them to create richer environments and make them available over familiar protocols like HTTP and packaged using canonical technologies like docker. Environment creators can use the OpenEnv framework to create environments that are isolated, secure, and easy to deploy and use.
 
@@ -82,7 +82,7 @@ The web interface is **conditionally enabled** based on environment variables:
 To use the web interface:
 
 ```python
-from core.env_server import create_hf_web_interface_app
+from core.env_server import create_web_interface_app
 from your_env.models import YourAction, YourObservation
 from your_env.server.your_environment import YourEnvironment
 
@@ -98,18 +98,18 @@ Base class for implementing environment logic:
 - **`step(action)`**: Execute an `Action`, returns resulting `Observation`
 - **`state()`**: Access episode metadata (`State` with episode_id, step_count, etc.)
 
-#### 2. HTTPEnvClient (Client-Side)
+#### 3. HTTPEnvClient (Client-Side)
 Base class for HTTP communication:
 - Handles HTTP requests to environment server
 - Contains a utility to spin up a docker container locally for the corresponding environment
 - Type-safe action/observation parsing
 
-#### 3. Container Providers
+#### 4. Container Providers
 Manage container deployment:
 - `LocalDockerProvider`: Run containers on local Docker daemon
 - `KubernetesProvider`: Deploy to K8s clusters (future)
 
-#### 4. Models
+#### 5. Models
 Type-safe data structures:
 - `Action`: Base class for environment actions
 - `Observation`: Base class for environment observations
@@ -287,7 +287,7 @@ Executes arbitrary Python code in a sandboxed environment. Features:
 See: [`src/envs/coding_env/README.md`](src/envs/coding_env/README.md)
 
 ## Community Support & Acknowledgments 
-This is an open and community centric project. If you would like to add your name here, please put up a pull request and tag @jspisak for review. Ty!!
+This is an open and community-centric project. If you would like to add your name here, please put up a pull request and tag @jspisak for review. Ty!!
 
 Supporters include: Meta-PyTorch, Hugging Face, [Patronus AI](https://patronus.ai), [Surge AI](https://surgehq.ai), [LastMile AI](https://www.lastmileai.dev), Unsloth AI, Reflection AI, vLLM, SkyRL (UC-Berkeley), LightningAI, Axolotl AI, Stanford Scaling Intelligence Lab, Mithril, [OpenMined](https://openmined.org/), [Fleet AI](https://fleetai.com) ..
 
@@ -295,4 +295,4 @@ And we'd also like to acknowledge the team at Farama Foundation as the OpenEnv A
 
 ## License
 
-BSD 3-Clause License (see LICENSE file)
+BSD 3-Clause License (see [LICENSE](./LICENSE) file)
