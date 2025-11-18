@@ -52,6 +52,73 @@ class Observation(BaseModel):
     )
 
 
+class ResetRequest(BaseModel):
+    """Request model for environment reset."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [{"seed": 42, "episode_id": "episode-001"}, {}]},
+    )
+
+    seed: Optional[int] = Field(
+        default=None, ge=0, description="Random seed for reproducible episodes"
+    )
+    episode_id: Optional[str] = Field(
+        default=None, max_length=255, description="Custom episode identifier"
+    )
+
+
+class ResetResponse(BaseModel):
+    """Response model for environment reset."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    observation: Dict[str, Any] = Field(
+        ..., description="Initial observation from the environment"
+    )
+    reward: Optional[float] = Field(
+        default=None, description="Initial reward (typically None at reset)"
+    )
+    done: bool = Field(
+        default=False, description="Whether episode is already done (typically False)"
+    )
+
+
+class StepRequest(BaseModel):
+    """Request model for environment step."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: Dict[str, Any] = Field(
+        ...,
+        description="Action to execute, must conform to environment's action schema",
+    )
+    timeout_s: Optional[float] = Field(
+        default=None,
+        gt=0,
+        description="Optional timeout in seconds for action execution",
+    )
+    request_id: Optional[str] = Field(
+        default=None,
+        max_length=255,
+        description="Optional request identifier for tracking",
+    )
+
+
+class StepResponse(BaseModel):
+    """Response model for environment step."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    observation: Dict[str, Any] = Field(
+        ..., description="Observation resulting from the action"
+    )
+    reward: Optional[float] = Field(
+        default=None, description="Reward signal from the action"
+    )
+    done: bool = Field(default=False, description="Whether the episode has terminated")
+
+
 class State(BaseModel):
     """Base class for environment state.
 

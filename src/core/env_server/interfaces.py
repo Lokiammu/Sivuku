@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from abc import ABC, abstractmethod
-from typing import Any, Protocol, TypedDict
+from typing import Any, Optional, Protocol, TypedDict
 
 from .types import Action, Observation, State
 
@@ -96,12 +96,22 @@ class Environment(ABC):
         self.transform = transform
 
     @abstractmethod
-    def reset(self) -> Observation:
+    def reset(
+        self,
+        seed: Optional[int] = None,
+        episode_id: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Observation:
         """Reset the environment and return initial observation."""
         pass
 
     @abstractmethod
-    def step(self, action: Action) -> Observation:
+    def step(
+        self,
+        action: Action,
+        timeout_s: Optional[float] = None,
+        **kwargs: Any,
+    ) -> Observation:
         """Take a step in the environment."""
         pass
 

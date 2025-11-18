@@ -14,15 +14,24 @@ over HTTP endpoints that HTTPEnvClient can consume.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, Type, Optional
+from typing import Any, Dict, Optional, Type
 
-from pydantic import ValidationError
 from fastapi import Body, FastAPI, HTTPException, status
+from pydantic import ValidationError
 
 from .interfaces import Environment
-from .types import Action, Observation, State
+from .types import (
+    Action,
+    Observation,
+    ResetRequest,
+    ResetResponse,
+    State,
+    StepRequest,
+    StepResponse,
+)
 
 
 class HTTPEnvServer:
@@ -81,21 +90,37 @@ class HTTPEnvServer:
         if not isinstance(app, FastAPI):
             raise TypeError("app must be a FastAPI instance")
 
-        @app.post("/reset")
-        async def reset(request: Dict[str, Any] = Body(default={})) -> Dict[str, Any]:
+        @app.post("/reset", response_model=ResetResponse)
+        async def reset(
+            request: ResetRequest = Body(default_factory=ResetRequest),
+        ) -> ResetResponse:
             """Reset endpoint - returns initial observation."""
-            # TODO: Handle seed, episode_id from request if provided
-            # Run sync environment code in thread pool to avoid blocking asyncio loop
-            loop = asyncio.get_event_loop()
-            observation = await loop.run_in_executor(self._executor, self.env.reset)
-            return self._serialize_observation(observation)
+            # Handle optional parameters
+            kwargs = {}
+            if request.seed is not None:
+                kwargs["seed"] = request.seed
+            if request.episode_id is not None:
+                kwargs["episode_id"] = request.episode_id
 
-        @app.post("/step")
-        async def step(request: Dict[str, Any]) -> Dict[str, Any]:
+            # Pass arguments only if environment accepts them
+            sig = inspect.signature(self.env.reset)
+            valid_kwargs = {}
+
+            has_kwargs = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+            )
+
+            for k, v in kwargs.items():
+                if k in sig.parameters or has_kwargs:
+                    valid_kwargs[k] = v
+
+            observation = self.env.reset(**valid_kwargs)
+            return ResetResponse(**self._serialize_observation(observation))
+
+        @app.post("/step", response_model=StepResponse)
+        async def step(request: StepRequest) -> StepResponse:
             """Step endpoint - executes action and returns observation."""
-            # Support both {"action": {...}} and direct action fields
-            action_data = request.get("action", request)
-            # TODO: Handle timeout_s, request_id, episode_id from request if provided
+            action_data = request.action
 
             # Deserialize action with Pydantic validation
             try:
@@ -106,20 +131,33 @@ class HTTPEnvServer:
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.errors()
                 )
 
-            # Execute step in thread pool to avoid blocking asyncio loop
-            loop = asyncio.get_event_loop()
-            observation = await loop.run_in_executor(
-                self._executor, self.env.step, action
+            # Handle optional parameters
+            kwargs = {}
+            if request.timeout_s is not None:
+                kwargs["timeout_s"] = request.timeout_s
+
+            # Pass arguments only if environment accepts them
+            sig = inspect.signature(self.env.step)
+            valid_kwargs = {}
+
+            has_kwargs = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
             )
 
-            # Return serialized observation
-            return self._serialize_observation(observation)
+            for k, v in kwargs.items():
+                if k in sig.parameters or has_kwargs:
+                    valid_kwargs[k] = v
 
-        @app.get("/state")
-        async def get_state() -> Dict[str, Any]:
+            # Execute step
+            observation = self.env.step(action, **valid_kwargs)
+
+            # Return serialized observation
+            return StepResponse(**self._serialize_observation(observation))
+
+        @app.get("/state", response_model=State)
+        async def get_state() -> State:
             """State endpoint - returns current environment state."""
-            state: State = self.env.state
-            return state.model_dump()
+            return self.env.state
 
         @app.get("/health")
         async def health() -> Dict[str, str]:
