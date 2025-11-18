@@ -15,7 +15,7 @@ pip install https://github.com/meta-pytorch/OpenEnv.git
     pip install openenv-core
     ```
 
-### Using the Echo Environment(Example)
+### Using the Echo Environment (Example)
 
 Let's start by using the Echo Environment. This is a simple environment that echoes back messages.
 
