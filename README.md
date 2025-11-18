@@ -130,6 +130,7 @@ This creates the following structure:
 
 ```
 my_env/
+├── .dockerignore        # Docker build exclusions
 ├── __init__.py           # Export YourAction, YourObservation, YourEnv
 ├── models.py             # Define Action, Observation, State dataclasses
 ├── client.py             # Implement YourEnv(HTTPEnvClient)
