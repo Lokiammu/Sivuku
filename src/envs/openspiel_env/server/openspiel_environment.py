@@ -111,7 +111,7 @@ class OpenSpielEnvironment(Environment):
         """
         Reset the environment and return initial observation.
 
-        For multi-player games, this will auto-play opponent turns until
+        For multi-player games, this will autoplay opponent turns until
         it's the agent's turn (or terminal state).
 
         Returns:
@@ -125,7 +125,7 @@ class OpenSpielEnvironment(Environment):
         self._state.step_count = 0
         self._last_opponent_action = None
 
-        # Auto-play opponent turns until agent's turn
+        # Autoplay opponent turns until agent's turn
         time_step = self._auto_play_opponents(time_step)
 
         # Convert to OpenEnv observation
@@ -137,7 +137,7 @@ class OpenSpielEnvironment(Environment):
 
         For multi-player games, this will:
         1. Apply the agent's action
-        2. Auto-play opponent turns until it's the agent's turn again
+        2. Autoplay opponent turns until it's the agent's turn again
         3. Return the observation from the agent's perspective
 
         Args:
@@ -178,7 +178,7 @@ class OpenSpielEnvironment(Environment):
 
         self._state.step_count += 1
 
-        # Auto-play opponent turns (for turn-based games)
+        # Autoplay opponent turns (for turn-based games)
         if self.is_turn_based:
             time_step = self._auto_play_opponents(time_step)
 
@@ -192,7 +192,7 @@ class OpenSpielEnvironment(Environment):
 
     def _auto_play_opponents(self, time_step) -> Any:
         """
-        Auto-play opponent turns until it's the agent's turn or game is terminal.
+        Autoplay opponent turns until it's the agent's turn or game is terminal.
 
         Args:
             time_step: Current TimeStep from OpenSpiel environment.

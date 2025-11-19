@@ -21,10 +21,10 @@ Usage:
     python -m envs.coding_env.server.app
 """
 
-from core.env_server import create_app
+from openenv_core.env_server import create_app
 
-from ..models import CodeAction, CodeObservation
-from .python_codeact_env import PythonCodeActEnv
+from coding_env.models import CodeAction, CodeObservation
+from coding_env.server.python_codeact_env import PythonCodeActEnv
 
 # Create the environment instance
 env = PythonCodeActEnv()
@@ -37,3 +37,14 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+def main():
+    """Main entry point for running the server."""
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+if __name__ == "__main__":
+    main()

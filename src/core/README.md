@@ -2,7 +2,7 @@
 
 An e2e framework for creating, deploying and using isolated execution environments for agentic RL training, built using Gymnasium style simple APIs. OpenEnv provides a standard for interacting with agentic execution environments via simple Gymnasium style APIs - step(), reset(), state(). Users of agentic execution environments can interact with the environment during RL training loops using these simple APIs.
 
-In addition to making it easier for researchers and RL framework writers, we also provide tools for environment creators making it easier for them to create richer environments and make them available over familar protocols like HTTP and packaged using canonical technologies like docker. Environment creators can use the OpenEnv framework to create environments that are isolated, secure, and easy to deploy and use.
+In addition to making it easier for researchers and RL framework writers, we also provide tools for environment creators making it easier for them to create richer environments and make them available over familiar protocols like HTTP and packaged using canonical technologies like docker. Environment creators can use the OpenEnv framework to create environments that are isolated, secure, and easy to deploy and use.
 
 
 ## Overview
@@ -175,6 +175,6 @@ Contributions are welcome! Please see the main OpenEnv repository for contributi
 
 ## Links
 
-- **Homepage**: https://github.com/facebookresearch/OpenEnv
-- **Documentation**: https://github.com/facebookresearch/OpenEnv/blob/main/README.md
-- **Bug Tracker**: https://github.com/facebookresearch/OpenEnv/issues
+- **Homepage**: https://github.com/meta-pytorch/OpenEnv
+- **Documentation**: https://github.com/meta-pytorch/OpenEnv/blob/main/README.md
+- **Bug Tracker**: https://github.com/meta-pytorch/OpenEnv/issues
