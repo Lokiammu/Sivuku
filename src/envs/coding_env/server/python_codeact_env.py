@@ -13,10 +13,10 @@ Python code actions using PyExecutor.
 
 import uuid
 
-from core.env_server import Action, Environment, Observation
-from core.tools import PyExecutor
+from openenv_core.env_server.interfaces import Action, Environment, Observation
+from coding_env.server.python_executor import PyExecutor
 
-from ..models import CodeAction, CodeObservation, CodeState
+from coding_env.models import CodeAction, CodeObservation, CodeState
 from .transforms import create_safe_coding_transform
 
 

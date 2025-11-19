@@ -14,7 +14,7 @@ We recommend starting here to get a mental model of what's in here already, what
 This project aims at standardizing environments for both training and evaluation. In the training space, this means also standardizing reward pipelines, while in the eval space this means helping with reproducibility where a model can be shipped with a complete set of agentic evals that can be easily run by others.
 
 ### The problem with abstraction boundaries
-Ideally, we would draw a boundary between environments and everything else (orchestration, resource allocation, RPCs, etc). We will try to do this as much as possible, but we will have to create additional interfaces so that if folks want to cross this boundary, they can. This will likely be necessary for things like:
+Ideally, we would draw a boundary between environments and everything else (orchestration, resource allocation, RPCs, etc.). We will try to do this as much as possible, but we will have to create additional interfaces so that if folks want to cross this boundary, they can. This will likely be necessary for things like:
 - Reward pipelines that call reward models (which will very likely need to RPC to GPU machines)
 - Agentic evals like Tau where the eval itself involves two agents interacting with one another (and sending many RPCs)
 - Container provider interfaces to support different deployment targets (Docker, Kubernetes, cloud providers, etc.)
