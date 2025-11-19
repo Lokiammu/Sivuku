@@ -90,7 +90,31 @@ class HTTPEnvServer:
         if not isinstance(app, FastAPI):
             raise TypeError("app must be a FastAPI instance")
 
-        @app.post("/reset", response_model=ResetResponse)
+        @app.post(
+            "/reset",
+            response_model=ResetResponse,
+            tags=["Environment Control"],
+            summary="Reset the environment",
+            description="""
+Reset the environment to its initial state and return the first observation.
+
+You can optionally provide a seed for reproducibility and an episode_id for tracking.
+            """,
+            responses={
+                200: {
+                    "description": "Environment reset successfully",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "observation": {"status": "ready", "data": {}},
+                                "reward": None,
+                                "done": False,
+                            }
+                        }
+                    },
+                }
+            },
+        )
         async def reset(
             request: ResetRequest = Body(default_factory=ResetRequest),
         ) -> ResetResponse:
@@ -114,7 +138,56 @@ class HTTPEnvServer:
             observation = self.env.reset(**valid_kwargs)
             return ResetResponse(**self._serialize_observation(observation))
 
-        @app.post("/step", response_model=StepResponse)
+        @app.post(
+            "/step",
+            response_model=StepResponse,
+            tags=["Environment Control"],
+            summary="Execute an action in the environment",
+            description="""
+Execute an action in the environment and receive the resulting observation.
+
+The action must conform to the environment's action schema, which can be
+retrieved from the `/schema/action` endpoint. If the action is invalid,
+the endpoint will return HTTP 422 with detailed validation errors.
+
+The response includes:
+- **observation**: The environment's response to the action
+- **reward**: Optional reward signal (float or None)
+- **done**: Boolean indicating if the episode has terminated
+            """,
+            responses={
+                200: {
+                    "description": "Action executed successfully",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "observation": {"status": "success", "data": {}},
+                                "reward": 1.0,
+                                "done": False,
+                            }
+                        }
+                    },
+                },
+                422: {
+                    "description": "Validation error - invalid action format or values",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "detail": [
+                                    {
+                                        "type": "string_too_short",
+                                        "loc": ["body", "action", "message"],
+                                        "msg": "String should have at least 1 character",
+                                        "input": "",
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                },
+                500: {"description": "Internal server error during action execution"},
+            },
+        )
         async def step(request: StepRequest) -> StepResponse:
             """Step endpoint - executes action and returns observation."""
             action_data = request.action
@@ -130,7 +203,7 @@ class HTTPEnvServer:
 
             # Handle optional parameters
             # Start with all fields from the request, including extra ones, but exclude 'action'
-            kwargs = request.model_dump(exclude_unset=True, exclude={'action'})
+            kwargs = request.model_dump(exclude_unset=True, exclude={"action"})
 
             # Pass arguments only if environment accepts them
             sig = inspect.signature(self.env.step)
@@ -150,17 +223,45 @@ class HTTPEnvServer:
             # Return serialized observation
             return StepResponse(**self._serialize_observation(observation))
 
-        @app.get("/state", response_model=State)
+        @app.get(
+            "/state",
+            response_model=State,
+            tags=["State Management"],
+            summary="Get current environment state",
+            description="""
+Retrieve the current internal state of the environment.
+
+This endpoint allows inspection of the environment state without modifying it.
+The structure of the state object is defined by the environment's State model.
+            """,
+        )
         async def get_state() -> State:
             """State endpoint - returns current environment state."""
             return self.env.state
 
-        @app.get("/health")
+        @app.get(
+            "/health",
+            tags=["Health"],
+            summary="Health check",
+            description="Check if the environment server is running and healthy.",
+        )
         async def health() -> Dict[str, str]:
             """Health check endpoint."""
             return {"status": "healthy"}
 
-        @app.get("/schema/action", tags=["Schema"])
+        @app.get(
+            "/schema/action",
+            tags=["Schema"],
+            summary="Get action JSON schema",
+            description="""
+Get JSON schema for actions accepted by this environment.
+
+Returns the complete JSON schema definition for the Action model,
+including all field types, constraints, and validation rules.
+This schema can be used to validate actions before sending them
+to the environment, or to generate forms in web interfaces.
+            """,
+        )
         async def get_action_schema() -> Dict[str, Any]:
             """
             Get JSON schema for actions accepted by this environment.
@@ -175,7 +276,18 @@ class HTTPEnvServer:
             """
             return self.action_cls.model_json_schema()
 
-        @app.get("/schema/observation", tags=["Schema"])
+        @app.get(
+            "/schema/observation",
+            tags=["Schema"],
+            summary="Get observation JSON schema",
+            description="""
+Get JSON schema for observations returned by this environment.
+
+Returns the complete JSON schema definition for the Observation model,
+including all field types and nested structures. This schema describes
+what observations the environment will return after actions are executed.
+            """,
+        )
         async def get_observation_schema() -> Dict[str, Any]:
             """
             Get JSON schema for observations returned by this environment.
@@ -189,7 +301,18 @@ class HTTPEnvServer:
             """
             return self.observation_cls.model_json_schema()
 
-        @app.get("/schema/state", tags=["Schema"])
+        @app.get(
+            "/schema/state",
+            tags=["Schema"],
+            summary="Get state JSON schema",
+            description="""
+Get JSON schema for environment state objects.
+
+Returns the complete JSON schema definition for the State model.
+This schema describes the internal state representation of the
+environment, which can be queried via the /state endpoint.
+            """,
+        )
         async def get_state_schema() -> Dict[str, Any]:
             """
             Get JSON schema for environment state objects.
@@ -305,26 +428,7 @@ def create_fastapi_app(
     action_cls: Type[Action],
     observation_cls: Type[Observation],
 ) -> Any:
-    """
-    Create a FastAPI application with routes for the given environment.
-
-    Args:
-        env: The Environment instance to serve
-        action_cls: The Action subclass this environment expects
-        observation_cls: The Observation subclass this environment returns
-
-    Returns:
-        FastAPI application instance with routes registered
-
-    Example:
-        >>> from envs.coding_env.server import CodeExecutionEnvironment
-        >>> from envs.coding_env.models import CodeAction, CodeObservation
-        >>>
-        >>> env = CodeExecutionEnvironment()
-        >>> app = create_fastapi_app(env, CodeAction, CodeObservation)
-        >>>
-        >>> # Run with: uvicorn module:app --host 0.0.0.0 --port 8000
-    """
+    """Create a FastAPI application with comprehensive documentation."""
     try:
         from fastapi import FastAPI
     except ImportError:
@@ -332,7 +436,62 @@ def create_fastapi_app(
             "FastAPI is required. Install with: pip install fastapi uvicorn"
         )
 
-    app = FastAPI(title="Environment HTTP Server")
+    app = FastAPI(
+        title="OpenEnv Environment HTTP API",
+        version="1.0.0",
+        description="""
+# OpenEnv Environment HTTP API
+
+HTTP API for interacting with OpenEnv environments through a standardized interface.
+
+## Features
+
+* **Environment Reset**: Initialize or restart episodes
+* **Action Execution**: Send actions and receive observations
+* **State Inspection**: Query current environment state
+* **Schema Access**: Retrieve JSON schemas for actions and observations
+
+## Workflow
+
+1. Call `/reset` to start a new episode and get initial observation
+2. Call `/step` repeatedly with actions to interact with environment
+3. Episode ends when observation returns `done: true`
+4. Call `/state` anytime to inspect current environment state
+
+## Documentation
+
+* **Swagger UI**: Available at `/docs`
+* **ReDoc**: Available at `/redoc`
+* **OpenAPI Schema**: Available at `/openapi.json`
+        """,
+        openapi_tags=[
+            {
+                "name": "Environment Control",
+                "description": "Core operations for environment interaction (reset, step)",
+            },
+            {
+                "name": "State Management",
+                "description": "Operations for inspecting environment state",
+            },
+            {
+                "name": "Schema",
+                "description": "JSON Schema endpoints for actions, observations, and state",
+            },
+            {"name": "Health", "description": "Service health and status checks"},
+        ],
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+        contact={
+            "name": "OpenEnv Team",
+            "url": "https://github.com/meta-pytorch/OpenEnv",
+        },
+        license_info={
+            "name": "BSD-3-Clause",
+            "url": "https://github.com/meta-pytorch/OpenEnv/blob/main/LICENSE",
+        },
+    )
+
     server = HTTPEnvServer(env, action_cls, observation_cls)
     server.register_routes(app)
     return app

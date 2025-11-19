@@ -1312,184 +1312,112 @@ def _generate_instructions_section(metadata: Optional[EnvironmentMetadata]) -> s
 
 def _extract_action_fields(action_cls: Type[Action]) -> List[Dict[str, Any]]:
     """Extract enhanced field metadata from Action class for form generation."""
+    # Use Pydantic's JSON schema generation for robust metadata extraction
+    try:
+        schema = action_cls.model_json_schema()
+    except AttributeError:
+        # Fallback for non-Pydantic v2 models or if something goes wrong
+        return []
+
+    properties = schema.get("properties", {})
+    required_fields = schema.get("required", [])
 
     action_fields = []
-    if not hasattr(action_cls, "model_fields"):
-        return action_fields
 
-    for field_name, field_info in action_cls.model_fields.items():
+    for field_name, field_info in properties.items():
         if field_name == "metadata":
             continue
 
-        field_type = field_info.annotation
-        field_metadata = _extract_field_metadata(field_name, field_info)
+        # JSON schema "type" can be a string or list/undefined
+        # Determine our internal input type
+        input_type = _determine_input_type_from_schema(field_info, field_name)
 
-        # Determine input type based on field type
-        input_type = _determine_input_type(field_type)
-
-        # Check if field is required
-        is_required = field_info.is_required()
+        is_required = field_name in required_fields
 
         action_fields.append(
             {
                 "name": field_name,
                 "type": input_type,
                 "required": is_required,
-                "description": field_metadata.get("description", ""),
-                "default_value": field_metadata.get("default_value"),
-                "choices": field_metadata.get("choices", []),
-                "min_value": field_metadata.get("min_value"),
-                "max_value": field_metadata.get("max_value"),
-                "placeholder": field_metadata.get("placeholder", ""),
-                "help_text": field_metadata.get("help_text", ""),
-            }
-        )
-
-    return action_fields
-
-    for field_name, field_info in action_cls.__dataclass_fields__.items():
-        if field_name == "metadata":
-            continue
-
-        field_type = field_info.type
-        field_metadata = _extract_field_metadata(field_name, field_info)
-
-        # Determine input type based on field type
-        input_type = _determine_input_type(field_type)
-
-        # Check if field is required
-        is_required = field_info.default is field_info.default_factory
-
-        action_fields.append(
-            {
-                "name": field_name,
-                "type": input_type,
-                "required": is_required,
-                "description": field_metadata.get("description", ""),
-                "default_value": field_metadata.get("default_value"),
-                "choices": field_metadata.get("choices", []),
-                "min_value": field_metadata.get("min_value"),
-                "max_value": field_metadata.get("max_value"),
-                "placeholder": field_metadata.get("placeholder", ""),
-                "help_text": field_metadata.get("help_text", ""),
+                "description": field_info.get("description", ""),
+                "default_value": field_info.get("default"),
+                "choices": field_info.get("enum"),
+                "min_value": field_info.get("minimum"),
+                "max_value": field_info.get("maximum"),
+                "min_length": field_info.get("minLength"),
+                "max_length": field_info.get("maxLength"),
+                "pattern": field_info.get("pattern"),
+                "placeholder": _generate_placeholder(field_name, field_info),
+                "help_text": _generate_help_text(field_name, field_info),
             }
         )
 
     return action_fields
 
 
-def _extract_field_metadata(field_name: str, field_info) -> Dict[str, Any]:
-    """Extract metadata from Pydantic field including description and type hints."""
-    from typing import get_origin, get_args, Literal, Union
+def _determine_input_type_from_schema(
+    field_info: Dict[str, Any], field_name: str
+) -> str:
+    """Determine the appropriate HTML input type from JSON schema info."""
+    schema_type = field_info.get("type")
 
-    metadata = {}
+    # Check for specific tensor field convention
+    if "tokens" in field_name.lower():
+        return "tensor"
 
-    # Extract description from Pydantic field description
-    if hasattr(field_info, "description") and field_info.description:
-        metadata["description"] = field_info.description
+    if "enum" in field_info:
+        return "select"
 
-    # Extract default value
-    if hasattr(field_info, "default") and field_info.default is not None:
-        metadata["default_value"] = field_info.default
-
-    # Extract type information
-    field_type = field_info.annotation
-    origin = get_origin(field_type)
-
-    # Handle Literal types for dropdown choices
-    if origin is Literal:
-        args = get_args(field_type)
-        metadata["choices"] = list(args)
-
-    # Handle Optional types
-    if origin is Union:
-        args = get_args(field_type)
-        if len(args) == 2 and type(None) in args:
-            # This is Optional[SomeType]
-            non_none_type = args[0] if args[1] is type(None) else args[1]
-            metadata["optional"] = True
-            # Recursively check non-None type for choices
-            if get_origin(non_none_type) is Literal:
-                metadata["choices"] = list(get_args(non_none_type))
-        else:
-            # Regular Union type
-            metadata["choices"] = [str(arg) for arg in args if arg is not type(None)]
-
-    # Handle numeric constraints from Pydantic field
-    if hasattr(field_info, "json_schema_extra") and field_info.json_schema_extra:
-        # Extract constraints from json_schema_extra if available
-        schema_extra = field_info.json_schema_extra
-        if "ge" in schema_extra:
-            metadata["min_value"] = schema_extra["ge"]
-        if "le" in schema_extra:
-            metadata["max_value"] = schema_extra["le"]
-
-    # Handle numeric constraints based on type
-    if field_type in (int, float):
-        # Check for common constraint patterns in field name
-        if "count" in field_name.lower() or "num" in field_name.lower():
-            metadata.setdefault("min_value", 0)
-        if "id" in field_name.lower():
-            metadata.setdefault("min_value", 0)
-
-    # Generate placeholder text
-    if "message" in field_name.lower():
-        metadata["placeholder"] = f"Enter {field_name.replace('_', ' ')}..."
-    elif "code" in field_name.lower():
-        metadata["placeholder"] = "Enter Python code here..."
-    elif "tokens" in field_name.lower():
-        metadata["placeholder"] = "Enter comma-separated token IDs (e.g., 1,2,3,4,5)"
-    else:
-        metadata["placeholder"] = f"Enter {field_name.replace('_', ' ')}..."
-
-    # Generate help text based on field name and type
-    if "action_id" in field_name.lower():
-        metadata["help_text"] = "The action ID to execute in environment"
-    elif "game_name" in field_name.lower():
-        metadata["help_text"] = "Name of game or environment"
-    elif "tokens" in field_name.lower():
-        metadata["help_text"] = "Token IDs as a comma-separated list of integers"
-    elif "code" in field_name.lower():
-        metadata["help_text"] = "Python code to execute in environment"
-    elif "message" in field_name.lower():
-        metadata["help_text"] = "Text message to send"
-
-    return metadata
-
-
-def _determine_input_type(field_type) -> str:
-    """Determine the appropriate HTML input type for a field type."""
-    from typing import get_origin, get_args, Literal, Union
-
-    # Handle direct types
-    if field_type is str:
-        return "text"
-    elif field_type is int:
-        return "number"
-    elif field_type is float:
-        return "number"
-    elif field_type is bool:
+    if schema_type == "boolean":
         return "checkbox"
 
-    # Handle complex types
-    origin = get_origin(field_type)
+    if schema_type == "integer" or schema_type == "number":
+        return "number"
 
-    if origin is Literal:
-        return "select"
-    elif origin is Union:
-        args = get_args(field_type)
-        if len(args) == 2 and type(None) in args:
-            # Optional type - use the non-None type
-            non_none_type = args[0] if args[1] is type(None) else args[1]
-            return _determine_input_type(non_none_type)
-        elif all(isinstance(arg, str) for arg in args if arg is not type(None)):
-            return "select"
-        else:
-            return "text"
-    elif hasattr(field_type, "__name__") and "Tensor" in field_type.__name__:
-        return "tensor"
-    else:
+    if schema_type == "string":
+        # Check if it should be a textarea
+        if (
+            field_info.get("maxLength", 0) > 100
+            or "message" in field_name.lower()
+            or "code" in field_name.lower()
+        ):
+            return "textarea"
         return "text"
+
+    # Default fallback
+    return "text"
+
+
+def _generate_placeholder(field_name: str, field_info: Dict[str, Any]) -> str:
+    """Generate placeholder text."""
+    if "message" in field_name.lower():
+        return f"Enter {field_name.replace('_', ' ')}..."
+    elif "code" in field_name.lower():
+        return "Enter Python code here..."
+    elif "tokens" in field_name.lower():
+        return "Enter comma-separated token IDs (e.g., 1,2,3,4,5)"
+    else:
+        return f"Enter {field_name.replace('_', ' ')}..."
+
+
+def _generate_help_text(field_name: str, field_info: Dict[str, Any]) -> str:
+    """Generate help text."""
+    description = field_info.get("description", "")
+    if description:
+        return description
+
+    if "action_id" in field_name.lower():
+        return "The action ID to execute in environment"
+    elif "game_name" in field_name.lower():
+        return "Name of game or environment"
+    elif "tokens" in field_name.lower():
+        return "Token IDs as a comma-separated list of integers"
+    elif "code" in field_name.lower():
+        return "Python code to execute in environment"
+    elif "message" in field_name.lower():
+        return "Text message to send"
+
+    return ""
 
 
 def _markdown_to_html(markdown: str) -> str:
@@ -1615,6 +1543,9 @@ def _generate_single_field(field: Dict[str, Any]) -> str:
     min_value = field.get("min_value")
     max_value = field.get("max_value")
     default_value = field.get("default_value")
+    min_length = field.get("min_length")
+    max_length = field.get("max_length")
+    pattern = field.get("pattern")
 
     # Build label with required indicator
     label_text = field_name.replace("_", " ").title()
@@ -1631,16 +1562,23 @@ def _generate_single_field(field: Dict[str, Any]) -> str:
         input_attrs.append(f'min="{min_value}"')
     if max_value is not None:
         input_attrs.append(f'max="{max_value}"')
+    if min_length is not None:
+        input_attrs.append(f'minlength="{min_length}"')
+    if max_length is not None:
+        input_attrs.append(f'maxlength="{max_length}"')
+    if pattern is not None:
+        input_attrs.append(f'pattern="{pattern}"')
     if default_value is not None:
         input_attrs.append(f'value="{default_value}"')
 
     attrs_str = " ".join(input_attrs)
 
     if field_type == "checkbox":
+        checked = "checked" if default_value is True else ""
         return f'''
             <div class="form-group">
                 <label>
-                    <input type="checkbox" name="{field_name}" value="true" {attrs_str}>
+                    <input type="checkbox" name="{field_name}" value="true" {checked}>
                     {label_text}
                 </label>
                 {f'<small class="help-text">{help_text}</small>' if help_text else ""}
@@ -1677,13 +1615,11 @@ def _generate_single_field(field: Dict[str, Any]) -> str:
             </div>
         '''
 
-    elif field_type == "text" and (
-        "message" in field_name.lower() or "code" in field_name.lower()
-    ):
+    elif field_type == "textarea":
         return f'''
             <div class="form-group">
                 <label for="{field_name}">{label_text}:</label>
-                <textarea name="{field_name}" id="{field_name}" rows="3" {attrs_str}></textarea>
+                <textarea name="{field_name}" id="{field_name}" rows="3" {attrs_str}>{default_value if default_value is not None else ""}</textarea>
                 {f'<small class="help-text">{help_text}</small>' if help_text else ""}
             </div>
         '''
