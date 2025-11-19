@@ -1,6 +1,14 @@
-from core.http_env_client import HTTPEnvClient
-from core.client_types import StepResult
-from .models import WildfireAction, WildfireObservation, WildfireState
+# Support both in-repo and standalone imports
+try:
+    # In-repo imports (when running from OpenEnv repository)
+    from core.http_env_client import HTTPEnvClient
+    from core.client_types import StepResult
+    from .models import WildfireAction, WildfireObservation, WildfireState
+except ImportError:
+    # Standalone imports (when environment is standalone with openenv-core from pip)
+    from openenv_core.http_env_client import HTTPEnvClient
+    from openenv_core.client_types import StepResult
+    from wildfire_env.models import WildfireAction, WildfireObservation, WildfireState
 
 class WildfireEnv(HTTPEnvClient[WildfireAction, WildfireObservation]):
     def _step_payload(self, action: WildfireAction) -> dict:

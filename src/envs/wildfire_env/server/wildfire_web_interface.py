@@ -6,18 +6,31 @@ and wildfire-specific features, without modifying the base web_interface.py.
 """
 
 from typing import Optional
+import json
 from dataclasses import asdict
-from core.env_server.types import EnvironmentMetadata
-from ..models import WildfireAction
+
+# Support both in-repo and standalone imports
+try:
+    # In-repo imports (when running from OpenEnv repository)
+    from core.env_server.types import EnvironmentMetadata
+    from ..models import WildfireAction
+except ImportError:
+    # Standalone imports (when environment is standalone with openenv-core from pip)
+    from openenv_core.env_server.types import EnvironmentMetadata
+    from wildfire_env.models import WildfireAction
 
 
 def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = None) -> str:
     """Generate custom HTML for the wildfire environment web interface."""
     
-    # Convert markdown to HTML for instructions
+    # Prepare README markdown and a simple HTML fallback
     instructions_html = ""
+    instructions_json = "null"
     if metadata and metadata.readme_content:
+        # Fallback lightweight conversion (in case JS markdown library fails)
         instructions_html = _markdown_to_html_simple(metadata.readme_content)
+        # Primary: pass raw markdown to the client for proper rendering via marked.js
+        instructions_json = json.dumps(metadata.readme_content)
     
     return f"""
 <!DOCTYPE html>
@@ -26,6 +39,13 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wildfire Environment - Web Interface</title>
+    <!-- Markdown rendering libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+    <script>
+      // Embed raw README markdown for client-side rendering
+      window.__WILDFIRE_README__ = {instructions_json};
+    </script>
     <style>
         * {{
             margin: 0;
@@ -622,6 +642,20 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                     }});
                 }}
                 
+                // Render README markdown into instructions (client-side, with proper markdown support)
+                const readmeMarkdown = window.__WILDFIRE_README__;
+                const instructionsTarget = document.getElementById('instructions-markdown');
+                if (instructionsTarget && readmeMarkdown) {{
+                    try {{
+                        if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {{
+                            const html = DOMPurify.sanitize(marked.parse(readmeMarkdown));
+                            instructionsTarget.innerHTML = html;
+                        }}
+                    }} catch (e) {{
+                        console.error('Failed to render README markdown:', e);
+                    }}
+                }}
+                
                 // Action type change - show/hide coordinates
                 document.getElementById('action').addEventListener('change', (e) => {{
                     const coordsGroup = document.getElementById('coordinates-group');
@@ -944,7 +978,12 @@ def _generate_instructions_section(instructions_html: str, metadata: Optional[En
                     </div>
                     <div class="instructions-content" id="instructions-content">
                         <div class="instructions-readme">
-                            {instructions_html}
+                            <!-- Client-side rendered markdown target -->
+                            <div id="instructions-markdown"></div>
+                            <!-- Fallback (very simple conversion) -->
+                            <noscript>
+                                {instructions_html}
+                            </noscript>
                         </div>
                     </div>
                 </div>

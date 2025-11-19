@@ -2,13 +2,25 @@
 import os
 from fastapi.responses import HTMLResponse
 from fastapi import WebSocket, WebSocketDisconnect
-from core.env_server import create_fastapi_app
-from core.env_server.web_interface import load_environment_metadata, WebInterfaceManager
-from core.env_server.types import Action, Observation
-from ..models import WildfireAction, WildfireObservation
-from .wildfire_environment import WildfireEnvironment
-from .wildfire_web_interface import get_wildfire_web_interface_html
 from dataclasses import asdict
+
+# Support both in-repo and standalone imports
+try:
+    # In-repo imports (when running from OpenEnv repository)
+    from core.env_server import create_fastapi_app
+    from core.env_server.web_interface import load_environment_metadata, WebInterfaceManager
+    from core.env_server.types import Action, Observation
+    from ..models import WildfireAction, WildfireObservation
+    from .wildfire_environment import WildfireEnvironment
+    from .wildfire_web_interface import get_wildfire_web_interface_html
+except ImportError:
+    # Standalone imports (when environment is standalone with openenv-core from pip)
+    from openenv_core.env_server import create_fastapi_app
+    from openenv_core.env_server.web_interface import load_environment_metadata, WebInterfaceManager
+    from openenv_core.env_server.types import Action, Observation
+    from wildfire_env.models import WildfireAction, WildfireObservation
+    from wildfire_env.server.wildfire_environment import WildfireEnvironment
+    from wildfire_env.server.wildfire_web_interface import get_wildfire_web_interface_html
 
 W = int(os.getenv("WILDFIRE_WIDTH", "16"))
 H = int(os.getenv("WILDFIRE_HEIGHT", "16"))
@@ -68,3 +80,14 @@ if enable_web:
     async def web_state():
         """State endpoint for web interface."""
         return web_manager.get_state()
+
+
+def main():
+    """Main entry point for running the server."""
+    import uvicorn
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
+
+if __name__ == "__main__":
+    main()

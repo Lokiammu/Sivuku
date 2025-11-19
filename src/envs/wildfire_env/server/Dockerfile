@@ -1,22 +1,31 @@
-# Build ARG for CI/CD consistency
-ARG BASE_IMAGE=openenv-base:latest
-FROM ${BASE_IMAGE}
+# Base image
+FROM python:3.11-slim
 
-# Work in app directory (already used by base image)
-WORKDIR /app
+# Set working directory
+WORKDIR /app/env
 
-# Copy OpenEnv core
-COPY src/core/ /app/src/core/
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy Wildfire environment
-COPY src/envs/wildfire_env/ /app/src/envs/wildfire_env/
+# Copy environment files
+COPY . .
 
-# Environment variables (override at runtime if needed)
-ENV PYTHONPATH=/app/src
+# Install Python dependencies
+RUN pip install --no-cache-dir -e .
+
+# Expose port
+EXPOSE 8000
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV ENABLE_WEB_INTERFACE=true
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run FastAPI server
-CMD ["uvicorn", "envs.wildfire_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the server
+CMD ["python", "-m", "uvicorn", "wildfire_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]

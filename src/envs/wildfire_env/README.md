@@ -1,3 +1,19 @@
+---
+title: Wildfire Environment Server
+emoji: 🔥
+colorFrom: red
+colorTo: blue
+sdk: docker
+pinned: false
+app_port: 8000
+base_path: /web
+tags:
+  - openenv
+  - reinforcement-learning
+  - wildfire
+  - simulation
+---
+
 # 🌲 Wildfire Environment
 
 Autonomous wildfire-control simulation for reinforcement-learning agents, built on the [OpenEnv](https://github.com/openenv) framework.  
