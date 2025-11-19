@@ -16,7 +16,12 @@ import nltk
 
 from core.env_server.interfaces import Environment
 
-from ..models import TextArenaAction, TextArenaMessage, TextArenaObservation, TextArenaState
+from ..models import (
+    TextArenaAction,
+    TextArenaMessage,
+    TextArenaObservation,
+    TextArenaState,
+)
 from ..rewards import RewardProvider, build_reward_providers
 
 
@@ -92,6 +97,18 @@ class TextArenaEnvironment(Environment):
     # Environment interface
     # ------------------------------------------------------------------
     def reset(self) -> TextArenaObservation:
+        # TextArena observation wrappers (LLMObservationWrapper, etc.) accumulate
+        # observations in self.full_observations across resets. Since we can't modify TextArena,
+        # we need to manually clear this state to prevent history accumulation.
+        env = self._ta_env
+        while hasattr(env, "env"):
+            if hasattr(env, "full_observations"):
+                env.full_observations = {}
+            env = env.env
+        # Also check the final unwrapped env
+        if hasattr(env, "full_observations"):
+            env.full_observations = {}
+
         self._ta_env.reset(num_players=self.num_players)
 
         for provider in self._reward_providers:
@@ -128,13 +145,18 @@ class TextArenaEnvironment(Environment):
         observation.reward = reward
         self._state.last_reward = reward
 
-        reward_signals = self._compute_reward_signals(action=action, observation=observation)
+        reward_signals = self._compute_reward_signals(
+            action=action, observation=observation
+        )
         if reward_signals:
             observation.info.setdefault("reward_signals", {}).update(reward_signals)
             observation.metadata.setdefault("reward_signals", {}).update(reward_signals)
         self._last_reward_signals = reward_signals
         if reward_signals:
-            self._state.last_info = {**(self._state.last_info or {}), "reward_signals": reward_signals}
+            self._state.last_info = {
+                **(self._state.last_info or {}),
+                "reward_signals": reward_signals,
+            }
         self._state.raw_state = self._snapshot_state()
 
         return observation
@@ -150,16 +172,30 @@ class TextArenaEnvironment(Environment):
         player_id, messages = self._ta_env.get_observation()
 
         ta_messages = self._convert_messages(messages)
+
+        # Extract prompt from the appropriate messages.
+        # TextArena PROMPT type messages contain the game instructions added during reset.
+        # As a fallback for environments that don't use typed messages, use only the first
+        # message if we're at turn 0 (fresh reset).
         prompt_lines = [msg.content for msg in ta_messages if msg.category == "PROMPT"]
+
         if not prompt_lines:
-            # Fallback to most recent message history for prompt
-            prompt_lines = [msg.content for msg in ta_messages]
+            # Fallback: use the first message only if at turn 0 (just after reset)
+            # DO NOT use all messages as this causes history accumulation
+            current_turn = getattr(self._ta_env.state, "turn", 0)
+            if current_turn == 0 and ta_messages:
+                prompt_lines = [ta_messages[0].content]
+            else:
+                # Use env_id as final fallback to avoid including game history
+                prompt_lines = [self.env_id]
+
+        prompt = "\n".join(prompt_lines).strip()
 
         info: Dict[str, Any] = {}
         info.update(getattr(self._ta_env.state, "step_info", {}))
 
         observation = TextArenaObservation(
-            prompt="\n".join(prompt_lines).strip(),
+            prompt=prompt,
             messages=ta_messages,
             current_player_id=player_id,
             legal_players=self._legal_players(),
@@ -182,11 +218,32 @@ class TextArenaEnvironment(Environment):
 
     def _legal_players(self) -> List[int]:
         role_mapping = getattr(self._ta_env.state, "role_mapping", {}) or {}
-        players = [pid for pid in role_mapping.keys() if isinstance(pid, int) and pid >= 0]
+        players = [
+            pid for pid in role_mapping.keys() if isinstance(pid, int) and pid >= 0
+        ]
         return sorted(players)
 
     def _convert_messages(self, messages: Iterable[Any]) -> List[TextArenaMessage]:
         converted: List[TextArenaMessage] = []
+        buffered_sender: int | None = None
+        buffered_category: str | None = None
+        buffered_content: List[str] = []
+
+        def flush_buffer() -> None:
+            nonlocal buffered_content, buffered_sender, buffered_category
+            if not buffered_content:
+                return
+            converted.append(
+                TextArenaMessage(
+                    sender_id=buffered_sender if buffered_sender is not None else -1,
+                    content="".join(buffered_content),
+                    category=buffered_category or "MESSAGE",
+                )
+            )
+            buffered_content = []
+            buffered_category = None
+            buffered_sender = None
+
         for entry in messages:
             if isinstance(entry, tuple) and len(entry) == 3:
                 sender, content, category = entry
@@ -197,13 +254,22 @@ class TextArenaEnvironment(Environment):
                 sender, content, category = -1, str(entry), "MESSAGE"
 
             category_name = getattr(category, "name", str(category))
-            converted.append(
-                TextArenaMessage(
-                    sender_id=int(sender) if isinstance(sender, (int, float)) else -1,
-                    content=str(content),
-                    category=category_name,
-                )
-            )
+            sender_id = int(sender) if isinstance(sender, (int, float)) else -1
+            text = str(content)
+
+            if (
+                buffered_content
+                and buffered_category == category_name
+                and buffered_sender == sender_id
+            ):
+                buffered_content.append(text)
+            else:
+                flush_buffer()
+                buffered_sender = sender_id
+                buffered_category = category_name
+                buffered_content = [text]
+
+        flush_buffer()
 
         return converted
 
@@ -249,4 +315,3 @@ class TextArenaEnvironment(Environment):
             for key, value in result.items():
                 aggregated[key] = float(value)
         return aggregated
-
