@@ -31,6 +31,7 @@ from .types import (
     State,
     StepRequest,
     StepResponse,
+    EnvironmentMetadata,
 )
 
 
@@ -135,7 +136,11 @@ You can optionally provide a seed for reproducibility and an episode_id for trac
                 if k in sig.parameters or has_kwargs:
                     valid_kwargs[k] = v
 
-            observation = self.env.reset(**valid_kwargs)
+            # Run synchronous reset in thread pool to avoid blocking event loop
+            loop = asyncio.get_event_loop()
+            observation = await loop.run_in_executor(
+                self._executor, lambda: self.env.reset(**valid_kwargs)
+            )
             return ResetResponse(**self._serialize_observation(observation))
 
         @app.post(
@@ -217,8 +222,11 @@ The response includes:
                 if k in sig.parameters or has_kwargs:
                     valid_kwargs[k] = v
 
-            # Execute step
-            observation = self.env.step(action, **valid_kwargs)
+            # Run synchronous step in thread pool to avoid blocking event loop
+            loop = asyncio.get_event_loop()
+            observation = await loop.run_in_executor(
+                self._executor, lambda: self.env.step(action, **valid_kwargs)
+            )
 
             # Return serialized observation
             return StepResponse(**self._serialize_observation(observation))
@@ -238,6 +246,27 @@ The structure of the state object is defined by the environment's State model.
         async def get_state() -> State:
             """State endpoint - returns current environment state."""
             return self.env.state
+
+        @app.get(
+            "/metadata",
+            response_model=EnvironmentMetadata,
+            tags=["Environment Info"],
+            summary="Get environment metadata",
+            description="""
+Get metadata about this environment.
+
+Returns information about the environment including name, description,
+version, author, and documentation links.
+            """,
+        )
+        async def get_metadata() -> EnvironmentMetadata:
+            """
+            Get metadata about this environment.
+
+            Returns information about the environment including name, description,
+            version, author, and documentation links.
+            """
+            return self.env.get_metadata()
 
         @app.get(
             "/health",
@@ -472,6 +501,10 @@ HTTP API for interacting with OpenEnv environments through a standardized interf
             {
                 "name": "State Management",
                 "description": "Operations for inspecting environment state",
+            },
+            {
+                "name": "Environment Info",
+                "description": "Information about the environment",
             },
             {
                 "name": "Schema",
