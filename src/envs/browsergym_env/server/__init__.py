@@ -1,1 +1,0 @@
-"""BrowserGym environment server module."""
