@@ -38,21 +38,13 @@ cli = [
     "rich>=13.0.0",
     "pyyaml>=6.0",
     "huggingface_hub>=0.20.0",
+    "openai>=2.7.2",
     "tomli>=2.3.0",
     "tomli-w>=1.2.0",
 ]
 all = [
-    "fastapi>=0.104.0",
-    "pydantic>=2.0.0",
-    "uvicorn>=0.24.0",
-    "requests>=2.25.0",
-    "typer>=0.9.0",
-    "rich>=13.0.0",
-    "pyyaml>=6.0",
-    "huggingface_hub>=0.20.0",
-    "openai>=2.7.2",
-    "tomli>=2.3.0",
-    "tomli-w>=1.2.0",
+    "openenv[core]",
+    "openenv[cli]",
 ]
 
 [project.scripts]
