@@ -8,7 +8,7 @@ on:
       - reopened
       - synchronize
     paths:
-      - 'src/envs/**'
+      - 'envs/**'
 
 permissions:
   contents: read
@@ -46,24 +46,24 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ ! -d base/src/envs ]; then
-            echo "Base repository missing src/envs directory."
+          if [ ! -d base/envs ]; then
+            echo "Base repository missing envs directory."
             echo "has_new_envs=false" >> "$GITHUB_OUTPUT"
             echo "new_envs=" >> "$GITHUB_OUTPUT"
             echo "new_envs_json=[]" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if [ ! -d pr/src/envs ]; then
-            echo "PR repository missing src/envs directory."
+          if [ ! -d pr/envs ]; then
+            echo "PR repository missing envs directory."
             echo "has_new_envs=false" >> "$GITHUB_OUTPUT"
             echo "new_envs=" >> "$GITHUB_OUTPUT"
             echo "new_envs_json=[]" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          mapfile -t BASE_ENVS < <(cd base/src/envs && find . -maxdepth 1 -mindepth 1 -type d | sed 's|^\./||' | sort)
-          mapfile -t PR_ENVS < <(cd pr/src/envs && find . -maxdepth 1 -mindepth 1 -type d | sed 's|^\./||' | sort)
+          mapfile -t BASE_ENVS < <(cd base/envs && find . -maxdepth 1 -mindepth 1 -type d | sed 's|^\./||' | sort)
+          mapfile -t PR_ENVS < <(cd pr/envs && find . -maxdepth 1 -mindepth 1 -type d | sed 's|^\./||' | sort)
 
           declare -A BASE_SET=()
           for env in "${BASE_ENVS[@]}"; do
@@ -128,7 +128,7 @@ jobs:
         shell: bash
         run: |
           set -u -o pipefail
-          env_dir="src/envs/${{ matrix.environment }}"
+          env_dir="envs/${{ matrix.environment }}"
 
           if [ ! -d "$env_dir" ]; then
             echo "Environment directory not found: $env_dir" >&2
@@ -180,7 +180,7 @@ jobs:
               ? 'Your env passes the vibe check. However, most environments should go straight to the hub, they will automatically be added to the official Env Hub collection on a nightly basis. Environments in the official specification repo are only meant to demonstrate usage of a specific spec feature for educational purposes. Re-run locally with:'
               : 'Validation reported issues. Review the log and re-run locally with `openenv validate --verbose`. Please note, we recently changed the standard template, your environment might pre-date this standard, follow the conversion guide https://github.com/meta-pytorch/OpenEnv/blob/main/scripts/CONVERT.md to convert your environment to the new standard.';
 
-            const envDir = 'src/envs/' + envName;
+            const envDir = 'envs/' + envName;
             const rawLog = process.env.VALIDATION_LOG || '';
             const trimmedLog = rawLog.trim();
             const maxLength = 6000;
