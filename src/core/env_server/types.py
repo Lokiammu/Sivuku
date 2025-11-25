@@ -182,3 +182,22 @@ class EnvironmentMetadata(BaseModel):
     documentation_url: Optional[str] = Field(
         default=None, description="URL to the environment's documentation"
     )
+
+
+class SchemaResponse(BaseModel):
+    """Response model for the combined schema endpoint."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    action: Dict[str, Any] = Field(
+        description="JSON schema for actions accepted by this environment"
+    )
+    observation: Dict[str, Any] = Field(
+        description="JSON schema for observations returned by this environment"
+    )
+    state: Dict[str, Any] = Field(
+        description="JSON schema for environment state objects"
+    )

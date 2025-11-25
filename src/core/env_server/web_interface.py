@@ -22,6 +22,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, ConfigDict
 
 from .interfaces import Environment
+from .serialization import deserialize_action_with_preprocessing, serialize_observation
 from .types import Action, Observation, State, EnvironmentMetadata
 
 
@@ -192,40 +193,40 @@ class WebInterfaceManager:
         observation: Observation = self.env.reset()
         state: State = self.env.state
 
+        # Serialize observation once using shared utility
+        serialized = serialize_observation(observation)
+
         # Update episode state
         self.episode_state.episode_id = state.episode_id
         self.episode_state.step_count = 0
-        self.episode_state.current_observation = observation.model_dump(
-            exclude={"reward", "done", "metadata"}
-        )
+        self.episode_state.current_observation = serialized["observation"]
         self.episode_state.action_logs = []
         self.episode_state.is_reset = True
 
         # Send state update
         await self._send_state_update()
 
-        return {
-            "observation": observation.model_dump(
-                exclude={"reward", "done", "metadata"}
-            ),
-            "reward": observation.reward,
-            "done": observation.done,
-        }
+        return serialized
 
     async def step_environment(self, action_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a step in the environment and update state."""
-        # Deserialize action
-        action: Action = self._deserialize_action(action_data)
+        # Deserialize action with preprocessing for web interface special cases
+        action: Action = deserialize_action_with_preprocessing(
+            action_data, self.action_cls
+        )
 
         # Execute step
         observation: Observation = self.env.step(action)
         state: State = self.env.state
 
+        # Serialize observation once using shared utility
+        serialized = serialize_observation(observation)
+
         # Create action log
         action_log = ActionLog(
             timestamp=datetime.now().isoformat(),
             action=action.model_dump(exclude={"metadata"}),
-            observation=observation.model_dump(exclude={"reward", "done", "metadata"}),
+            observation=serialized["observation"],
             reward=observation.reward,
             done=observation.done,
             step_count=state.step_count,
@@ -234,63 +235,19 @@ class WebInterfaceManager:
         # Update episode state
         self.episode_state.episode_id = state.episode_id
         self.episode_state.step_count = state.step_count
-        self.episode_state.current_observation = observation.model_dump(
-            exclude={"reward", "done", "metadata"}
-        )
+        self.episode_state.current_observation = serialized["observation"]
         self.episode_state.action_logs.append(action_log)
         self.episode_state.is_reset = False
 
         # Send state update
         await self._send_state_update()
 
-        return {
-            "observation": observation.model_dump(
-                exclude={"reward", "done", "metadata"}
-            ),
-            "reward": observation.reward,
-            "done": observation.done,
-        }
+        return serialized
 
     def get_state(self) -> Dict[str, Any]:
         """Get current environment state."""
         state: State = self.env.state
         return state.model_dump()
-
-    def _deserialize_action(self, action_data: Dict[str, Any]) -> Action:
-        """Convert JSON dict to Action instance using Pydantic validation."""
-        # Handle tensor fields that come from JSON as lists
-        processed_data = {}
-        for key, value in action_data.items():
-            if key == "tokens" and isinstance(value, (list, str)):
-                # Convert list or string to tensor
-                if isinstance(value, str):
-                    # If it's a string, try to parse it as a list of numbers
-                    try:
-                        import json
-
-                        value = json.loads(value)
-                    except Exception:
-                        # If parsing fails, treat as empty list
-                        value = []
-                if isinstance(value, list):
-                    import torch
-
-                    processed_data[key] = torch.tensor(value, dtype=torch.long)
-                else:
-                    processed_data[key] = value
-            elif key == "action_id" and isinstance(value, str):
-                # Convert action_id from string to int
-                try:
-                    processed_data[key] = int(value)
-                except ValueError:
-                    # If conversion fails, keep original value
-                    processed_data[key] = value
-            else:
-                processed_data[key] = value
-
-        # Use Pydantic's model_validate for automatic validation
-        action = self.action_cls.model_validate(processed_data)
-        return action
 
 
 def create_web_interface_app(

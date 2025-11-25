@@ -23,6 +23,11 @@ from fastapi import Body, FastAPI, HTTPException, status
 from pydantic import ValidationError
 
 from .interfaces import Environment
+from .route_config import (
+    GetEndpointConfig,
+    register_get_endpoints,
+)
+from .serialization import deserialize_action, serialize_observation
 from .types import (
     Action,
     Observation,
@@ -32,6 +37,7 @@ from .types import (
     StepRequest,
     StepResponse,
     EnvironmentMetadata,
+    SchemaResponse,
 )
 
 
@@ -80,6 +86,29 @@ class HTTPEnvServer:
         # This is needed for environments using sync libraries (e.g., Playwright sync API)
         self._executor = ThreadPoolExecutor(max_workers=1)
 
+    async def _run_sync_in_thread_pool(self, func, *args, **kwargs):
+        """Run a synchronous function in the thread pool executor."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(self._executor, lambda: func(*args, **kwargs))
+
+    def _get_valid_kwargs(self, sig, kwargs, skip_params=None):
+        """Filter kwargs to only include parameters accepted by the function signature."""
+        if skip_params is None:
+            skip_params = set()
+
+        valid_kwargs = {}
+
+        has_kwargs = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+
+        for k, v in kwargs.items():
+            if k in sig.parameters or has_kwargs:
+                if k not in skip_params:
+                    valid_kwargs[k] = v
+
+        return valid_kwargs
+
     def register_routes(self, app: Any) -> None:
         """
         Register HTTP routes on a FastAPI application.
@@ -91,6 +120,56 @@ class HTTPEnvServer:
         if not isinstance(app, FastAPI):
             raise TypeError("app must be a FastAPI instance")
 
+        # Helper function to handle reset endpoint
+        async def reset_handler(
+            request: ResetRequest = Body(default_factory=ResetRequest),
+        ) -> ResetResponse:
+            """Reset endpoint - returns initial observation."""
+            # Handle optional parameters
+            # Start with all fields from the request, including extra ones
+            kwargs = request.model_dump(exclude_unset=True)
+
+            # Pass arguments only if environment accepts them
+            sig = inspect.signature(self.env.reset)
+            valid_kwargs = self._get_valid_kwargs(sig, kwargs)
+
+            # Run synchronous reset in thread pool to avoid blocking event loop
+            observation = await self._run_sync_in_thread_pool(
+                self.env.reset, **valid_kwargs
+            )
+            return ResetResponse(**serialize_observation(observation))
+
+        # Helper function to handle step endpoint
+        async def step_handler(request: StepRequest) -> StepResponse:
+            """Step endpoint - executes action and returns observation."""
+            action_data = request.action
+
+            # Deserialize action with Pydantic validation
+            try:
+                action = deserialize_action(action_data, self.action_cls)
+            except ValidationError as e:
+                # Return HTTP 422 with detailed validation errors
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=e.errors()
+                )
+
+            # Handle optional parameters
+            # Start with all fields from the request, including extra ones, but exclude 'action'
+            kwargs = request.model_dump(exclude_unset=True, exclude={"action"})
+
+            # Pass arguments only if environment accepts them
+            sig = inspect.signature(self.env.step)
+            valid_kwargs = self._get_valid_kwargs(sig, kwargs, skip_params={"action"})
+
+            # Run synchronous step in thread pool to avoid blocking event loop
+            observation = await self._run_sync_in_thread_pool(
+                self.env.step, action, **valid_kwargs
+            )
+
+            # Return serialized observation
+            return StepResponse(**serialize_observation(observation))
+
+        # Register routes using the helpers
         @app.post(
             "/reset",
             response_model=ResetResponse,
@@ -119,29 +198,7 @@ You can optionally provide a seed for reproducibility and an episode_id for trac
         async def reset(
             request: ResetRequest = Body(default_factory=ResetRequest),
         ) -> ResetResponse:
-            """Reset endpoint - returns initial observation."""
-            # Handle optional parameters
-            # Start with all fields from the request, including extra ones
-            kwargs = request.model_dump(exclude_unset=True)
-
-            # Pass arguments only if environment accepts them
-            sig = inspect.signature(self.env.reset)
-            valid_kwargs = {}
-
-            has_kwargs = any(
-                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
-            )
-
-            for k, v in kwargs.items():
-                if k in sig.parameters or has_kwargs:
-                    valid_kwargs[k] = v
-
-            # Run synchronous reset in thread pool to avoid blocking event loop
-            loop = asyncio.get_event_loop()
-            observation = await loop.run_in_executor(
-                self._executor, lambda: self.env.reset(**valid_kwargs)
-            )
-            return ResetResponse(**self._serialize_observation(observation))
+            return await reset_handler(request)
 
         @app.post(
             "/step",
@@ -152,7 +209,7 @@ You can optionally provide a seed for reproducibility and an episode_id for trac
 Execute an action in the environment and receive the resulting observation.
 
 The action must conform to the environment's action schema, which can be
-retrieved from the `/schema/action` endpoint. If the action is invalid,
+retrieved from the `/schema` endpoint. If the action is invalid,
 the endpoint will return HTTP 422 with detailed validation errors.
 
 The response includes:
@@ -194,223 +251,95 @@ The response includes:
             },
         )
         async def step(request: StepRequest) -> StepResponse:
-            """Step endpoint - executes action and returns observation."""
-            action_data = request.action
+            return await step_handler(request)
 
-            # Deserialize action with Pydantic validation
-            try:
-                action = self._deserialize_action(action_data)
-            except ValidationError as e:
-                # Return HTTP 422 with detailed validation errors
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.errors()
-                )
-
-            # Handle optional parameters
-            # Start with all fields from the request, including extra ones, but exclude 'action'
-            kwargs = request.model_dump(exclude_unset=True, exclude={"action"})
-
-            # Pass arguments only if environment accepts them
-            sig = inspect.signature(self.env.step)
-            valid_kwargs = {}
-
-            has_kwargs = any(
-                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
-            )
-
-            for k, v in kwargs.items():
-                if k in sig.parameters or has_kwargs:
-                    valid_kwargs[k] = v
-
-            # Run synchronous step in thread pool to avoid blocking event loop
-            loop = asyncio.get_event_loop()
-            observation = await loop.run_in_executor(
-                self._executor, lambda: self.env.step(action, **valid_kwargs)
-            )
-
-            # Return serialized observation
-            return StepResponse(**self._serialize_observation(observation))
-
-        @app.get(
-            "/state",
-            response_model=State,
-            tags=["State Management"],
-            summary="Get current environment state",
-            description="""
+        # Configure and register GET endpoints declaratively
+        get_endpoints = [
+            GetEndpointConfig(
+                path="/state",
+                handler=lambda: self.env.state,
+                response_model=State,
+                tag="State Management",
+                summary="Get current environment state",
+                description="""
 Retrieve the current internal state of the environment.
 
 This endpoint allows inspection of the environment state without modifying it.
 The structure of the state object is defined by the environment's State model.
-            """,
-        )
-        async def get_state() -> State:
-            """State endpoint - returns current environment state."""
-            return self.env.state
-
-        @app.get(
-            "/metadata",
-            response_model=EnvironmentMetadata,
-            tags=["Environment Info"],
-            summary="Get environment metadata",
-            description="""
+                """,
+            ),
+            GetEndpointConfig(
+                path="/metadata",
+                handler=self.env.get_metadata,
+                response_model=EnvironmentMetadata,
+                tag="Environment Info",
+                summary="Get environment metadata",
+                description="""
 Get metadata about this environment.
 
 Returns information about the environment including name, description,
 version, author, and documentation links.
-            """,
-        )
-        async def get_metadata() -> EnvironmentMetadata:
-            """
-            Get metadata about this environment.
+                """,
+            ),
+            GetEndpointConfig(
+                path="/health",
+                handler=lambda: {"status": "healthy"},
+                response_model=Dict[str, str],
+                tag="Health",
+                summary="Health check",
+                description="Check if the environment server is running and healthy.",
+            ),
+        ]
+        register_get_endpoints(app, get_endpoints)
 
-            Returns information about the environment including name, description,
-            version, author, and documentation links.
-            """
-            return self.env.get_metadata()
-
+        # Register combined schema endpoint
         @app.get(
-            "/health",
-            tags=["Health"],
-            summary="Health check",
-            description="Check if the environment server is running and healthy.",
-        )
-        async def health() -> Dict[str, str]:
-            """Health check endpoint."""
-            return {"status": "healthy"}
-
-        @app.get(
-            "/schema/action",
+            "/schema",
+            response_model=SchemaResponse,
             tags=["Schema"],
-            summary="Get action JSON schema",
+            summary="Get all JSON schemas",
             description="""
-Get JSON schema for actions accepted by this environment.
+Get JSON schemas for actions, observations, and state in a single response.
 
-Returns the complete JSON schema definition for the Action model,
-including all field types, constraints, and validation rules.
-This schema can be used to validate actions before sending them
-to the environment, or to generate forms in web interfaces.
+Returns a combined schema object containing:
+- **action**: JSON schema for actions accepted by this environment
+- **observation**: JSON schema for observations returned by this environment  
+- **state**: JSON schema for environment state objects
+
+This is more efficient than calling individual schema endpoints and provides
+all schema information needed to interact with the environment.
             """,
+            responses={
+                200: {
+                    "description": "Combined schemas retrieved successfully",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "action": {
+                                    "type": "object",
+                                    "properties": {"message": {"type": "string"}},
+                                },
+                                "observation": {
+                                    "type": "object",
+                                    "properties": {"response": {"type": "string"}},
+                                },
+                                "state": {
+                                    "type": "object",
+                                    "properties": {"step_count": {"type": "integer"}},
+                                },
+                            }
+                        }
+                    },
+                }
+            },
         )
-        async def get_action_schema() -> Dict[str, Any]:
-            """
-            Get JSON schema for actions accepted by this environment.
-
-            Returns the complete JSON schema definition for the Action model,
-            including all field types, constraints, and validation rules.
-            This schema can be used to validate actions before sending them
-            to the environment, or to generate forms in web interfaces.
-
-            Returns:
-                Dict containing JSON Schema
-            """
-            return self.action_cls.model_json_schema()
-
-        @app.get(
-            "/schema/observation",
-            tags=["Schema"],
-            summary="Get observation JSON schema",
-            description="""
-Get JSON schema for observations returned by this environment.
-
-Returns the complete JSON schema definition for the Observation model,
-including all field types and nested structures. This schema describes
-what observations the environment will return after actions are executed.
-            """,
-        )
-        async def get_observation_schema() -> Dict[str, Any]:
-            """
-            Get JSON schema for observations returned by this environment.
-
-            Returns the complete JSON schema definition for the Observation model,
-            including all field types and nested structures. This schema describes
-            what observations the environment will return after actions are executed.
-
-            Returns:
-                Dict containing JSON Schema
-            """
-            return self.observation_cls.model_json_schema()
-
-        @app.get(
-            "/schema/state",
-            tags=["Schema"],
-            summary="Get state JSON schema",
-            description="""
-Get JSON schema for environment state objects.
-
-Returns the complete JSON schema definition for the State model.
-This schema describes the internal state representation of the
-environment, which can be queried via the /state endpoint.
-            """,
-        )
-        async def get_state_schema() -> Dict[str, Any]:
-            """
-            Get JSON schema for environment state objects.
-
-            Returns the complete JSON schema definition for the State model.
-            This schema describes the internal state representation of the
-            environment, which can be queried via the /state endpoint.
-
-            Returns:
-                Dict containing JSON Schema
-            """
-            return State.model_json_schema()
-
-    def _deserialize_action(self, action_data: Dict[str, Any]) -> Action:
-        """
-        Convert JSON dict to Action instance using Pydantic validation.
-
-        Args:
-            action_data: Dictionary containing action data
-
-        Returns:
-            Action instance
-
-        Raises:
-            ValidationError: If action_data is invalid for the action class
-
-        Note:
-            This uses Pydantic's model_validate() for automatic validation.
-        """
-        # Pydantic handles validation automatically
-        action = self.action_cls.model_validate(action_data)
-        return action
-
-    def _serialize_observation(self, observation: Observation) -> Dict[str, Any]:
-        """
-        Convert Observation instance to JSON-compatible dict using Pydantic.
-
-        Args:
-            observation: Observation instance
-
-        Returns:
-            Dictionary compatible with HTTPEnvClient._parse_result()
-
-        The format matches what HTTPEnvClient expects:
-        {
-            "observation": {...},  # Observation fields
-            "reward": float | None,
-            "done": bool,
-        }
-        """
-        # Use Pydantic's model_dump() for serialization
-        obs_dict = observation.model_dump(
-            exclude={
-                "reward",
-                "done",
-                "metadata",
-            }  # Exclude these from observation dict
-        )
-
-        # Extract reward and done directly from the observation
-        reward = observation.reward
-        done = observation.done
-
-        # Return in HTTPEnvClient expected format
-        return {
-            "observation": obs_dict,
-            "reward": reward,
-            "done": done,
-        }
+        async def get_schemas() -> SchemaResponse:
+            """Return all schemas in one response."""
+            return SchemaResponse(
+                action=self.action_cls.model_json_schema(),
+                observation=self.observation_cls.model_json_schema(),
+                state=State.model_json_schema(),
+            )
 
 
 def create_app(
