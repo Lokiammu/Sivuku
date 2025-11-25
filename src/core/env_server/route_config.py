@@ -12,13 +12,10 @@ by using configuration objects instead of repeated function calls.
 """
 
 from dataclasses import dataclass
-from typing import Callable, List, Type, TypeVar
+from typing import Callable, List, Type
 
 from fastapi import FastAPI
 from pydantic import BaseModel
-
-# TypeVar for generic response types
-T = TypeVar("T", bound=BaseModel)
 
 
 @dataclass
@@ -27,7 +24,7 @@ class GetEndpointConfig:
 
     path: str
     handler: Callable[[], BaseModel | dict]
-    response_model: Type[BaseModel] | Type[dict]
+    response_model: Type[BaseModel] | type[dict]
     tag: str
     summary: str
     description: str

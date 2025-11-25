@@ -17,7 +17,7 @@ import asyncio
 import inspect
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, Optional, Type
+from typing import Optional, Type
 
 from fastapi import Body, FastAPI, HTTPException, status
 from pydantic import ValidationError
@@ -38,6 +38,7 @@ from .types import (
     StepResponse,
     EnvironmentMetadata,
     SchemaResponse,
+    HealthResponse,
 )
 
 
@@ -109,16 +110,13 @@ class HTTPEnvServer:
 
         return valid_kwargs
 
-    def register_routes(self, app: Any) -> None:
+    def register_routes(self, app: FastAPI) -> None:
         """
         Register HTTP routes on a FastAPI application.
 
         Args:
             app: FastAPI application instance
         """
-
-        if not isinstance(app, FastAPI):
-            raise TypeError("app must be a FastAPI instance")
 
         # Helper function to handle reset endpoint
         async def reset_handler(
@@ -283,8 +281,8 @@ version, author, and documentation links.
             ),
             GetEndpointConfig(
                 path="/health",
-                handler=lambda: {"status": "healthy"},
-                response_model=Dict[str, str],
+                handler=lambda: HealthResponse(status="healthy"),
+                response_model=HealthResponse,
                 tag="Health",
                 summary="Health check",
                 description="Check if the environment server is running and healthy.",
@@ -347,7 +345,7 @@ def create_app(
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     env_name: Optional[str] = None,
-) -> Any:
+) -> FastAPI:
     """
     Create a FastAPI application with or without web interface.
 
@@ -385,7 +383,7 @@ def create_fastapi_app(
     env: Environment,
     action_cls: Type[Action],
     observation_cls: Type[Observation],
-) -> Any:
+) -> FastAPI:
     """Create a FastAPI application with comprehensive documentation."""
     try:
         from fastapi import FastAPI

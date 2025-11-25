@@ -44,7 +44,7 @@ class Observation(BaseModel):
     )
 
     done: bool = Field(default=False, description="Whether the episode has terminated")
-    reward: Union[bool, int, float, None] = Field(
+    reward: bool | int | float | None = Field(
         default=None, description="Reward signal from the last action"
     )
     metadata: Dict[str, Any] = Field(
@@ -201,3 +201,14 @@ class SchemaResponse(BaseModel):
     state: Dict[str, Any] = Field(
         description="JSON schema for environment state objects"
     )
+
+
+class HealthResponse(BaseModel):
+    """Response model for health check endpoint."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    status: str = Field(description="Health status of the environment server")

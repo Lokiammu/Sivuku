@@ -15,7 +15,7 @@ from .serialization import (
     deserialize_action_with_preprocessing,
     serialize_observation,
 )
-from .types import Action, Observation, State, SchemaResponse
+from .types import Action, Observation, State, SchemaResponse, HealthResponse
 from .web_interface import create_web_interface_app, WebInterfaceManager
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     "Observation",
     "State",
     "SchemaResponse",
+    "HealthResponse",
     # Base transforms
     "CompositeTransform",
     "NullTransform",
