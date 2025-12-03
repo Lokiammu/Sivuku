@@ -9,7 +9,13 @@
 from .base_transforms import CompositeTransform, NullTransform
 from .http_server import HTTPEnvServer, create_app, create_fastapi_app
 from .interfaces import Environment, Message, ModelTokenizer, Transform
-from .types import Action, Observation, State
+from .route_config import GetEndpointConfig
+from .serialization import (
+    deserialize_action,
+    deserialize_action_with_preprocessing,
+    serialize_observation,
+)
+from .types import Action, Observation, State, SchemaResponse, HealthResponse
 from .web_interface import create_web_interface_app, WebInterfaceManager
 
 __all__ = [
@@ -22,6 +28,8 @@ __all__ = [
     "Action",
     "Observation",
     "State",
+    "SchemaResponse",
+    "HealthResponse",
     # Base transforms
     "CompositeTransform",
     "NullTransform",
@@ -32,4 +40,10 @@ __all__ = [
     # Web Interface
     "create_web_interface_app",
     "WebInterfaceManager",
+    # Serialization utilities
+    "deserialize_action",
+    "deserialize_action_with_preprocessing",
+    "serialize_observation",
+    # Route configuration
+    "GetEndpointConfig",
 ]
