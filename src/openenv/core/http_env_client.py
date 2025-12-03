@@ -61,14 +61,16 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         2. Waits for the server to be ready
         3. Creates and returns a client instance connected to the container
 
-        Note: The container lifecycle management is left to the user or higher-level
-        orchestration. The container will keep running until manually stopped.
+        Note: The container lifecycle management is left to the user or
+        higher-level orchestration. The container will keep running until
+        manually stopped.
 
         Args:
             image: Docker image name to run (e.g., "echo-env:latest")
-            provider: Container provider to use (defaults to LocalDockerProvider)
-            **kwargs: Additional arguments to pass to provider.start_container()
-                     (e.g., env_vars, port)
+            provider: Container provider to use (defaults to
+                LocalDockerProvider)
+            **kwargs: Additional arguments to pass to
+                provider.start_container() (e.g., env_vars, port)
 
         Returns:
             An instance of the client class connected to the running container
@@ -129,11 +131,12 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
             provider: Optional provider instance to reuse. Must be a
                 :class:`ContainerProvider` when ``use_docker=True`` and a
                 :class:`RuntimeProvider`` otherwise.
-            provider_kwargs: Additional keyword arguments forwarded to either the
-                container provider's ``start_container`` (docker) or to the
-                ``UVProvider`` constructor/start (uv). When ``use_docker=False``,
-                the ``project_path`` argument can be used to override the default
-                git URL (``git+https://huggingface.co/spaces/{repo_id}``).
+            provider_kwargs: Additional keyword arguments forwarded to
+                either the container provider's ``start_container`` (docker)
+                or to the ``UVProvider`` constructor/start (uv). When
+                ``use_docker=False``, the ``project_path`` argument can be
+                used to override the default git URL
+                (``git+https://huggingface.co/spaces/{repo_id}``).
         """
 
         start_args = {}
@@ -167,7 +170,7 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
 
     @abstractmethod
     def _step_payload(self, action: ActT) -> dict:
-        """Convert an Action object to the JSON body expected by the env server."""
+        """Convert an Action object to the JSON body expected by env server."""
         raise NotImplementedError
 
     @abstractmethod
@@ -177,15 +180,28 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
 
     @abstractmethod
     def _parse_state(self, payload: dict) -> Any:
-        """Convert a JSON response from the state endpoint to a State object."""
+        """Convert a JSON response from state endpoint to a State object."""
         raise NotImplementedError
 
     # ---------- Environment Server Interface Methods ----------
-    def reset(self) -> StepResult[ObsT]:
-        body: Dict[str, Any] = {}
-        # TODO: later:
-        # body["seed"] = seed
-        # body["episode_id"] = episode_id
+    def reset(self, **kwargs: Any) -> StepResult[ObsT]:
+        """
+        Reset the environment with optional parameters.
+
+        Args:
+            **kwargs: Optional parameters passed to the environment's reset
+                method. Common parameters include:
+                - seed: Random seed for reproducibility
+                - episode_id: Custom episode identifier
+                - Any environment-specific reset parameters
+
+        Returns:
+            StepResult containing initial observation
+
+        Example:
+            >>> env.reset(seed=42, episode_id="ep-001")
+        """
+        body: Dict[str, Any] = kwargs.copy()
         r = self._http.post(
             f"{self._base}/reset",
             json=body,
@@ -195,14 +211,31 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         r.raise_for_status()
         return self._parse_result(r.json())
 
-    def step(self, action: ActT) -> StepResult[ObsT]:
+    def step(self, action: ActT, **kwargs: Any) -> StepResult[ObsT]:
+        """
+        Execute an action in the environment with optional parameters.
+
+        Args:
+            action: The action to execute
+            **kwargs: Optional parameters passed to the environment's step
+                method. Common parameters include:
+                - timeout_s: Execution timeout in seconds
+                - request_id: Request identifier for tracking
+                - render: Whether to render the environment
+                - Any environment-specific step parameters
+
+        Returns:
+            StepResult containing observation, reward, and done status
+
+        Example:
+            >>> env.step(
+            ...     action, timeout_s=30.0, request_id="req-123", render=True
+            ... )
+        """
         body: Dict[str, Any] = {
             "action": self._step_payload(action),
-            "timeout_s": int(self._timeout),
+            **kwargs,  # Forward all additional parameters
         }
-        # TODO: later:
-        # body["request_id"] = str(uuid.uuid4())
-        # body["episode_id"] = current_episode_id
         r = self._http.post(
             f"{self._base}/step",
             json=body,
@@ -217,7 +250,8 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         Get the current environment state from the server.
 
         Returns:
-            State object with environment state information (e.g., episode_id, step_count)
+            State object with environment state information
+            (e.g., episode_id, step_count)
 
         Example:
             >>> client = EchoEnv.from_docker_image("echo-env:latest")
