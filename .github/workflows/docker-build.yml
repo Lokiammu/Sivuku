@@ -85,6 +85,8 @@ jobs:
             dockerfile: envs/textarena_env/server/Dockerfile
           - name: browsergym-env
             dockerfile: envs/browsergym_env/server/Dockerfile
+          - name: snake-env
+            dockerfile: envs/snake_env/server/Dockerfile
 
     steps:
       - name: Checkout code
