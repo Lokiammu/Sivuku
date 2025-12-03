@@ -278,8 +278,8 @@ class Environment(ABC):
 ### Example 1: Code Execution Environment
 
 ```python
-from core.env_server import Environment, Observation, State, ToolCallAction
-from core.tools import PyExecutor
+from openenv.core.env_server import Environment, Observation, State, ToolCallAction
+from openenv.core.tools import PyExecutor
 
 class PythonCodeActEnv(Environment):
     """Environment for executing Python code via tool calls."""
@@ -331,7 +331,7 @@ class PythonCodeActEnv(Environment):
 ### Example 2: Game Environment (Non-Tool Actions)
 
 ```python
-from core.env_server import Environment, Observation, State, ToolCallAction
+from openenv.core.env_server import Environment, Observation, State, ToolCallAction
 
 class ChessEnv(Environment):
     """Chess environment - actions are game moves, not tools."""

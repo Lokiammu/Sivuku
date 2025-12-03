@@ -338,7 +338,7 @@ def filter_imports(code: str) -> str:
 Environments act as MCP clients:
 
 ```python
-from core.env_server import Environment, Observation
+from openenv.core.env_server import Environment, Observation
 from mcp_client import MCPClient
 
 class ToolCallingEnvironment(Environment):
@@ -369,8 +369,8 @@ class ToolCallingEnvironment(Environment):
 Python code execution environments pre-import tools into the execution namespace:
 
 ```python
-from core.env_server import Environment
-from core.tools import PyExecutor
+from openenv.core.env_server import Environment
+from openenv.core.tools import PyExecutor
 from mcp_client import MCPClient, MCPToolRegistry, filter_imports
 
 class CodeActEnvironment(Environment):
