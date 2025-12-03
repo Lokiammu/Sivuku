@@ -3,7 +3,7 @@
 from typing import Any, Dict
 
 from openenv.core.http_env_client import HTTPEnvClient, StepResult
-from browsergym_env.models import (
+from .models import (
     BrowserGymAction,
     BrowserGymObservation,
     BrowserGymState,
@@ -82,9 +82,7 @@ class BrowserGymEnv(HTTPEnvClient[BrowserGymAction, BrowserGymObservation]):
             "metadata": action.metadata,
         }
 
-    def _parse_result(
-        self, payload: Dict[str, Any]
-    ) -> StepResult[BrowserGymObservation]:
+    def _parse_result(self, payload: Dict[str, Any]) -> StepResult[BrowserGymObservation]:
         """Parse the server response into a StepResult."""
         obs_data = payload.get("observation", {})
 
