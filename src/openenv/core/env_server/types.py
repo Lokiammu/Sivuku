@@ -280,3 +280,99 @@ class WSErrorResponse(BaseModel):
 
     type: str = Field(default="error", description="Response type")
     data: Dict[str, Any] = Field(description="Error details including message and code")
+
+
+class ConcurrencySafetyLevel(str):
+    """
+    Classification of environment concurrency safety.
+    
+    Environments are classified based on their ability to safely handle
+    multiple concurrent sessions within a single container.
+    """
+    
+    UNSAFE = "unsafe"
+    SAFE = "safe"
+
+
+class ConcurrencyConfig(BaseModel):
+    """Configuration for concurrent environment sessions."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    max_concurrent_envs: int = Field(
+        default=1,
+        ge=1,
+        le=1000,
+        description="Maximum number of concurrent WebSocket sessions allowed",
+    )
+    session_timeout_seconds: Optional[float] = Field(
+        default=None,
+        gt=0,
+        description="Timeout in seconds for inactive sessions. None means no timeout.",
+    )
+    reject_on_capacity: bool = Field(
+        default=True,
+        description="If True, reject new connections when at capacity. If False, queue them.",
+    )
+
+
+class ServerCapacityStatus(BaseModel):
+    """Status of server capacity for concurrent sessions."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    active_sessions: int = Field(
+        ge=0,
+        description="Number of currently active sessions",
+    )
+    max_sessions: int = Field(
+        ge=1,
+        description="Maximum number of allowed sessions",
+    )
+    available_slots: int = Field(
+        ge=0,
+        description="Number of available session slots",
+    )
+    is_at_capacity: bool = Field(
+        description="Whether the server has reached maximum capacity",
+    )
+
+    @classmethod
+    def from_counts(cls, active: int, max_sessions: int) -> "ServerCapacityStatus":
+        """Create status from active and max session counts."""
+        available = max(0, max_sessions - active)
+        return cls(
+            active_sessions=active,
+            max_sessions=max_sessions,
+            available_slots=available,
+            is_at_capacity=active >= max_sessions,
+        )
+
+
+class SessionInfo(BaseModel):
+    """Information about an active session."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    session_id: str = Field(description="Unique identifier for the session")
+    created_at: float = Field(description="Unix timestamp when the session was created")
+    last_activity_at: float = Field(
+        description="Unix timestamp of the last activity in the session"
+    )
+    step_count: int = Field(
+        default=0,
+        ge=0,
+        description="Number of steps executed in this session",
+    )
+    environment_type: str = Field(
+        description="Type name of the environment class for this session"
+    )

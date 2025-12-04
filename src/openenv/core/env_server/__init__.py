@@ -21,7 +21,6 @@ from .types import (
     State,
     SchemaResponse,
     HealthResponse,
-    # WebSocket message types
     WSMessage,
     WSResetMessage,
     WSStepMessage,
@@ -30,6 +29,17 @@ from .types import (
     WSObservationResponse,
     WSStateResponse,
     WSErrorResponse,
+    ConcurrencyConfig,
+    ServerCapacityStatus,
+    SessionInfo,
+)
+from .exceptions import (
+    OpenEnvError,
+    ConcurrencyConfigurationError,
+    SessionCapacityError,
+    SessionNotFoundError,
+    SessionCreationError,
+    EnvironmentFactoryError,
 )
 from .web_interface import create_web_interface_app, WebInterfaceManager
 
@@ -54,6 +64,17 @@ __all__ = [
     "WSObservationResponse",
     "WSStateResponse",
     "WSErrorResponse",
+    # Concurrency types
+    "ConcurrencyConfig",
+    "ServerCapacityStatus",
+    "SessionInfo",
+    # Exceptions
+    "OpenEnvError",
+    "ConcurrencyConfigurationError",
+    "SessionCapacityError",
+    "SessionNotFoundError",
+    "SessionCreationError",
+    "EnvironmentFactoryError",
     # Base transforms
     "CompositeTransform",
     "NullTransform",

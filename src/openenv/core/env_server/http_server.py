@@ -49,6 +49,14 @@ from .types import (
     WSObservationResponse,
     WSStateResponse,
     WSErrorResponse,
+    ConcurrencyConfig,
+    ServerCapacityStatus,
+    SessionInfo,
+)
+from .exceptions import (
+    ConcurrencyConfigurationError,
+    SessionCapacityError,
+    EnvironmentFactoryError,
 )
 
 
@@ -90,6 +98,7 @@ class HTTPEnvServer:
         action_cls: Type[Action] = None,
         observation_cls: Type[Observation] = None,
         max_concurrent_envs: int = 1,
+        skip_concurrency_check: bool = False,
     ):
         """
         Initialize HTTP server wrapper.
@@ -103,9 +112,19 @@ class HTTPEnvServer:
             observation_cls: The Observation subclass this environment returns
             max_concurrent_envs: Maximum number of concurrent WebSocket sessions.
                                  Only applies when env is a factory. Default is 1.
+            skip_concurrency_check: If True, skip concurrency safety validation.
+                                    Use with caution for advanced users who understand
+                                    the isolation requirements.
+                                    
+        Raises:
+            ConcurrencyConfigurationError: If max_concurrent_envs > 1 for an
+                environment that is not marked as CONCURRENCY_SAFE.
         """
         self._env_factory: Optional[Callable[[], Environment]] = None
         self._max_concurrent_envs = max_concurrent_envs
+        self._skip_concurrency_check = skip_concurrency_check or os.getenv(
+            "OPENENV_SKIP_CONCURRENCY_CHECK", ""
+        ).lower() in ("1", "true", "yes")
         
         # Determine if env is an instance or factory
         if isinstance(env, Environment):
@@ -116,11 +135,18 @@ class HTTPEnvServer:
             # Factory mode - env is a class or callable
             self._env_factory = env
             # Create a single instance for HTTP endpoints (backward compat)
-            self.env = env()
+            try:
+                self.env = env()
+            except Exception as e:
+                factory_name = getattr(env, "__name__", str(env))
+                raise EnvironmentFactoryError(factory_name, e) from e
         else:
             raise TypeError(
                 f"env must be an Environment instance or callable, got {type(env)}"
             )
+        
+        # Validate concurrency configuration
+        self._validate_concurrency_safety()
         
         self.action_cls = action_cls
         self.observation_cls = observation_cls
@@ -128,11 +154,47 @@ class HTTPEnvServer:
         # Session management for WebSocket connections
         self._sessions: Dict[str, Environment] = {}
         self._session_executors: Dict[str, ThreadPoolExecutor] = {}
+        self._session_info: Dict[str, SessionInfo] = {}
         self._session_lock = asyncio.Lock()
         
         # Create thread pool for running sync code in async context
         # This is needed for environments using sync libraries (e.g., Playwright sync API)
         self._executor = ThreadPoolExecutor(max_workers=1)
+
+    def _validate_concurrency_safety(self) -> None:
+        """
+        Validate that the environment supports the configured concurrency level.
+        
+        Raises:
+            ConcurrencyConfigurationError: If max_concurrent_envs > 1 for an
+                environment that is not marked as CONCURRENCY_SAFE.
+        """
+        if self._max_concurrent_envs <= 1:
+            return
+        
+        if self._skip_concurrency_check:
+            return
+        
+        is_concurrency_safe = getattr(self.env, "CONCURRENCY_SAFE", False)
+        
+        if not is_concurrency_safe:
+            env_name = type(self.env).__name__
+            raise ConcurrencyConfigurationError(
+                environment_name=env_name,
+                max_concurrent_envs=self._max_concurrent_envs,
+            )
+
+    def get_capacity_status(self) -> ServerCapacityStatus:
+        """
+        Get the current capacity status of the server.
+        
+        Returns:
+            ServerCapacityStatus with current session counts and availability.
+        """
+        return ServerCapacityStatus.from_counts(
+            active=len(self._sessions),
+            max_sessions=self._max_concurrent_envs,
+        )
 
     async def _run_sync_in_thread_pool(self, func, *args, **kwargs):
         """Run a synchronous function in the thread pool executor."""
@@ -165,32 +227,53 @@ class HTTPEnvServer:
             Tuple of (session_id, environment)
             
         Raises:
-            RuntimeError: If max concurrent sessions reached or no factory available
+            SessionCapacityError: If max concurrent sessions reached
+            EnvironmentFactoryError: If the factory fails to create an environment
         """
+        import time
+        
         async with self._session_lock:
             if len(self._sessions) >= self._max_concurrent_envs:
-                raise RuntimeError(
-                    f"Maximum concurrent environments ({self._max_concurrent_envs}) reached"
+                raise SessionCapacityError(
+                    active_sessions=len(self._sessions),
+                    max_sessions=self._max_concurrent_envs,
                 )
+            
+            session_id = str(uuid.uuid4())
+            current_time = time.time()
             
             if self._env_factory is None:
                 # Single instance mode - use shared env (limited concurrency)
                 if self._sessions:
-                    raise RuntimeError(
-                        "Single instance mode: only one WebSocket session allowed"
+                    raise SessionCapacityError(
+                        active_sessions=len(self._sessions),
+                        max_sessions=1,
+                        message="Single instance mode: only one WebSocket session allowed",
                     )
-                session_id = str(uuid.uuid4())
-                self._sessions[session_id] = self.env
+                env = self.env
             else:
                 # Factory mode - create new environment
-                session_id = str(uuid.uuid4())
-                env = self._env_factory()
-                self._sessions[session_id] = env
+                try:
+                    env = self._env_factory()
+                except Exception as e:
+                    factory_name = getattr(self._env_factory, "__name__", str(self._env_factory))
+                    raise EnvironmentFactoryError(factory_name, e) from e
+            
+            self._sessions[session_id] = env
             
             # Create dedicated executor for this session
             self._session_executors[session_id] = ThreadPoolExecutor(max_workers=1)
             
-            return session_id, self._sessions[session_id]
+            # Track session metadata
+            self._session_info[session_id] = SessionInfo(
+                session_id=session_id,
+                created_at=current_time,
+                last_activity_at=current_time,
+                step_count=0,
+                environment_type=type(env).__name__,
+            )
+            
+            return session_id, env
     
     async def _destroy_session(self, session_id: str) -> None:
         """
@@ -212,7 +295,37 @@ class HTTPEnvServer:
             if session_id in self._session_executors:
                 executor = self._session_executors.pop(session_id)
                 executor.shutdown(wait=False)
+            
+            # Remove session metadata
+            self._session_info.pop(session_id, None)
     
+    def _update_session_activity(self, session_id: str, increment_step: bool = False) -> None:
+        """
+        Update session activity timestamp and optionally increment step count.
+        
+        Args:
+            session_id: The session ID to update
+            increment_step: If True, increment the step count
+        """
+        import time
+        
+        if session_id in self._session_info:
+            self._session_info[session_id].last_activity_at = time.time()
+            if increment_step:
+                self._session_info[session_id].step_count += 1
+    
+    def get_session_info(self, session_id: str) -> Optional[SessionInfo]:
+        """
+        Get information about a specific session.
+        
+        Args:
+            session_id: The session ID to query
+            
+        Returns:
+            SessionInfo if the session exists, None otherwise
+        """
+        return self._session_info.get(session_id)
+
     async def _run_in_session_executor(
         self, session_id: str, func: Callable, *args, **kwargs
     ) -> Any:
@@ -230,6 +343,11 @@ class HTTPEnvServer:
     def max_concurrent_envs(self) -> int:
         """Return the maximum number of concurrent environments."""
         return self._max_concurrent_envs
+
+    @property
+    def is_concurrency_safe(self) -> bool:
+        """Return whether the environment is marked as concurrency safe."""
+        return getattr(self.env, "CONCURRENCY_SAFE", False)
 
     def register_routes(self, app: FastAPI) -> None:
         """
@@ -508,6 +626,8 @@ all schema information needed to interact with the environment.
                                 session_id, session_env.reset, **valid_kwargs
                             )
                             
+                            self._update_session_activity(session_id)
+                            
                             response = WSObservationResponse(
                                 data=serialize_observation(observation)
                             )
@@ -535,6 +655,8 @@ all schema information needed to interact with the environment.
                             observation = await self._run_in_session_executor(
                                 session_id, session_env.step, action
                             )
+                            
+                            self._update_session_activity(session_id, increment_step=True)
                             
                             response = WSObservationResponse(
                                 data=serialize_observation(observation)
@@ -569,9 +691,33 @@ all schema information needed to interact with the environment.
                         await websocket.send_text(error_resp.model_dump_json())
                         
             except WebSocketDisconnect:
-                pass  # Client disconnected normally
-            except RuntimeError as e:
-                # Could not create session (max concurrent reached)
+                pass
+            except SessionCapacityError as e:
+                try:
+                    error_resp = WSErrorResponse(
+                        data={
+                            "message": str(e),
+                            "code": "CAPACITY_REACHED",
+                            "active_sessions": e.active_sessions,
+                            "max_sessions": e.max_sessions,
+                        }
+                    )
+                    await websocket.send_text(error_resp.model_dump_json())
+                except Exception:
+                    pass
+            except EnvironmentFactoryError as e:
+                try:
+                    error_resp = WSErrorResponse(
+                        data={
+                            "message": str(e),
+                            "code": "FACTORY_ERROR",
+                            "factory_name": e.factory_name,
+                        }
+                    )
+                    await websocket.send_text(error_resp.model_dump_json())
+                except Exception:
+                    pass
+            except Exception as e:
                 try:
                     error_resp = WSErrorResponse(
                         data={"message": str(e), "code": "SESSION_ERROR"}
