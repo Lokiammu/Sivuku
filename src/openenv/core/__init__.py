@@ -10,10 +10,12 @@
 from .env_server import *
 from .client_types import StepResult
 from .http_env_client import HTTPEnvClient
+from .ws_env_client import WebSocketEnvClient
 
 # Note: MCP module doesn't export anything yet
 
 __all__ = [
     "HTTPEnvClient",
+    "WebSocketEnvClient",
     "StepResult",
 ]

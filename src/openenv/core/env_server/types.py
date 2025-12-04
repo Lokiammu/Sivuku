@@ -212,3 +212,71 @@ class HealthResponse(BaseModel):
     )
 
     status: str = Field(description="Health status of the environment server")
+
+class WSMessage(BaseModel):
+    """Base class for WebSocket messages."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    type: str = Field(description="Message type identifier")
+
+
+class WSResetMessage(WSMessage):
+    """WebSocket message to reset the environment."""
+
+    type: str = Field(default="reset", description="Message type")
+    data: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Optional reset parameters (seed, episode_id, etc.)",
+    )
+
+
+class WSStepMessage(WSMessage):
+    """WebSocket message to execute a step."""
+
+    type: str = Field(default="step", description="Message type")
+    data: Dict[str, Any] = Field(
+        ..., description="Action data conforming to environment's action schema"
+    )
+
+
+class WSStateMessage(WSMessage):
+    """WebSocket message to request current state."""
+
+    type: str = Field(default="state", description="Message type")
+
+
+class WSCloseMessage(WSMessage):
+    """WebSocket message to close the session."""
+
+    type: str = Field(default="close", description="Message type")
+
+
+class WSObservationResponse(BaseModel):
+    """WebSocket response containing an observation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: str = Field(default="observation", description="Response type")
+    data: Dict[str, Any] = Field(description="Observation data")
+
+
+class WSStateResponse(BaseModel):
+    """WebSocket response containing environment state."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: str = Field(default="state", description="Response type")
+    data: Dict[str, Any] = Field(description="State data")
+
+
+class WSErrorResponse(BaseModel):
+    """WebSocket response for errors."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: str = Field(default="error", description="Response type")
+    data: Dict[str, Any] = Field(description="Error details including message and code")
