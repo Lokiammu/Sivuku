@@ -61,6 +61,7 @@ markdown_extensions:
         - name: important
         - name: warning
         - name: caution
+  - meta
 
 watch:
   - ../src/core
