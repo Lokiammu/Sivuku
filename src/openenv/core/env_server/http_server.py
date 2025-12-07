@@ -99,6 +99,7 @@ class HTTPEnvServer:
         observation_cls: Type[Observation] = None,
         max_concurrent_envs: int = 1,
         skip_concurrency_check: bool = False,
+        concurrency_config: Optional[ConcurrencyConfig] = None,
     ):
         """
         Initialize HTTP server wrapper.
@@ -112,16 +113,33 @@ class HTTPEnvServer:
             observation_cls: The Observation subclass this environment returns
             max_concurrent_envs: Maximum number of concurrent WebSocket sessions.
                                  Only applies when env is a factory. Default is 1.
+                                 If concurrency_config is provided, this parameter is ignored.
             skip_concurrency_check: If True, skip concurrency safety validation.
                                     Use with caution for advanced users who understand
                                     the isolation requirements.
+            concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
+                                If provided, overrides max_concurrent_envs and allows
+                                configuration of session timeout and capacity behavior.
                                     
         Raises:
             ConcurrencyConfigurationError: If max_concurrent_envs > 1 for an
                 environment that is not marked as CONCURRENCY_SAFE.
         """
         self._env_factory: Optional[Callable[[], Environment]] = None
-        self._max_concurrent_envs = max_concurrent_envs
+        
+        # Handle concurrency configuration
+        if concurrency_config is not None:
+            self._concurrency_config = concurrency_config
+            self._max_concurrent_envs = concurrency_config.max_concurrent_envs
+        else:
+            # Use legacy parameters
+            self._concurrency_config = ConcurrencyConfig(
+                max_concurrent_envs=max_concurrent_envs,
+                session_timeout_seconds=None,
+                reject_on_capacity=True,
+            )
+            self._max_concurrent_envs = max_concurrent_envs
+        
         self._skip_concurrency_check = skip_concurrency_check or os.getenv(
             "OPENENV_SKIP_CONCURRENCY_CHECK", ""
         ).lower() in ("1", "true", "yes")
@@ -238,10 +256,18 @@ class HTTPEnvServer:
         
         async with self._session_lock:
             if len(self._sessions) >= self._max_concurrent_envs:
-                raise SessionCapacityError(
-                    active_sessions=len(self._sessions),
-                    max_sessions=self._max_concurrent_envs,
-                )
+                if self._concurrency_config.reject_on_capacity:
+                    raise SessionCapacityError(
+                        active_sessions=len(self._sessions),
+                        max_sessions=self._max_concurrent_envs,
+                    )
+                else:
+                    # TODO: Implement queuing mechanism when reject_on_capacity=False
+                    raise SessionCapacityError(
+                        active_sessions=len(self._sessions),
+                        max_sessions=self._max_concurrent_envs,
+                        message="Session queuing not yet implemented",
+                    )
             
             session_id = str(uuid.uuid4())
             current_time = time.time()
@@ -352,6 +378,11 @@ class HTTPEnvServer:
     def is_concurrency_safe(self) -> bool:
         """Return whether the environment is marked as concurrency safe."""
         return getattr(self.env, "CONCURRENCY_SAFE", False)
+
+    @property
+    def concurrency_config(self) -> ConcurrencyConfig:
+        """Return the concurrency configuration."""
+        return self._concurrency_config
 
     def register_routes(self, app: FastAPI) -> None:
         """
@@ -539,6 +570,25 @@ version, author, and documentation links.
         ]
         register_get_endpoints(app, get_endpoints)
 
+        # Register concurrency config endpoint
+        @app.get(
+            "/concurrency",
+            response_model=ConcurrencyConfig,
+            tags=["Environment Info"],
+            summary="Get concurrency configuration",
+            description="""
+Get the current concurrency configuration for this server.
+
+Returns information about:
+- **max_concurrent_envs**: Maximum number of concurrent WebSocket sessions
+- **session_timeout_seconds**: Timeout for inactive sessions (None if no timeout)
+- **reject_on_capacity**: Whether to reject or queue connections at capacity
+            """,
+        )
+        async def get_concurrency_config() -> ConcurrencyConfig:
+            """Return concurrency configuration."""
+            return self._concurrency_config
+
         # Register combined schema endpoint
         @app.get(
             "/schema",
@@ -598,8 +648,8 @@ all schema information needed to interact with the environment.
             factory mode) or shares the single instance (backward compatible mode).
             
             Message Protocol:
-            - Client sends: {"type": "reset|step|state|close", "data": {...}}
-            - Server responds: {"type": "observation|state|error", "data": {...}}
+            - Client sends: WSResetMessage | WSStepMessage | WSStateMessage | WSCloseMessage
+            - Server responds: WSObservationResponse | WSStateResponse | WSErrorResponse
             """
             await websocket.accept()
             
@@ -615,7 +665,7 @@ all schema information needed to interact with the environment.
                     raw_message = await websocket.receive_text()
                     
                     try:
-                        message = json.loads(raw_message)
+                        message_dict = json.loads(raw_message)
                     except json.JSONDecodeError as e:
                         error_resp = WSErrorResponse(
                             data={"message": f"Invalid JSON: {e}", "code": "INVALID_JSON"}
@@ -623,14 +673,23 @@ all schema information needed to interact with the environment.
                         await websocket.send_text(error_resp.model_dump_json())
                         continue
                     
-                    msg_type = message.get("type", "")
-                    msg_data = message.get("data", {})
+                    msg_type = message_dict.get("type", "")
                     
                     try:
                         if msg_type == "reset":
+                            # Parse and validate reset message
+                            try:
+                                msg = WSResetMessage(**message_dict)
+                            except ValidationError as e:
+                                error_resp = WSErrorResponse(
+                                    data={"message": "Invalid reset message", "code": "VALIDATION_ERROR", "errors": e.errors()}
+                                )
+                                await websocket.send_text(error_resp.model_dump_json())
+                                continue
+                            
                             # Handle reset
                             sig = inspect.signature(session_env.reset)
-                            valid_kwargs = self._get_valid_kwargs(sig, msg_data)
+                            valid_kwargs = self._get_valid_kwargs(sig, msg.data)
                             
                             observation = await self._run_in_session_executor(
                                 session_id, session_env.reset, **valid_kwargs
@@ -644,17 +703,19 @@ all schema information needed to interact with the environment.
                             await websocket.send_text(response.model_dump_json())
                             
                         elif msg_type == "step":
-                            # Handle step
-                            if not msg_data:
+                            # Parse and validate step message
+                            try:
+                                msg = WSStepMessage(**message_dict)
+                            except ValidationError as e:
                                 error_resp = WSErrorResponse(
-                                    data={"message": "Missing action data", "code": "MISSING_ACTION"}
+                                    data={"message": "Invalid step message", "code": "VALIDATION_ERROR", "errors": e.errors()}
                                 )
                                 await websocket.send_text(error_resp.model_dump_json())
                                 continue
                             
                             # Deserialize action with Pydantic validation
                             try:
-                                action = deserialize_action(msg_data, self.action_cls)
+                                action = deserialize_action(msg.data, self.action_cls)
                             except ValidationError as e:
                                 error_resp = WSErrorResponse(
                                     data={"message": str(e), "code": "VALIDATION_ERROR", "errors": e.errors()}
@@ -674,6 +735,16 @@ all schema information needed to interact with the environment.
                             await websocket.send_text(response.model_dump_json())
                             
                         elif msg_type == "state":
+                            # Parse and validate state message
+                            try:
+                                msg = WSStateMessage(**message_dict)
+                            except ValidationError as e:
+                                error_resp = WSErrorResponse(
+                                    data={"message": "Invalid state message", "code": "VALIDATION_ERROR", "errors": e.errors()}
+                                )
+                                await websocket.send_text(error_resp.model_dump_json())
+                                continue
+                            
                             # Handle state request
                             state = session_env.state
                             if hasattr(state, 'model_dump'):
@@ -685,6 +756,16 @@ all schema information needed to interact with the environment.
                             await websocket.send_text(response.model_dump_json())
                             
                         elif msg_type == "close":
+                            # Parse and validate close message
+                            try:
+                                msg = WSCloseMessage(**message_dict)
+                            except ValidationError as e:
+                                error_resp = WSErrorResponse(
+                                    data={"message": "Invalid close message", "code": "VALIDATION_ERROR", "errors": e.errors()}
+                                )
+                                await websocket.send_text(error_resp.model_dump_json())
+                                continue
+                            
                             # Client requested close
                             break
                             
@@ -751,6 +832,7 @@ def create_app(
     observation_cls: Type[Observation],
     env_name: Optional[str] = None,
     max_concurrent_envs: int = 1,
+    concurrency_config: Optional[ConcurrencyConfig] = None,
 ) -> FastAPI:
     """
     Create a FastAPI application with or without web interface.
@@ -763,7 +845,10 @@ def create_app(
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         env_name: Optional environment name for README loading
-        max_concurrent_envs: Maximum concurrent WebSocket sessions (default: 1)
+        max_concurrent_envs: Maximum concurrent WebSocket sessions (default: 1).
+                             Ignored if concurrency_config is provided.
+        concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
+                            If provided, overrides max_concurrent_envs.
 
     Returns:
         FastAPI application instance with or without web interface and README integration
@@ -780,10 +865,16 @@ def create_app(
         # Import web interface only when needed
         from .web_interface import create_web_interface_app
 
-        return create_web_interface_app(env, action_cls, observation_cls, env_name)
+        return create_web_interface_app(
+            env, action_cls, observation_cls, env_name, 
+            max_concurrent_envs, concurrency_config
+        )
     else:
         # Use standard FastAPI app without web interface
-        return create_fastapi_app(env, action_cls, observation_cls, max_concurrent_envs)
+        return create_fastapi_app(
+            env, action_cls, observation_cls, 
+            max_concurrent_envs, concurrency_config
+        )
 
 
 def create_fastapi_app(
@@ -791,6 +882,7 @@ def create_fastapi_app(
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     max_concurrent_envs: int = 1,
+    concurrency_config: Optional[ConcurrencyConfig] = None,
 ) -> FastAPI:
     """
     Create a FastAPI application with comprehensive documentation.
@@ -799,7 +891,10 @@ def create_fastapi_app(
         env: The Environment instance, factory callable, or class to serve
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
-        max_concurrent_envs: Maximum concurrent WebSocket sessions (default: 1)
+        max_concurrent_envs: Maximum concurrent WebSocket sessions (default: 1).
+                             Ignored if concurrency_config is provided.
+        concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
+                            If provided, overrides max_concurrent_envs.
         
     Returns:
         FastAPI application instance
@@ -869,6 +964,9 @@ HTTP API for interacting with OpenEnv environments through a standardized interf
         },
     )
 
-    server = HTTPEnvServer(env, action_cls, observation_cls, max_concurrent_envs)
+    server = HTTPEnvServer(
+        env, action_cls, observation_cls, 
+        max_concurrent_envs, concurrency_config=concurrency_config
+    )
     server.register_routes(app)
     return app
