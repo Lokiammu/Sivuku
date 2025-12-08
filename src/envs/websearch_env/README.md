@@ -13,39 +13,71 @@ tags:
 
 # Web Search Environment
 
-A simple test environment that echoes back messages. Perfect for testing the env APIs as well as demonstrating environment usage patterns.
+A web search environment that searches the web with Google Search API (via Serper.dev).
+
+## Prerequisites
+
+### API Key Setup
+
+This environment requires a Serper.dev API key to function. 
+
+1. **Get your API Key:**
+   - Visit [Serper.dev](https://serper.dev/) and sign up for an account
+   - Navigate to your dashboard to get your API key
+   - Free tier includes 2,500 free searches
+
+2. **Configure the API Key:**
+
+   **For Local Development:**
+   ```bash
+   export SERPER_API_KEY="your-api-key-here"
+   ```
+
+   **For Docker:**
+   ```bash
+   docker run -e SERPER_API_KEY="your-api-key-here" web_search-env:latest
+   ```
+
+   **For Hugging Face Spaces (after deployment):**
+   - Navigate to your Space's settings page: `https://huggingface.co/spaces/USERNAME/SPACE_NAME/settings`
+   - Scroll to the "Repository secrets" section
+   - Click "New secret"
+   - Name: `SERPER_API_KEY`
+   - Value: Your Serper.dev API key
+   - Click "Add"
+   - The Space will automatically restart and use your API key
+
+   > **Important:** Never commit your API key to code. Always use environment variables or secrets management.
 
 ## Quick Start
 
-The simplest way to use the Web Search environment is through the `WebSearchEnv` class:
+The simplest way to use the Web Search environment is through the `WebSearchEnvironment` class:
 
 ```python
-from web_search import WebSearchAction, WebSearchEnv
+from envs.websearch_env.server.websearch_env_environment import WebSearchEnvironment
+from envs.websearch_env import WebSearchAction
 
 try:
     # Create environment from Docker image
-    web_searchenv = WebSearchEnv.from_docker_image("web_search-env:latest")
+    web_search_env = WebSearchEnvironment.from_docker_image("web_search-env:latest")
 
     # Reset
-    result = web_searchenv.reset()
-    print(f"Reset: {result.observation.echoed_message}")
+    result = web_search_env.reset()
+    print(f"Reset: {result.observation.content}")
 
-    # Send multiple messages
-    messages = ["Hello, World!", "Testing echo", "Final message"]
+    # Send a search query
+    query = "What is the capital of China?"
 
-    for msg in messages:
-        result = web_searchenv.step(WebSearchAction(message=msg))
-        print(f"Sent: '{msg}'")
-        print(f"  → Echoed: '{result.observation.echoed_message}'")
-        print(f"  → Length: {result.observation.message_length}")
-        print(f"  → Reward: {result.reward}")
+    result = web_search_env.step(WebSearchAction(query=query))
+    print(f"Formatted search result:", result.observation.content)
+    print(f"Individual web contents:", result.observation.web_contents)
 
 finally:
     # Always clean up
-    web_searchenv.close()
+    web_search_env.close()
 ```
 
-That's it! The `WebSearchEnv.from_docker_image()` method handles:
+That's it! The `WebSearchEnvironment.from_docker_image()` method handles:
 - Starting the Docker container
 - Waiting for the server to be ready
 - Connecting to the environment
@@ -110,6 +142,9 @@ openenv push --repo-id my-org/my-env --base-image custom-base:latest --private
 After deployment, your space will be available at:
 `https://huggingface.co/spaces/<repo-id>`
 
+**⚠️ Important: Configure your API key!**
+After deployment, you must add your Serper.dev API key as a secret in the Space settings (see [API Key Setup](#api-key-setup) above). The environment will not work without it.
+
 The deployed space includes:
 - **Web Interface** at `/web` - Interactive UI for exploring the environment
 - **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
@@ -119,21 +154,19 @@ The deployed space includes:
 
 ### Action
 **WebSearchAction**: Contains a single field
-- `message` (str) - The message to echo back
+- `query` (str) - The query to search for
+- `temp_api_key` (str) - Temporary Serper.dev API key if not set in envrionment variables.
 
 ### Observation
 **WebSearchObservation**: Contains the echo response and metadata
-- `echoed_message` (str) - The message echoed back
-- `message_length` (int) - Length of the message
-- `reward` (float) - Reward based on message length (length × 0.1)
-- `done` (bool) - Always False for echo environment
+- `content` (str) - The formatted prompt that aggregates both query and web contents
+- `web_contents` (list) - List of web contents for top ranked web pages
+- `reward` (float) - Reward is not defined in this scenario
+- `done` (bool) - Always False for search environment
 - `metadata` (dict) - Additional info like step count
 
 ### Reward
-The reward is calculated as: `message_length × 0.1`
-- "Hi" → reward: 0.2
-- "Hello, World!" → reward: 1.3
-- Empty message → reward: 0.0
+The reward is undefined here.
 
 ## Advanced Usage
 
@@ -142,17 +175,17 @@ The reward is calculated as: `message_length × 0.1`
 If you already have a Web Search environment server running, you can connect directly:
 
 ```python
-from web_search import WebSearchEnv
+from envs.websearch_env import WebSearchEnvironment
 
 # Connect to existing server
-web_searchenv = WebSearchEnv(base_url="<ENV_HTTP_URL_HERE>")
+web_search_env = WebSearchEnvironment(base_url="<ENV_HTTP_URL_HERE>")
 
 # Use as normal
-result = web_searchenv.reset()
-result = web_searchenv.step(WebSearchAction(message="Hello!"))
+result = web_search_env.reset()
+result = web_search_env.step(WebSearchAction(query="What is the capital of China?"))
 ```
 
-Note: When connecting to an existing server, `web_searchenv.close()` will NOT stop the server.
+Note: When connecting to an existing server, `web_search_env.close()` will NOT stop the server.
 
 ## Development & Testing
 
@@ -176,6 +209,10 @@ This verifies that:
 Run the server locally for development:
 
 ```bash
+# Make sure to set your API key first
+export SERPER_API_KEY="your-api-key-here"
+
+# Then run the server
 uvicorn server.app:app --reload
 ```
 
@@ -192,7 +229,7 @@ web_search/
 ├── models.py              # Action and Observation models
 └── server/
     ├── __init__.py        # Server module exports
-    ├── web_search_environment.py  # Core environment logic
+    ├── websearch_env_environment.py  # Core environment logic
     ├── app.py             # FastAPI application
     └── Dockerfile         # Container image definition
 ```
