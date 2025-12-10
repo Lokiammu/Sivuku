@@ -14,7 +14,7 @@ including a two-pane layout for HumanAgent interaction and state observation.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 from datetime import datetime
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from .interfaces import Environment
 from .serialization import deserialize_action_with_preprocessing, serialize_observation
-from .types import Action, Observation, State, EnvironmentMetadata
+from .types import Action, Observation, State, EnvironmentMetadata, ConcurrencyConfig
 
 
 def load_environment_metadata(
@@ -251,19 +251,23 @@ class WebInterfaceManager:
 
 
 def create_web_interface_app(
-    env: Environment,
+    env: Union[Callable[[], Environment], Type[Environment]],
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     env_name: Optional[str] = None,
+    max_concurrent_envs: int = 1,
+    concurrency_config: Optional[ConcurrencyConfig] = None,
 ) -> FastAPI:
     """
     Create a FastAPI application with web interface for the given environment.
 
     Args:
-        env: The Environment instance to serve
+        env: Environment factory (callable or class) that creates new instances
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         env_name: Optional environment name for README loading
+        max_concurrent_envs: Maximum concurrent WebSocket sessions (default: 1)
+        concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings
 
     Returns:
         FastAPI application instance with web interface
@@ -271,13 +275,16 @@ def create_web_interface_app(
     from .http_server import create_fastapi_app
 
     # Create the base environment app
-    app = create_fastapi_app(env, action_cls, observation_cls)
+    app = create_fastapi_app(env, action_cls, observation_cls, max_concurrent_envs, concurrency_config)
+    
+    # Create a test instance for metadata
+    env_instance = env()
 
     # Load environment metadata
-    metadata = load_environment_metadata(env, env_name)
+    metadata = load_environment_metadata(env_instance, env_name)
 
     # Create web interface manager
-    web_manager = WebInterfaceManager(env, action_cls, observation_cls, metadata)
+    web_manager = WebInterfaceManager(env_instance, action_cls, observation_cls, metadata)
 
     # Add web interface routes
     @app.get("/web", response_class=HTMLResponse)

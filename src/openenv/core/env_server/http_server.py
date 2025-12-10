@@ -76,13 +76,9 @@ class HTTPEnvServer:
         >>> from core.env_server import HTTPEnvServer
         >>> from envs.coding_env.server import CodeExecutionEnvironment
         >>>
-        >>> # Single environment (backward compatible)
-        >>> env = CodeExecutionEnvironment()
-        >>> server = HTTPEnvServer(env)
-        >>>
-        >>> # Factory pattern for concurrent sessions
+        >>> # Pass environment class (factory pattern)
         >>> server = HTTPEnvServer(
-        ...     env=CodeExecutionEnvironment,  # Pass class, not instance
+        ...     env=CodeExecutionEnvironment,
         ...     max_concurrent_envs=4,
         ... )
         >>>
@@ -94,9 +90,9 @@ class HTTPEnvServer:
 
     def __init__(
         self,
-        env: Union[Environment, Callable[[], Environment], Type[Environment]],
-        action_cls: Type[Action] = None,
-        observation_cls: Type[Observation] = None,
+        env: Union[Callable[[], Environment], Type[Environment]],
+        action_cls: Type[Action],
+        observation_cls: Type[Observation],
         max_concurrent_envs: int = 1,
         skip_concurrency_check: bool = False,
         concurrency_config: Optional[ConcurrencyConfig] = None,
@@ -105,14 +101,11 @@ class HTTPEnvServer:
         Initialize HTTP server wrapper.
 
         Args:
-            env: The Environment instance, factory callable, or class to wrap.
-                 - If an instance is provided, it's used directly (single-env mode)
-                 - If a callable/class is provided, it's called to create new
-                   environments for each WebSocket session (factory mode)
+            env: Environment factory (callable or class) that creates new instances.
+                 Will be called to create a new environment for each WebSocket session.
             action_cls: The Action subclass this environment expects
             observation_cls: The Observation subclass this environment returns
-            max_concurrent_envs: Maximum number of concurrent WebSocket sessions.
-                                 Only applies when env is a factory. Default is 1.
+            max_concurrent_envs: Maximum number of concurrent WebSocket sessions (default: 1).
                                  If concurrency_config is provided, this parameter is ignored.
             skip_concurrency_check: If True, skip concurrency safety validation.
                                     Use with caution for advanced users who understand
@@ -125,7 +118,14 @@ class HTTPEnvServer:
             ConcurrencyConfigurationError: If max_concurrent_envs > 1 for an
                 environment that is not marked as CONCURRENCY_SAFE.
         """
-        self._env_factory: Optional[Callable[[], Environment]] = None
+        # Validate that env is callable
+        if not callable(env):
+            raise TypeError(
+                f"env must be a callable (class or factory function), got {type(env)}. "
+                f"Pass the environment class (e.g., MyEnvironment) not an instance (e.g., MyEnvironment())."
+            )
+        
+        self._env_factory: Callable[[], Environment] = env
         
         # Handle concurrency configuration
         if concurrency_config is not None:
@@ -144,24 +144,7 @@ class HTTPEnvServer:
             "OPENENV_SKIP_CONCURRENCY_CHECK", ""
         ).lower() in ("1", "true", "yes")
         
-        # Determine if env is an instance or factory
-        if isinstance(env, Environment):
-            # Single instance mode (backward compatible)
-            self.env = env
-            self._env_factory = None
-        elif callable(env):
-            # Factory mode - env is a class or callable
-            self._env_factory = env
-            # Create a single instance for HTTP endpoints (backward compat)
-            try:
-                self.env = env()
-            except Exception as e:
-                factory_name = getattr(env, "__name__", str(env))
-                raise EnvironmentFactoryError(factory_name, e) from e
-        else:
-            raise TypeError(
-                f"env must be an Environment instance or callable, got {type(env)}"
-            )
+        self.env = env()
         
         # Validate concurrency configuration
         self._validate_concurrency_safety()
@@ -272,22 +255,7 @@ class HTTPEnvServer:
             session_id = str(uuid.uuid4())
             current_time = time.time()
             
-            if self._env_factory is None:
-                # Single instance mode - use shared env (limited concurrency)
-                if self._sessions:
-                    raise SessionCapacityError(
-                        active_sessions=len(self._sessions),
-                        max_sessions=1,
-                        message="Single instance mode: only one WebSocket session allowed",
-                    )
-                env = self.env
-            else:
-                # Factory mode - create new environment
-                try:
-                    env = self._env_factory()
-                except Exception as e:
-                    factory_name = getattr(self._env_factory, "__name__", str(self._env_factory))
-                    raise EnvironmentFactoryError(factory_name, e) from e
+            env = self._env_factory()
             
             self._sessions[session_id] = env
             
@@ -827,7 +795,7 @@ all schema information needed to interact with the environment.
 
 
 def create_app(
-    env: Union[Environment, Callable[[], Environment], Type[Environment]],
+    env: Union[Callable[[], Environment], Type[Environment]],
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     env_name: Optional[str] = None,
@@ -841,7 +809,7 @@ def create_app(
     including README integration for better user experience.
 
     Args:
-        env: The Environment instance, factory callable, or class to serve
+        env: Environment factory (callable or class) that creates new instances
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         env_name: Optional environment name for README loading
@@ -878,7 +846,7 @@ def create_app(
 
 
 def create_fastapi_app(
-    env: Union[Environment, Callable[[], Environment], Type[Environment]],
+    env: Union[Callable[[], Environment], Type[Environment]],
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     max_concurrent_envs: int = 1,
@@ -888,7 +856,7 @@ def create_fastapi_app(
     Create a FastAPI application with comprehensive documentation.
     
     Args:
-        env: The Environment instance, factory callable, or class to serve
+        env: Environment factory (callable or class) that creates new instances
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         max_concurrent_envs: Maximum concurrent WebSocket sessions (default: 1).
