@@ -288,18 +288,6 @@ class WSErrorResponse(BaseModel):
     data: Dict[str, Any] = Field(description="Error details including message and code")
 
 
-class ConcurrencySafetyLevel(str):
-    """
-    Classification of environment concurrency safety.
-    
-    Environments are classified based on their ability to safely handle
-    multiple concurrent sessions within a single container.
-    """
-    
-    UNSAFE = "unsafe"
-    SAFE = "safe"
-
-
 class ConcurrencyConfig(BaseModel):
     """Configuration for concurrent environment sessions."""
 
