@@ -262,7 +262,7 @@ def create_web_interface_app(
     Create a FastAPI application with web interface for the given environment.
 
     Args:
-        env: The Environment instance to serve
+        env: The Environment instance, factory callable, or class to serve
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         env_name: Optional environment name for README loading
@@ -282,11 +282,22 @@ def create_web_interface_app(
         max_concurrent_envs, concurrency_config
     )
 
+    # If env is a class/factory, instantiate it for the web interface
+    # (the HTTPEnvServer in create_fastapi_app handles this separately)
+    if isinstance(env, Environment):
+        env_instance = env
+    elif callable(env):
+        env_instance = env()
+    else:
+        raise TypeError(
+            f"env must be an Environment instance or callable, got {type(env)}"
+        )
+
     # Load environment metadata
-    metadata = load_environment_metadata(env, env_name)
+    metadata = load_environment_metadata(env_instance, env_name)
 
     # Create web interface manager
-    web_manager = WebInterfaceManager(env, action_cls, observation_cls, metadata)
+    web_manager = WebInterfaceManager(env_instance, action_cls, observation_cls, metadata)
 
     # Add web interface routes
     @app.get("/web", response_class=HTMLResponse)
