@@ -114,6 +114,7 @@ The deployed space includes:
 - **Web Interface** at `/web` - Interactive UI for exploring the environment
 - **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
 - **Health Check** at `/health` - Container health monitoring
+- **WebSocket** at `/ws` - Persistent session endpoint for low-latency interactions
 
 ## Environment Details
 
@@ -154,6 +155,61 @@ result = __ENV_NAME__env.step(__ENV_CLASS_NAME__Action(message="Hello!"))
 
 Note: When connecting to an existing server, `__ENV_NAME__env.close()` will NOT stop the server.
 
+### WebSocket Client for Persistent Sessions
+
+For long-running episodes or when you need lower latency, use the WebSocket client:
+
+```python
+from __ENV_NAME__ import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__EnvWS
+
+# Connect via WebSocket (maintains persistent connection)
+with __ENV_CLASS_NAME__EnvWS(base_url="http://localhost:8000") as env:
+    result = env.reset()
+    print(f"Reset: {result.observation.echoed_message}")
+    # Multiple steps with low latency
+    for msg in ["Hello", "World", "!"]:
+        result = env.step(__ENV_CLASS_NAME__Action(message=msg))
+        print(f"Echoed: {result.observation.echoed_message}")
+```
+
+WebSocket advantages:
+- **Lower latency**: No HTTP connection overhead per request
+- **Persistent session**: Server maintains your environment state
+- **Efficient for episodes**: Better for many sequential steps
+
+### Concurrent WebSocket Sessions
+
+The server supports multiple concurrent WebSocket connections. To enable this,
+modify `server/app.py` to use factory mode:
+
+```python
+# In server/app.py - use factory mode for concurrent sessions
+app = create_app(
+    __ENV_CLASS_NAME__Environment,  # Pass class, not instance
+    __ENV_CLASS_NAME__Action,
+    __ENV_CLASS_NAME__Observation,
+    max_concurrent_envs=4,  # Allow 4 concurrent sessions
+)
+```
+
+Then multiple clients can connect simultaneously:
+
+```python
+from __ENV_NAME__ import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__EnvWS
+from concurrent.futures import ThreadPoolExecutor
+
+def run_episode(client_id: int):
+    with __ENV_CLASS_NAME__EnvWS(base_url="http://localhost:8000") as env:
+        result = env.reset()
+        for i in range(10):
+            result = env.step(__ENV_CLASS_NAME__Action(message=f"Client {client_id}, step {i}"))
+        return client_id, result.observation.message_length
+
+# Run 4 episodes concurrently
+with ThreadPoolExecutor(max_workers=4) as executor:
+    results = list(executor.map(run_episode, range(4)))
+```
+
 ## Development & Testing
 
 ### Direct Environment Testing
@@ -189,11 +245,11 @@ __ENV_NAME__/
 ├── openenv.yaml           # OpenEnv manifest
 ├── pyproject.toml         # Project metadata and dependencies
 ├── uv.lock                # Locked dependencies (generated)
-├── client.py              # __ENV_CLASS_NAME__Env client implementation
+├── client.py              # __ENV_CLASS_NAME__Env (HTTP) and __ENV_CLASS_NAME__EnvWS (WebSocket) clients
 ├── models.py              # Action and Observation models
 └── server/
     ├── __init__.py        # Server module exports
     ├── __ENV_NAME___environment.py  # Core environment logic
-    ├── app.py             # FastAPI application
+    ├── app.py             # FastAPI application (HTTP + WebSocket endpoints)
     └── Dockerfile         # Container image definition
 ```
