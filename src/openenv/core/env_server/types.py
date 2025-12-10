@@ -4,7 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, Literal, Annotated
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -213,46 +213,52 @@ class HealthResponse(BaseModel):
 
     status: str = Field(description="Health status of the environment server")
 
-class WSMessage(BaseModel):
-    """Base class for WebSocket messages."""
+
+class BaseMessage(BaseModel):
+    """Base class for WebSocket messages with shared configuration."""
 
     model_config = ConfigDict(
         extra="forbid",
         validate_assignment=True,
     )
 
-    type: str = Field(description="Message type identifier")
 
-
-class WSResetMessage(WSMessage):
+class WSResetMessage(BaseMessage):
     """WebSocket message to reset the environment."""
 
-    type: str = Field(default="reset", description="Message type")
+    type: Literal["reset"] = Field(default="reset", description="Message type")
     data: Dict[str, Any] = Field(
         default_factory=dict,
         description="Optional reset parameters (seed, episode_id, etc.)",
     )
 
 
-class WSStepMessage(WSMessage):
+class WSStepMessage(BaseMessage):
     """WebSocket message to execute a step."""
 
-    type: str = Field(default="step", description="Message type")
+    type: Literal["step"] = Field(default="step", description="Message type")
     data: Dict[str, Any] = Field(
         ..., description="Action data conforming to environment's action schema"
     )
 
 
-class WSStateMessage(WSMessage):
+class WSStateMessage(BaseMessage):
     """WebSocket message to request current state."""
 
-    type: str = Field(default="state", description="Message type")
+    type: Literal["state"] = Field(default="state", description="Message type")
 
 
-class WSCloseMessage(WSMessage):
+class WSCloseMessage(BaseMessage):
     """WebSocket message to close the session."""
 
-    type: str = Field(default="close", description="Message type")
+    type: Literal["close"] = Field(default="close", description="Message type")
+
+
+# Discriminated union for incoming WebSocket messages
+WSIncomingMessage = Annotated[
+    WSResetMessage | WSStepMessage | WSStateMessage | WSCloseMessage,
+    Field(discriminator="type")
+]
 
 
 class WSObservationResponse(BaseModel):
