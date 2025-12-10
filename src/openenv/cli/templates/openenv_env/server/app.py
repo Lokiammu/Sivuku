@@ -35,7 +35,8 @@ except Exception as e:  # pragma: no cover
         "openenv is required for the web interface. Install dependencies with '\n    uv sync\n'"
     ) from e
 
-from __ENV_NAME__.models import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Observation
+# Import from local models.py (PYTHONPATH includes /app/env in Docker)
+from models import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Observation
 from .__ENV_NAME___environment import __ENV_CLASS_NAME__Environment
 
 
