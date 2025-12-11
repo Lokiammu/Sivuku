@@ -6,8 +6,12 @@
 
 """__ENV_TITLE_NAME__ Environment - A simple test environment for HTTP server."""
 
-from .client import __ENV_CLASS_NAME__Env
+from .client import __ENV_CLASS_NAME__Env, __ENV_CLASS_NAME__EnvWS
 from .models import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Observation
 
-__all__ = ["__ENV_CLASS_NAME__Action", "__ENV_CLASS_NAME__Observation", "__ENV_CLASS_NAME__Env"]
-
+__all__ = [
+    "__ENV_CLASS_NAME__Action",
+    "__ENV_CLASS_NAME__Observation",
+    "__ENV_CLASS_NAME__Env",
+    "__ENV_CLASS_NAME__EnvWS",
+]

@@ -8,7 +8,14 @@
 FastAPI application for the __ENV_TITLE_NAME__ Environment.
 
 This module creates an HTTP server that exposes the __ENV_CLASS_NAME__Environment
-over HTTP endpoints, making it compatible with HTTPEnvClient.
+over HTTP and WebSocket endpoints, compatible with HTTPEnvClient and WebSocketEnvClient.
+
+Endpoints:
+    - POST /reset: Reset the environment
+    - POST /step: Execute an action
+    - GET /state: Get current environment state
+    - GET /schema: Get action/observation schemas
+    - WS /ws: WebSocket endpoint for persistent sessions
 
 Usage:
     # Development (with auto-reload):
@@ -28,18 +35,18 @@ except Exception as e:  # pragma: no cover
         "openenv is required for the web interface. Install dependencies with '\n    uv sync\n'"
     ) from e
 
-from __ENV_NAME__.models import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Observation
+# Import from local models.py (PYTHONPATH includes /app/env in Docker)
+from models import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Observation
 from .__ENV_NAME___environment import __ENV_CLASS_NAME__Environment
 
-# Create the environment instance
-env = __ENV_CLASS_NAME__Environment()
 
 # Create the app with web interface and README integration
 app = create_app(
-    env,
+    __ENV_CLASS_NAME__Environment,
     __ENV_CLASS_NAME__Action,
     __ENV_CLASS_NAME__Observation,
     env_name="__ENV_NAME__",
+    max_concurrent_envs=1,  # increase this number to allow more concurrent WebSocket sessions
 )
 
 
