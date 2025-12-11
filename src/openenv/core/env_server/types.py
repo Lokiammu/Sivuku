@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from typing import Any, Dict, Optional, Union, Literal, Annotated
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 # Type aliases
@@ -299,23 +299,32 @@ class ServerCapacityStatus(BaseMessage):
         ge=1,
         description="Maximum number of allowed sessions",
     )
-    available_slots: int = Field(
-        ge=0,
-        description="Number of available session slots",
-    )
-    is_at_capacity: bool = Field(
-        description="Whether the server has reached maximum capacity",
-    )
+
+    @model_validator(mode="after")
+    def check_capacity_bounds(self) -> "ServerCapacityStatus":
+        if self.active_sessions > self.max_sessions:
+            raise ValueError(
+                f"active_sessions ({self.active_sessions}) cannot exceed "
+                f"max_sessions ({self.max_sessions})"
+            )
+        return self
+
+    @property
+    def available_slots(self) -> int:
+        """Number of available session slots."""
+        return self.max_sessions - self.active_sessions
+
+    @property
+    def is_at_capacity(self) -> bool:
+        """Whether the server has reached maximum capacity."""
+        return self.available_slots == 0
 
     @classmethod
     def from_counts(cls, active: int, max_sessions: int) -> "ServerCapacityStatus":
         """Create status from active and max session counts."""
-        available = max(0, max_sessions - active)
         return cls(
             active_sessions=active,
             max_sessions=max_sessions,
-            available_slots=available,
-            is_at_capacity=active >= max_sessions,
         )
 
 
@@ -333,5 +342,5 @@ class SessionInfo(BaseMessage):
         description="Number of steps executed in this session",
     )
     environment_type: str = Field(
-        description="Type name of the environment class for this session"
+        description="Environment type for this session (e.g. `CodingEnv`)"
     )

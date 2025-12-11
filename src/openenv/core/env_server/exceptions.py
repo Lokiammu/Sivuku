@@ -20,7 +20,7 @@ class ConcurrencyConfigurationError(OpenEnvError):
     Raised when an environment is misconfigured for concurrent sessions.
     
     This error is raised during server startup when max_concurrent_envs > 1
-    is specified for an environment that is not marked as CONCURRENCY_SAFE.
+    is specified for an environment that is not marked as SUPPORTS_CONCURRENT_SESSIONS.
     """
 
     def __init__(
@@ -34,10 +34,10 @@ class ConcurrencyConfigurationError(OpenEnvError):
         
         if message is None:
             message = (
-                f"Environment '{environment_name}' is not marked as CONCURRENCY_SAFE. "
+                f"Environment '{environment_name}' is not marked as SUPPORTS_CONCURRENT_SESSIONS. "
                 f"Cannot run with max_concurrent_envs={max_concurrent_envs}. "
                 f"Either set max_concurrent_envs=1 or ensure the environment "
-                f"properly isolates session state and set CONCURRENCY_SAFE=True."
+                f"properly isolates session state and set SUPPORTS_CONCURRENT_SESSIONS=True."
             )
         
         super().__init__(message)

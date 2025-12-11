@@ -40,7 +40,7 @@ class __ENV_CLASS_NAME__Environment(Environment):
     # Set to True if your environment isolates state between instances.
     # When True, multiple WebSocket clients can connect simultaneously, each
     # getting their own environment instance (when using factory mode in app.py).
-    CONCURRENCY_SAFE: bool = True
+    SUPPORTS_CONCURRENT_SESSIONS: bool = True
 
     def __init__(self):
         """Initialize the __ENV_NAME__ environment."""

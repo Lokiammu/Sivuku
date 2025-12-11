@@ -104,7 +104,7 @@ class Environment(ABC):
     """
     
     # Class-level flag indicating whether this environment supports concurrent sessions
-    CONCURRENCY_SAFE: bool = False
+    SUPPORTS_CONCURRENT_SESSIONS: bool = False
 
     def __init__(self, transform: Transform | None = None):
         self.transform = transform
