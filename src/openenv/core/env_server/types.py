@@ -288,13 +288,8 @@ class WSErrorResponse(BaseModel):
     data: Dict[str, Any] = Field(description="Error details including message and code")
 
 
-class ConcurrencyConfig(BaseModel):
+class ConcurrencyConfig(BaseMessage):
     """Configuration for concurrent environment sessions."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_assignment=True,
-    )
 
     max_concurrent_envs: int = Field(
         default=1,
@@ -302,7 +297,7 @@ class ConcurrencyConfig(BaseModel):
         le=1000,
         description="Maximum number of concurrent WebSocket sessions allowed",
     )
-    session_timeout_seconds: Optional[float] = Field(
+    session_timeout: Optional[float] = Field(
         default=None,
         gt=0,
         description="Timeout in seconds for inactive sessions. None means no timeout.",
@@ -313,13 +308,8 @@ class ConcurrencyConfig(BaseModel):
     )
 
 
-class ServerCapacityStatus(BaseModel):
+class ServerCapacityStatus(BaseMessage):
     """Status of server capacity for concurrent sessions."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_assignment=True,
-    )
 
     active_sessions: int = Field(
         ge=0,
@@ -349,13 +339,8 @@ class ServerCapacityStatus(BaseModel):
         )
 
 
-class SessionInfo(BaseModel):
+class SessionInfo(BaseMessage):
     """Information about an active session."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_assignment=True,
-    )
 
     session_id: str = Field(description="Unique identifier for the session")
     created_at: float = Field(description="Unix timestamp when the session was created")
