@@ -135,7 +135,7 @@ class HTTPEnvServer:
             # Use legacy parameters
             self._concurrency_config = ConcurrencyConfig(
                 max_concurrent_envs=max_concurrent_envs,
-                session_timeout_seconds=None,
+                session_timeout=None,
                 reject_on_capacity=True,
             )
             self._max_concurrent_envs = max_concurrent_envs
@@ -549,7 +549,7 @@ Get the current concurrency configuration for this server.
 
 Returns information about:
 - **max_concurrent_envs**: Maximum number of concurrent WebSocket sessions
-- **session_timeout_seconds**: Timeout for inactive sessions (None if no timeout)
+- **session_timeout**: Timeout in seconds for inactive sessions (None if no timeout)
 - **reject_on_capacity**: Whether to reject or queue connections at capacity
             """,
         )
