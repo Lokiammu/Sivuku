@@ -127,6 +127,15 @@ class StepResponse(BaseModel):
     done: bool = Field(default=False, description="Whether the episode has terminated")
 
 
+class BaseMessage(BaseModel):
+    """Base class for WebSocket messages with shared configuration."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
 class State(BaseModel):
     """Base class for environment state.
 
@@ -149,26 +158,16 @@ class State(BaseModel):
     )
 
 
-class CodeExecResult(BaseModel):
+class CodeExecResult(BaseMessage):
     """Result of code execution containing stdout, stderr, and exit code."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_assignment=True,
-    )
 
     stdout: str = Field(description="Standard output from code execution")
     stderr: str = Field(description="Standard error from code execution")
     exit_code: int = Field(description="Exit code from code execution")
 
 
-class EnvironmentMetadata(BaseModel):
+class EnvironmentMetadata(BaseMessage):
     """Metadata about an environment for documentation and UI purposes."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_assignment=True,
-    )
 
     name: str = Field(description="Name of the environment")
     description: str = Field(description="Description of what the environment does")
@@ -184,13 +183,8 @@ class EnvironmentMetadata(BaseModel):
     )
 
 
-class SchemaResponse(BaseModel):
+class SchemaResponse(BaseMessage):
     """Response model for the combined schema endpoint."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_assignment=True,
-    )
 
     action: Dict[str, Any] = Field(
         description="JSON schema for actions accepted by this environment"
@@ -203,24 +197,10 @@ class SchemaResponse(BaseModel):
     )
 
 
-class HealthResponse(BaseModel):
+class HealthResponse(BaseMessage):
     """Response model for health check endpoint."""
 
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_assignment=True,
-    )
-
     status: str = Field(description="Health status of the environment server")
-
-
-class BaseMessage(BaseModel):
-    """Base class for WebSocket messages with shared configuration."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_assignment=True,
-    )
 
 
 class WSResetMessage(BaseMessage):
@@ -257,7 +237,7 @@ class WSCloseMessage(BaseMessage):
 # Discriminated union for incoming WebSocket messages
 WSIncomingMessage = Annotated[
     WSResetMessage | WSStepMessage | WSStateMessage | WSCloseMessage,
-    Field(discriminator="type")
+    Field(discriminator="type"),
 ]
 
 
