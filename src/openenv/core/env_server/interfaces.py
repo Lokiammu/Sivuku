@@ -96,7 +96,7 @@ class Environment(ABC, Generic[ActT, ObsT, StateT]):
         transform: Optional transform to apply to observations
         
     Class Attributes:
-        CONCURRENCY_SAFE: Whether this environment supports concurrent sessions.
+        SUPPORTS_CONCURRENT_SESSIONS: Whether this environment supports concurrent sessions.
             When True, multiple WebSocket connections can each have their own
             environment instance (up to max_concurrent_envs). When False (default),
             the environment should only be used with a single session at a time.

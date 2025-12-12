@@ -274,7 +274,6 @@ class ConcurrencyConfig(BaseMessage):
     max_concurrent_envs: int = Field(
         default=1,
         ge=1,
-        le=1000,
         description="Maximum number of concurrent WebSocket sessions allowed",
     )
     session_timeout: Optional[float] = Field(

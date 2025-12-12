@@ -96,10 +96,9 @@ class SessionCreationError(OpenEnvError):
 class EnvironmentFactoryError(OpenEnvError):
     """Raised when the environment factory fails to create an instance."""
 
-    def __init__(self, factory_name: str, cause: Exception):
+    def __init__(self, factory_name: str):
         self.factory_name = factory_name
-        self.cause = cause
         
-        message = f"Environment factory '{factory_name}' failed to create instance: {cause}"
+        message = f"Environment factory '{factory_name}' failed to create instance."
         
         super().__init__(message)

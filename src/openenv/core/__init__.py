@@ -8,9 +8,10 @@
 
 # Re-export main components from submodules for convenience
 from .env_server import *  # noqa: F403
-from .env_server import __all__ as _env_server_all
-
+from . import env_server
+from .ws_env_client import WebSocketEnvClient
+from .http_env_client import HTTPEnvClient
 
 # Note: MCP module doesn't export anything yet
 
-__all__ = list(_env_server_all)
+__all__ = ["WebSocketEnvClient", "HTTPEnvClient"] + env_server.__all__ # type: ignore

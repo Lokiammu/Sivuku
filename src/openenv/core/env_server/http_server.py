@@ -96,8 +96,7 @@ class HTTPEnvServer:
         env: Union[Callable[[], Environment], Type[Environment]],
         action_cls: Type[Action],
         observation_cls: Type[Observation],
-        max_concurrent_envs: int = 1,
-        skip_concurrency_check: bool = False,
+        max_concurrent_envs: Optional[int] = None,
         concurrency_config: Optional[ConcurrencyConfig] = None,
     ):
         """
@@ -108,16 +107,13 @@ class HTTPEnvServer:
                  Will be called to create a new environment for each WebSocket session.
             action_cls: The Action subclass this environment expects
             observation_cls: The Observation subclass this environment returns
-            max_concurrent_envs: Maximum number of concurrent WebSocket sessions (default: 1).
-                                 If concurrency_config is provided, this parameter is ignored.
-            skip_concurrency_check: If True, skip concurrency safety validation.
-                                    Use with caution for advanced users who understand
-                                    the isolation requirements.
+            max_concurrent_envs: Maximum number of concurrent WebSocket sessions.
+                                 Mutually exclusive with concurrency_config.
             concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
-                                If provided, overrides max_concurrent_envs and allows
-                                configuration of session timeout and capacity behavior.
+                                Mutually exclusive with max_concurrent_envs.
 
         Raises:
+            ValueError: If both max_concurrent_envs and concurrency_config are provided.
             ConcurrencyConfigurationError: If max_concurrent_envs > 1 for an
                 environment that is not marked as SUPPORTS_CONCURRENT_SESSIONS.
         """
@@ -131,21 +127,29 @@ class HTTPEnvServer:
         self._env_factory: Callable[[], Environment] = env
 
         # Handle concurrency configuration
+        if max_concurrent_envs is not None and concurrency_config is not None:
+            raise ValueError(
+                "Cannot specify both 'max_concurrent_envs' and 'concurrency_config'. "
+                "Please use only one method to configure concurrency."
+            )
+
         if concurrency_config is not None:
             self._concurrency_config = concurrency_config
-            self._max_concurrent_envs = concurrency_config.max_concurrent_envs
-        else:
-            # Use legacy parameters
+        elif max_concurrent_envs is not None:
             self._concurrency_config = ConcurrencyConfig(
                 max_concurrent_envs=max_concurrent_envs,
                 session_timeout=None,
                 reject_on_capacity=True,
             )
-            self._max_concurrent_envs = max_concurrent_envs
+        else:
+            # Default configuration
+            self._concurrency_config = ConcurrencyConfig(
+                max_concurrent_envs=1,
+                session_timeout=None,
+                reject_on_capacity=True,
+            )
 
-        self._skip_concurrency_check = skip_concurrency_check or os.getenv(
-            "OPENENV_SKIP_CONCURRENCY_CHECK", ""
-        ).lower() in ("1", "true", "yes")
+        self._max_concurrent_envs = self._concurrency_config.max_concurrent_envs
 
         # Validate concurrency configuration
         self._validate_concurrency_safety()
@@ -174,9 +178,6 @@ class HTTPEnvServer:
                 environment that is not marked as SUPPORTS_CONCURRENT_SESSIONS.
         """
         if self._max_concurrent_envs <= 1:
-            return
-
-        if self._skip_concurrency_check:
             return
 
         if inspect.isclass(self._env_factory):
@@ -268,7 +269,11 @@ class HTTPEnvServer:
             session_id = str(uuid.uuid4())
             current_time = time.time()
 
-            env = self._env_factory()
+            try:
+                env = self._env_factory()
+            except Exception as e:
+                factory_name = getattr(self._env_factory, "__name__", str(self._env_factory))
+                raise EnvironmentFactoryError(factory_name) from e
 
             self._sessions[session_id] = env
 
@@ -862,7 +867,7 @@ def create_app(
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     env_name: Optional[str] = None,
-    max_concurrent_envs: int = 1,
+    max_concurrent_envs: Optional[int] = None,
     concurrency_config: Optional[ConcurrencyConfig] = None,
 ) -> FastAPI:
     """
@@ -876,10 +881,10 @@ def create_app(
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         env_name: Optional environment name for README loading
-        max_concurrent_envs: Maximum concurrent WebSocket sessions (default: 1).
-                             Ignored if concurrency_config is provided.
+        max_concurrent_envs: Maximum concurrent WebSocket sessions.
+                             Mutually exclusive with concurrency_config.
         concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
-                            If provided, overrides max_concurrent_envs.
+                            Mutually exclusive with max_concurrent_envs.
 
     Returns:
         FastAPI application instance with or without web interface and README integration
@@ -915,7 +920,7 @@ def create_fastapi_app(
     env: Union[Callable[[], Environment], Type[Environment]],
     action_cls: Type[Action],
     observation_cls: Type[Observation],
-    max_concurrent_envs: int = 1,
+    max_concurrent_envs: Optional[int] = None,
     concurrency_config: Optional[ConcurrencyConfig] = None,
 ) -> FastAPI:
     """
@@ -925,10 +930,10 @@ def create_fastapi_app(
         env: Environment factory (callable or class) that creates new instances
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
-        max_concurrent_envs: Maximum concurrent WebSocket sessions (default: 1).
-                             Ignored if concurrency_config is provided.
+        max_concurrent_envs: Maximum concurrent WebSocket sessions.
+                             Mutually exclusive with concurrency_config.
         concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
-                            If provided, overrides max_concurrent_envs.
+                            Mutually exclusive with max_concurrent_envs.
 
     Returns:
         FastAPI application instance
