@@ -1,9 +1,10 @@
 # Type definitions for EnvTorch
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 # Generic type for observations
-ObsT = TypeVar("ObsT")  # TypeVar for typehinting in IDEs
+ObsT = TypeVar("ObsT")
+StateT = TypeVar("StateT")
 
 
 @dataclass

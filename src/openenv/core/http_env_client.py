@@ -16,7 +16,7 @@ from typing import Any, Dict, Generic, Optional, Type, TYPE_CHECKING, TypeVar
 
 import requests
 
-from .client_types import StepResult
+from .client_types import StepResult, StateT
 from .containers.runtime import LocalDockerProvider
 
 if TYPE_CHECKING:
@@ -27,7 +27,7 @@ ObsT = TypeVar("ObsT")
 EnvClientT = TypeVar("EnvClientT", bound="HTTPEnvClient")
 
 
-class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
+class HTTPEnvClient(ABC, Generic[ActT, ObsT, StateT]):
     def __init__(
         self,
         base_url: str,
@@ -129,17 +129,17 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         return cls.from_docker_image(image=base_url, provider=provider)
 
     @abstractmethod
-    def _step_payload(self, action: ActT) -> dict:
+    def _step_payload(self, action: ActT) -> Dict[str, Any]:
         """Convert an Action object to the JSON body expected by the env server."""
         raise NotImplementedError
 
     @abstractmethod
-    def _parse_result(self, payload: dict) -> StepResult[ObsT]:
+    def _parse_result(self, payload: Dict[str, Any]) -> StepResult[ObsT]:
         """Convert a JSON response from the env server to StepResult[ObsT]."""
         raise NotImplementedError
 
     @abstractmethod
-    def _parse_state(self, payload: dict) -> Any:
+    def _parse_state(self, payload: Dict[str, Any]) -> StateT:
         """Convert a JSON response from the state endpoint to a State object."""
         raise NotImplementedError
 
@@ -203,7 +203,7 @@ class HTTPEnvClient(ABC, Generic[ActT, ObsT]):
         r.raise_for_status()
         return self._parse_result(r.json())
 
-    def state(self) -> Any:
+    def state(self) -> StateT:
         """
         Get the current environment state from the server.
 

@@ -5,9 +5,13 @@
 # LICENSE file in the root directory of this source tree.
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Protocol, TypedDict
+from typing import Any, Generic, Optional, Protocol, TypedDict, TypeVar
 
 from .types import Action, Observation, State, EnvironmentMetadata
+
+ActT = TypeVar("ActT", bound=Action)
+ObsT = TypeVar("ObsT", bound=Observation)
+StateT = TypeVar("StateT", bound=State)
 
 
 class Message(TypedDict):
@@ -64,7 +68,7 @@ class ModelTokenizer(Protocol):
         ...
 
 
-class Transform(ABC):
+class Transform(ABC, Generic[ObsT]):
     """Transform observations to add rewards, metrics, or other modifications.
 
     Transforms follow the TorchRL pattern where they take an observation
@@ -73,7 +77,7 @@ class Transform(ABC):
     """
 
     @abstractmethod
-    def __call__(self, observation: Observation) -> Observation:
+    def __call__(self, observation: ObsT) -> ObsT:
         """Transform an observation.
 
         Args:
@@ -85,7 +89,7 @@ class Transform(ABC):
         pass
 
 
-class Environment(ABC):
+class Environment(ABC, Generic[ActT, ObsT, StateT]):
     """Base class for all environment servers following Gym/Gymnasium API.
 
     Args:
@@ -106,7 +110,7 @@ class Environment(ABC):
     # Class-level flag indicating whether this environment supports concurrent sessions
     SUPPORTS_CONCURRENT_SESSIONS: bool = False
 
-    def __init__(self, transform: Transform | None = None):
+    def __init__(self, transform: Optional[Transform[ObsT]] = None):
         self.transform = transform
 
     @abstractmethod
@@ -115,23 +119,47 @@ class Environment(ABC):
         seed: Optional[int] = None,
         episode_id: Optional[str] = None,
         **kwargs: Any,
-    ) -> Observation:
+    ) -> ObsT:
         """Reset the environment and return initial observation."""
         pass
+
+    async def reset_async(
+        self,
+        seed: Optional[int] = None,
+        episode_id: Optional[str] = None,
+        **kwargs: Any,
+    ) -> ObsT:
+        """Async version of reset. Default implementation calls sync reset.
+        
+        Override to provide true async implementation.
+        """
+        return self.reset(seed=seed, episode_id=episode_id, **kwargs)
 
     @abstractmethod
     def step(
         self,
-        action: Action,
+        action: ActT,
         timeout_s: Optional[float] = None,
         **kwargs: Any,
-    ) -> Observation:
+    ) -> ObsT:
         """Take a step in the environment."""
         pass
 
+    async def step_async(
+        self,
+        action: ActT,
+        timeout_s: Optional[float] = None,
+        **kwargs: Any,
+    ) -> ObsT:
+        """Async version of step. Default implementation calls sync step.
+        
+        Override to provide true async implementation.
+        """
+        return self.step(action, timeout_s=timeout_s, **kwargs)
+
     @property
     @abstractmethod
-    def state(self) -> State:
+    def state(self) -> StateT:
         """Get the current environment state."""
         pass
 
@@ -151,8 +179,16 @@ class Environment(ABC):
             version="1.0.0",
         )
 
-    def _apply_transform(self, observation: Observation) -> Observation:
+    def _apply_transform(self, observation: ObsT) -> ObsT:
         """Apply transform if one is provided."""
         if self.transform is not None:
             return self.transform(observation)
         return observation
+
+    def close(self) -> None:
+        """Clean up resources used by the environment.
+        
+        Override this method to implement custom cleanup logic.
+        Called when the environment is being destroyed or reset.
+        """
+        pass

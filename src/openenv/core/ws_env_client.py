@@ -18,26 +18,21 @@ import json
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Generic, Optional, Type, TYPE_CHECKING, TypeVar
 
-from .client_types import StepResult
+from .client_types import StepResult, StateT
 from .containers.runtime import LocalDockerProvider
 
 if TYPE_CHECKING:
     from .containers.runtime import ContainerProvider
     from websockets.sync.client import ClientConnection
 
-try:
-    import websockets
-    from websockets.sync.client import connect as ws_connect
-except ImportError:
-    websockets = None  # type: ignore
-    ws_connect = None  # type: ignore
+from websockets.sync.client import connect as ws_connect
 
 ActT = TypeVar("ActT")
 ObsT = TypeVar("ObsT")
 WSEnvClientT = TypeVar("WSEnvClientT", bound="WebSocketEnvClient")
 
 
-class WebSocketEnvClient(ABC, Generic[ActT, ObsT]):
+class WebSocketEnvClient(ABC, Generic[ActT, ObsT, StateT]):
     """
     WebSocket-based environment client for persistent sessions.
 
@@ -78,12 +73,6 @@ class WebSocketEnvClient(ABC, Generic[ActT, ObsT]):
             message_timeout_s: Timeout for receiving responses to messages
             provider: Optional container provider for lifecycle management
         """
-        if websockets is None:
-            raise ImportError(
-                "websockets library is required for WebSocketEnvClient. "
-                "Install with: pip install websockets"
-            )
-
         # Convert HTTP URL to WebSocket URL
         ws_url = base_url.rstrip("/")
         if ws_url.startswith("http://"):
@@ -220,17 +209,17 @@ class WebSocketEnvClient(ABC, Generic[ActT, ObsT]):
         return cls.from_docker_image(image=base_url, provider=provider, **kwargs)
 
     @abstractmethod
-    def _step_payload(self, action: ActT) -> dict:
+    def _step_payload(self, action: ActT) -> Dict[str, Any]:
         """Convert an Action object to the JSON data expected by the env server."""
         raise NotImplementedError
 
     @abstractmethod
-    def _parse_result(self, payload: dict) -> StepResult[ObsT]:
+    def _parse_result(self, payload: Dict[str, Any]) -> StepResult[ObsT]:
         """Convert a JSON response from the env server to StepResult[ObsT]."""
         raise NotImplementedError
 
     @abstractmethod
-    def _parse_state(self, payload: dict) -> Any:
+    def _parse_state(self, payload: Dict[str, Any]) -> StateT:
         """Convert a JSON response from the state endpoint to a State object."""
         raise NotImplementedError
 
@@ -272,7 +261,7 @@ class WebSocketEnvClient(ABC, Generic[ActT, ObsT]):
         response = self._send_and_receive(message)
         return self._parse_result(response.get("data", {}))
 
-    def state(self) -> Any:
+    def state(self) -> StateT:
         """
         Get the current environment state from the server.
 

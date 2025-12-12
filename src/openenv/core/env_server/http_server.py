@@ -20,7 +20,7 @@ import json
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Awaitable, Callable, Dict, Optional, Type, Union, cast
+from typing import Any, Callable, Dict, Optional, Type, Union
 
 from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect, status
 from pydantic import ValidationError
@@ -75,10 +75,13 @@ class HTTPEnvServer:
     Example:
         >>> from core.env_server import HTTPEnvServer
         >>> from envs.coding_env.server import CodeExecutionEnvironment
+        >>> from envs.coding_env.models import CodeAction, CodeObservation
         >>>
         >>> # Pass environment class (factory pattern)
         >>> server = HTTPEnvServer(
         ...     env=CodeExecutionEnvironment,
+        ...     action_cls=CodeAction,
+        ...     observation_cls=CodeObservation,
         ...     max_concurrent_envs=4,
         ... )
         >>>
@@ -144,8 +147,6 @@ class HTTPEnvServer:
             "OPENENV_SKIP_CONCURRENCY_CHECK", ""
         ).lower() in ("1", "true", "yes")
 
-        self.env = env()
-
         # Validate concurrency configuration
         self._validate_concurrency_safety()
 
@@ -164,22 +165,6 @@ class HTTPEnvServer:
         pool_size = int(os.getenv("OPENENV_THREAD_POOL_SIZE", "32"))
         self._executor = ThreadPoolExecutor(max_workers=pool_size)
 
-        self._reset_async: Optional[Callable[..., Awaitable[Observation]]] = None
-        if hasattr(self.env, "reset_async"):
-            reset_method = getattr(self.env, "reset_async")
-            if asyncio.iscoroutinefunction(reset_method):
-                self._reset_async = cast(
-                    Callable[..., Awaitable[Observation]], reset_method
-                )
-
-        self._step_async: Optional[Callable[..., Awaitable[Observation]]] = None
-        if hasattr(self.env, "step_async"):
-            step_method = getattr(self.env, "step_async")
-            if asyncio.iscoroutinefunction(step_method):
-                self._step_async = cast(
-                    Callable[..., Awaitable[Observation]], step_method
-                )
-
     def _validate_concurrency_safety(self) -> None:
         """
         Validate that the environment supports the configured concurrency level.
@@ -194,10 +179,17 @@ class HTTPEnvServer:
         if self._skip_concurrency_check:
             return
 
-        is_concurrency_safe = getattr(self.env, "SUPPORTS_CONCURRENT_SESSIONS", False)
+        if inspect.isclass(self._env_factory):
+            is_concurrency_safe = getattr(self._env_factory, "SUPPORTS_CONCURRENT_SESSIONS", False)
+            env_name = self._env_factory.__name__
+        else:
+            _temp_env = self._env_factory()
+            is_concurrency_safe = getattr(_temp_env, "SUPPORTS_CONCURRENT_SESSIONS", False)
+            env_name = type(_temp_env).__name__
+            _temp_env.close()
+            del _temp_env
 
         if not is_concurrency_safe:
-            env_name = type(self.env).__name__
             raise ConcurrencyConfigurationError(
                 environment_name=env_name,
                 max_concurrent_envs=self._max_concurrent_envs,
@@ -303,17 +295,12 @@ class HTTPEnvServer:
         async with self._session_lock:
             if session_id in self._sessions:
                 env = self._sessions.pop(session_id)
-                if hasattr(env, "close") and callable(getattr(env, "close")):
-                    try:
-                        getattr(env, "close")()
-                    except Exception:
-                        pass
+                env.close()
 
             if session_id in self._session_executors:
                 executor = self._session_executors.pop(session_id)
                 executor.shutdown(wait=False)
 
-            # Remove session metadata
             self._session_info.pop(session_id, None)
 
     def _update_session_activity(
@@ -366,7 +353,15 @@ class HTTPEnvServer:
     @property
     def is_concurrency_safe(self) -> bool:
         """Return whether the environment is marked as concurrency safe."""
-        return getattr(self.env, "SUPPORTS_CONCURRENT_SESSIONS", False)
+        import inspect
+        if inspect.isclass(self._env_factory):
+            return getattr(self._env_factory, "SUPPORTS_CONCURRENT_SESSIONS", False)
+        else:
+            _temp_env = self._env_factory()
+            result = getattr(_temp_env, "SUPPORTS_CONCURRENT_SESSIONS", False)
+            _temp_env.close()
+            del _temp_env
+            return result
 
     @property
     def concurrency_config(self) -> ConcurrencyConfig:
@@ -386,57 +381,64 @@ class HTTPEnvServer:
             request: ResetRequest = Body(default_factory=ResetRequest),
         ) -> ResetResponse:
             """Reset endpoint - returns initial observation."""
-            # Handle optional parameters
-            # Start with all fields from the request, including extra ones
-            kwargs = request.model_dump(exclude_unset=True)
+            _env = self._env_factory()
+            
+            try:
+                kwargs = request.model_dump(exclude_unset=True)
 
-            if self._reset_async:
-                sig = inspect.signature(self._reset_async)
-            else:
-                sig = inspect.signature(self.env.reset)
-            valid_kwargs = self._get_valid_kwargs(sig, kwargs)
+                is_async = _env.reset_async.__func__ is not Environment.reset_async
 
-            if self._reset_async:
-                observation = await self._reset_async(**valid_kwargs)
-            else:
-                observation = await self._run_sync_in_thread_pool(
-                    self.env.reset, **valid_kwargs
-                )
-            return ResetResponse(**serialize_observation(observation))
+                if is_async:
+                    sig = inspect.signature(_env.reset_async)
+                else:
+                    sig = inspect.signature(_env.reset)
+                valid_kwargs = self._get_valid_kwargs(sig, kwargs)
+
+                if is_async:
+                    observation = await _env.reset_async(**valid_kwargs)
+                else:
+                    observation = await self._run_sync_in_thread_pool(
+                        _env.reset, **valid_kwargs
+                    )
+                return ResetResponse(**serialize_observation(observation))
+            finally:
+                _env.close()
 
         # Helper function to handle step endpoint
         async def step_handler(request: StepRequest) -> StepResponse:
             """Step endpoint - executes action and returns observation."""
             action_data = request.action
 
-            # Deserialize action with Pydantic validation
             try:
                 action = deserialize_action(action_data, self.action_cls)
             except ValidationError as e:
-                # Return HTTP 422 with detailed validation errors
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=e.errors()
                 )
 
-            # Handle optional parameters
-            # Start with all fields from the request, including extra ones, but exclude 'action'
-            kwargs = request.model_dump(exclude_unset=True, exclude={"action"})
+            _env = self._env_factory()
+            
+            try:
+                kwargs = request.model_dump(exclude_unset=True, exclude={"action"})
 
-            if self._step_async:
-                sig = inspect.signature(self._step_async)
-            else:
-                sig = inspect.signature(self.env.step)
-            valid_kwargs = self._get_valid_kwargs(sig, kwargs, skip_params={"action"})
+                is_async = _env.step_async.__func__ is not Environment.step_async
 
-            if self._step_async:
-                observation = await self._step_async(action, **valid_kwargs)
-            else:
-                observation = await self._run_sync_in_thread_pool(
-                    self.env.step, action, **valid_kwargs
-                )
+                if is_async:
+                    sig = inspect.signature(_env.step_async)
+                else:
+                    sig = inspect.signature(_env.step)
+                valid_kwargs = self._get_valid_kwargs(sig, kwargs, skip_params={"action"})
 
-            # Return serialized observation
-            return StepResponse(**serialize_observation(observation))
+                if is_async:
+                    observation = await _env.step_async(action, **valid_kwargs)
+                else:
+                    observation = await self._run_sync_in_thread_pool(
+                        _env.step, action, **valid_kwargs
+                    )
+
+                return StepResponse(**serialize_observation(observation))
+            finally:
+                _env.close()
 
         # Register routes using the helpers
         @app.post(
@@ -522,24 +524,36 @@ The response includes:
         async def step(request: StepRequest) -> StepResponse:
             return await step_handler(request)
 
-        # Configure and register GET endpoints declaratively
+        def get_state_handler() -> State:
+            _env = self._env_factory()
+            try:
+                return _env.state
+            finally:
+                _env.close()
+        
+        def get_metadata_handler() -> EnvironmentMetadata:
+            _env = self._env_factory()
+            try:
+                return _env.get_metadata()
+            finally:
+                _env.close()
+
         get_endpoints = [
             GetEndpointConfig(
                 path="/state",
-                handler=lambda: self.env.state,
+                handler=get_state_handler,
                 response_model=State,
                 tag="State Management",
                 summary="Get current environment state",
                 description="""
 Retrieve the current internal state of the environment.
 
-This endpoint allows inspection of the environment state without modifying it.
 The structure of the state object is defined by the environment's State model.
                 """,
             ),
             GetEndpointConfig(
                 path="/metadata",
-                handler=self.env.get_metadata,
+                handler=get_metadata_handler,
                 response_model=EnvironmentMetadata,
                 tag="Environment Info",
                 summary="Get environment metadata",
@@ -686,12 +700,18 @@ all schema information needed to interact with the environment.
                                 continue
 
                             # Handle reset
-                            sig = inspect.signature(session_env.reset)
-                            valid_kwargs = self._get_valid_kwargs(sig, msg.data)
+                            is_async = session_env.reset_async.__func__ is not Environment.reset_async
 
-                            observation = await self._run_in_session_executor(
-                                session_id, session_env.reset, **valid_kwargs
-                            )
+                            if is_async:
+                                sig = inspect.signature(session_env.reset_async)
+                                valid_kwargs = self._get_valid_kwargs(sig, msg.data)
+                                observation = await session_env.reset_async(**valid_kwargs)
+                            else:
+                                sig = inspect.signature(session_env.reset)
+                                valid_kwargs = self._get_valid_kwargs(sig, msg.data)
+                                observation = await self._run_in_session_executor(
+                                    session_id, session_env.reset, **valid_kwargs
+                                )
 
                             self._update_session_activity(session_id)
 
@@ -729,9 +749,14 @@ all schema information needed to interact with the environment.
                                 await websocket.send_text(error_resp.model_dump_json())
                                 continue
 
-                            observation = await self._run_in_session_executor(
-                                session_id, session_env.step, action
-                            )
+                            is_async = session_env.step_async.__func__ is not Environment.step_async
+
+                            if is_async:
+                                observation = await session_env.step_async(action)
+                            else:
+                                observation = await self._run_in_session_executor(
+                                    session_id, session_env.step, action
+                                )
 
                             self._update_session_activity(
                                 session_id, increment_step=True
@@ -803,46 +828,33 @@ all schema information needed to interact with the environment.
             except WebSocketDisconnect:
                 pass
             except SessionCapacityError as e:
-                try:
-                    error_resp = WSErrorResponse(
-                        data={
-                            "message": str(e),
-                            "code": "CAPACITY_REACHED",
-                            "active_sessions": e.active_sessions,
-                            "max_sessions": e.max_sessions,
-                        }
-                    )
-                    await websocket.send_text(error_resp.model_dump_json())
-                except Exception:
-                    pass
+                error_resp = WSErrorResponse(
+                    data={
+                        "message": str(e),
+                        "code": "CAPACITY_REACHED",
+                        "active_sessions": e.active_sessions,
+                        "max_sessions": e.max_sessions,
+                    }
+                )
+                await websocket.send_text(error_resp.model_dump_json())
             except EnvironmentFactoryError as e:
-                try:
-                    error_resp = WSErrorResponse(
-                        data={
-                            "message": str(e),
-                            "code": "FACTORY_ERROR",
-                            "factory_name": e.factory_name,
-                        }
-                    )
-                    await websocket.send_text(error_resp.model_dump_json())
-                except Exception:
-                    pass
+                error_resp = WSErrorResponse(
+                    data={
+                        "message": str(e),
+                        "code": "FACTORY_ERROR",
+                        "factory_name": e.factory_name,
+                    }
+                )
+                await websocket.send_text(error_resp.model_dump_json())
             except Exception as e:
-                try:
-                    error_resp = WSErrorResponse(
-                        data={"message": str(e), "code": "SESSION_ERROR"}
-                    )
-                    await websocket.send_text(error_resp.model_dump_json())
-                except Exception:
-                    pass
+                error_resp = WSErrorResponse(
+                    data={"message": str(e), "code": "SESSION_ERROR"}
+                )
+                await websocket.send_text(error_resp.model_dump_json())
             finally:
-                # Cleanup session
                 if session_id:
                     await self._destroy_session(session_id)
-                try:
-                    await websocket.close()
-                except Exception:
-                    pass
+                await websocket.close()
 
 
 def create_app(
