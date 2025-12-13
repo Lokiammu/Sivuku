@@ -281,10 +281,6 @@ class ConcurrencyConfig(BaseMessage):
         gt=0,
         description="Timeout in seconds for inactive sessions. None means no timeout.",
     )
-    reject_on_capacity: bool = Field(
-        default=True,
-        description="If True, reject new connections when at capacity. If False, queue them.",
-    )
 
 
 class ServerCapacityStatus(BaseMessage):

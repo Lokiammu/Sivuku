@@ -31,7 +31,7 @@ class ConcurrencyConfigurationError(OpenEnvError):
     ):
         self.environment_name = environment_name
         self.max_concurrent_envs = max_concurrent_envs
-        
+
         if message is None:
             message = (
                 f"Environment '{environment_name}' is not marked as SUPPORTS_CONCURRENT_SESSIONS. "
@@ -39,7 +39,7 @@ class ConcurrencyConfigurationError(OpenEnvError):
                 f"Either set max_concurrent_envs=1 or ensure the environment "
                 f"properly isolates session state and set SUPPORTS_CONCURRENT_SESSIONS=True."
             )
-        
+
         super().__init__(message)
 
 
@@ -96,9 +96,10 @@ class SessionCreationError(OpenEnvError):
 class EnvironmentFactoryError(OpenEnvError):
     """Raised when the environment factory fails to create an instance."""
 
-    def __init__(self, factory_name: str):
+    def __init__(self, factory_name: str, message: Optional[str] = None):
         self.factory_name = factory_name
-        
-        message = f"Environment factory '{factory_name}' failed to create instance."
-        
+
+        if message is None:
+            message = f"Environment factory '{factory_name}' failed to create instance."
+
         super().__init__(message)

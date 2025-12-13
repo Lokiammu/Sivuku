@@ -18,6 +18,7 @@ import asyncio
 import inspect
 import json
 import os
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, Optional, Type, Union
@@ -139,14 +140,12 @@ class HTTPEnvServer:
             self._concurrency_config = ConcurrencyConfig(
                 max_concurrent_envs=max_concurrent_envs,
                 session_timeout=None,
-                reject_on_capacity=True,
             )
         else:
             # Default configuration
             self._concurrency_config = ConcurrencyConfig(
                 max_concurrent_envs=1,
                 session_timeout=None,
-                reject_on_capacity=True,
             )
 
         self._max_concurrent_envs = self._concurrency_config.max_concurrent_envs
@@ -165,9 +164,7 @@ class HTTPEnvServer:
 
         # Create thread pool for running sync code in async context
         # This is needed for environments using sync libraries (e.g., Playwright)
-        # Configurable via OPENENV_THREAD_POOL_SIZE (default: 32)
-        pool_size = int(os.getenv("OPENENV_THREAD_POOL_SIZE", "32"))
-        self._executor = ThreadPoolExecutor(max_workers=pool_size)
+        self._executor = ThreadPoolExecutor(max_workers=32)
 
     def _validate_concurrency_safety(self) -> None:
         """
@@ -181,18 +178,16 @@ class HTTPEnvServer:
             return
 
         if inspect.isclass(self._env_factory):
-            is_concurrency_safe = getattr(self._env_factory, "SUPPORTS_CONCURRENT_SESSIONS", False)
-            env_name = self._env_factory.__name__
+            env_cls = self._env_factory
         else:
             _temp_env = self._env_factory()
-            is_concurrency_safe = getattr(_temp_env, "SUPPORTS_CONCURRENT_SESSIONS", False)
-            env_name = type(_temp_env).__name__
+            env_cls = type(_temp_env)
             _temp_env.close()
             del _temp_env
 
-        if not is_concurrency_safe:
+        if not getattr(env_cls, "SUPPORTS_CONCURRENT_SESSIONS", False):
             raise ConcurrencyConfigurationError(
-                environment_name=env_name,
+                environment_name=env_cls.__name__,
                 max_concurrent_envs=self._max_concurrent_envs,
             )
 
@@ -249,22 +244,12 @@ class HTTPEnvServer:
             SessionCapacityError: If max concurrent sessions reached
             EnvironmentFactoryError: If the factory fails to create an environment
         """
-        import time
-
         async with self._session_lock:
             if len(self._sessions) >= self._max_concurrent_envs:
-                if self._concurrency_config.reject_on_capacity:
-                    raise SessionCapacityError(
-                        active_sessions=len(self._sessions),
-                        max_sessions=self._max_concurrent_envs,
-                    )
-                else:
-                    # TODO: Implement queuing mechanism when reject_on_capacity=False
-                    raise SessionCapacityError(
-                        active_sessions=len(self._sessions),
-                        max_sessions=self._max_concurrent_envs,
-                        message="Session queuing not yet implemented",
-                    )
+                raise SessionCapacityError(
+                    active_sessions=len(self._sessions),
+                    max_sessions=self._max_concurrent_envs,
+                )
 
             session_id = str(uuid.uuid4())
             current_time = time.time()
@@ -318,8 +303,6 @@ class HTTPEnvServer:
             session_id: The session ID to update
             increment_step: If True, increment the step count
         """
-        import time
-
         if session_id in self._session_info:
             self._session_info[session_id].last_activity_at = time.time()
             if increment_step:
@@ -580,24 +563,6 @@ version, author, and documentation links.
         ]
         register_get_endpoints(app, get_endpoints)
 
-        # Register concurrency config endpoint
-        @app.get(
-            "/concurrency",
-            response_model=ConcurrencyConfig,
-            tags=["Environment Info"],
-            summary="Get concurrency configuration",
-            description="""
-Get the current concurrency configuration for this server.
-
-Returns information about:
-- **max_concurrent_envs**: Maximum number of concurrent WebSocket sessions
-- **session_timeout**: Timeout in seconds for inactive sessions (None if no timeout)
-- **reject_on_capacity**: Whether to reject or queue connections at capacity
-            """,
-        )
-        async def get_concurrency_config() -> ConcurrencyConfig:
-            """Return concurrency configuration."""
-            return self._concurrency_config
 
         # Register combined schema endpoint
         @app.get(
@@ -654,8 +619,7 @@ all schema information needed to interact with the environment.
             """
             WebSocket endpoint for persistent environment sessions.
 
-            Each WebSocket connection gets its own environment instance (when using
-            factory mode) or shares the single instance (backward compatible mode).
+            Each WebSocket connection gets its own environment instance.
 
             Message Protocol:
             - Client sends: WSResetMessage | WSStepMessage | WSStateMessage | WSCloseMessage
@@ -689,141 +653,83 @@ all schema information needed to interact with the environment.
                     msg_type = message_dict.get("type", "")
 
                     try:
-                        if msg_type == "reset":
-                            # Parse and validate reset message
-                            try:
+                        match msg_type:
+                            case "reset":
                                 msg = WSResetMessage(**message_dict)
-                            except ValidationError as e:
-                                error_resp = WSErrorResponse(
-                                    data={
-                                        "message": "Invalid reset message",
-                                        "code": "VALIDATION_ERROR",
-                                        "errors": e.errors(),
-                                    }
-                                )
-                                await websocket.send_text(error_resp.model_dump_json())
-                                continue
 
-                            # Handle reset
-                            is_async = session_env.reset_async.__func__ is not Environment.reset_async
+                                is_async = session_env.reset_async.__func__ is not Environment.reset_async
 
-                            if is_async:
-                                sig = inspect.signature(session_env.reset_async)
-                                valid_kwargs = self._get_valid_kwargs(sig, msg.data)
-                                observation = await session_env.reset_async(**valid_kwargs)
-                            else:
-                                sig = inspect.signature(session_env.reset)
-                                valid_kwargs = self._get_valid_kwargs(sig, msg.data)
-                                observation = await self._run_in_session_executor(
-                                    session_id, session_env.reset, **valid_kwargs
+                                if is_async:
+                                    sig = inspect.signature(session_env.reset_async)
+                                    valid_kwargs = self._get_valid_kwargs(sig, msg.data)
+                                    observation = await session_env.reset_async(**valid_kwargs)
+                                else:
+                                    sig = inspect.signature(session_env.reset)
+                                    valid_kwargs = self._get_valid_kwargs(sig, msg.data)
+                                    observation = await self._run_in_session_executor(
+                                        session_id, session_env.reset, **valid_kwargs
+                                    )
+
+                                self._update_session_activity(session_id)
+
+                                response = WSObservationResponse(
+                                    data=serialize_observation(observation)
                                 )
 
-                            self._update_session_activity(session_id)
-
-                            response = WSObservationResponse(
-                                data=serialize_observation(observation)
-                            )
-                            await websocket.send_text(response.model_dump_json())
-
-                        elif msg_type == "step":
-                            # Parse and validate step message
-                            try:
+                            case "step":
                                 msg = WSStepMessage(**message_dict)
-                            except ValidationError as e:
-                                error_resp = WSErrorResponse(
-                                    data={
-                                        "message": "Invalid step message",
-                                        "code": "VALIDATION_ERROR",
-                                        "errors": e.errors(),
-                                    }
-                                )
-                                await websocket.send_text(error_resp.model_dump_json())
-                                continue
-
-                            # Deserialize action with Pydantic validation
-                            try:
                                 action = deserialize_action(msg.data, self.action_cls)
-                            except ValidationError as e:
-                                error_resp = WSErrorResponse(
-                                    data={
-                                        "message": str(e),
-                                        "code": "VALIDATION_ERROR",
-                                        "errors": e.errors(),
-                                    }
-                                )
-                                await websocket.send_text(error_resp.model_dump_json())
-                                continue
 
-                            is_async = session_env.step_async.__func__ is not Environment.step_async
+                                is_async = session_env.step_async.__func__ is not Environment.step_async
 
-                            if is_async:
-                                observation = await session_env.step_async(action)
-                            else:
-                                observation = await self._run_in_session_executor(
-                                    session_id, session_env.step, action
+                                if is_async:
+                                    observation = await session_env.step_async(action)
+                                else:
+                                    observation = await self._run_in_session_executor(
+                                        session_id, session_env.step, action
+                                    )
+
+                                self._update_session_activity(
+                                    session_id, increment_step=True
                                 )
 
-                            self._update_session_activity(
-                                session_id, increment_step=True
-                            )
+                                response = WSObservationResponse(
+                                    data=serialize_observation(observation)
+                                )
 
-                            response = WSObservationResponse(
-                                data=serialize_observation(observation)
-                            )
-                            await websocket.send_text(response.model_dump_json())
-
-                        elif msg_type == "state":
-                            # Parse and validate state message
-                            try:
+                            case "state":
                                 msg = WSStateMessage(**message_dict)
-                            except ValidationError as e:
-                                error_resp = WSErrorResponse(
-                                    data={
-                                        "message": "Invalid state message",
-                                        "code": "VALIDATION_ERROR",
-                                        "errors": e.errors(),
-                                    }
-                                )
-                                await websocket.send_text(error_resp.model_dump_json())
-                                continue
+                                state = session_env.state
+                                if hasattr(state, "model_dump"):
+                                    state_data = state.model_dump()
+                                else:
+                                    state_data = dict(state) if state else {}
 
-                            # Handle state request
-                            state = session_env.state
-                            if hasattr(state, "model_dump"):
-                                state_data = state.model_dump()
-                            else:
-                                state_data = dict(state) if state else {}
+                                response = WSStateResponse(data=state_data)
 
-                            response = WSStateResponse(data=state_data)
-                            await websocket.send_text(response.model_dump_json())
-
-                        elif msg_type == "close":
-                            # Parse and validate close message
-                            try:
+                            case "close":
                                 msg = WSCloseMessage(**message_dict)
-                            except ValidationError as e:
-                                error_resp = WSErrorResponse(
+                                break
+
+                            case _:
+                                response = WSErrorResponse(
                                     data={
-                                        "message": "Invalid close message",
-                                        "code": "VALIDATION_ERROR",
-                                        "errors": e.errors(),
+                                        "message": f"Unknown message type: {msg_type}",
+                                        "code": "UNKNOWN_TYPE",
                                     }
                                 )
-                                await websocket.send_text(error_resp.model_dump_json())
-                                continue
 
-                            # Client requested close
-                            break
+                        await websocket.send_text(response.model_dump_json())
 
-                        else:
-                            error_resp = WSErrorResponse(
-                                data={
-                                    "message": f"Unknown message type: {msg_type}",
-                                    "code": "UNKNOWN_TYPE",
-                                }
-                            )
-                            await websocket.send_text(error_resp.model_dump_json())
-
+                    except ValidationError as e:
+                        error_resp = WSErrorResponse(
+                            data={
+                                "message": "Invalid message",
+                                "code": "VALIDATION_ERROR",
+                                "errors": e.errors(),
+                            }
+                        )
+                        await websocket.send_text(error_resp.model_dump_json())
                     except Exception as e:
                         error_resp = WSErrorResponse(
                             data={"message": str(e), "code": "EXECUTION_ERROR"}
@@ -859,7 +765,10 @@ all schema information needed to interact with the environment.
             finally:
                 if session_id:
                     await self._destroy_session(session_id)
-                await websocket.close()
+                try:
+                    await websocket.close()
+                except RuntimeError:
+                    pass
 
 
 def create_app(
