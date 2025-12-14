@@ -94,7 +94,7 @@ class HTTPEnvServer:
 
     def __init__(
         self,
-        env: Union[Callable[[], Environment], Type[Environment]],
+        env: Callable[[], Environment],
         action_cls: Type[Action],
         observation_cls: Type[Observation],
         max_concurrent_envs: Optional[int] = None,
@@ -104,7 +104,7 @@ class HTTPEnvServer:
         Initialize HTTP server wrapper.
 
         Args:
-            env: Environment factory (callable or class) that creates new instances.
+            env: Environment factory (callable) that creates new instances.
                  Will be called to create a new environment for each WebSocket session.
             action_cls: The Action subclass this environment expects
             observation_cls: The Observation subclass this environment returns
@@ -772,7 +772,7 @@ all schema information needed to interact with the environment.
 
 
 def create_app(
-    env: Union[Callable[[], Environment], Type[Environment]],
+    env: Callable[[], Environment],
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     env_name: Optional[str] = None,
@@ -786,7 +786,7 @@ def create_app(
     including README integration for better user experience.
 
     Args:
-        env: Environment factory (callable or class) that creates new instances
+        env: Environment factory (callable) that creates new instances
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         env_name: Optional environment name for README loading
@@ -826,7 +826,7 @@ def create_app(
 
 
 def create_fastapi_app(
-    env: Union[Callable[[], Environment], Type[Environment]],
+    env: Callable[[], Environment],
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     max_concurrent_envs: Optional[int] = None,
@@ -836,7 +836,7 @@ def create_fastapi_app(
     Create a FastAPI application with comprehensive documentation.
 
     Args:
-        env: Environment factory (callable or class) that creates new instances
+        env: Environment factory (callable) that creates new instances
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         max_concurrent_envs: Maximum concurrent WebSocket sessions.

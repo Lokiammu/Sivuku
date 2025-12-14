@@ -20,6 +20,7 @@ from typing import Any, Dict, Generic, Optional, Type, TYPE_CHECKING, TypeVar
 
 from .client_types import StepResult, StateT
 from .containers.runtime import LocalDockerProvider
+from .utils import convert_to_ws_url
 
 if TYPE_CHECKING:
     from .containers.runtime import ContainerProvider
@@ -74,13 +75,7 @@ class WebSocketEnvClient(ABC, Generic[ActT, ObsT, StateT]):
             provider: Optional container provider for lifecycle management
         """
         # Convert HTTP URL to WebSocket URL
-        ws_url = base_url.rstrip("/")
-        if ws_url.startswith("http://"):
-            ws_url = "ws://" + ws_url[7:]
-        elif ws_url.startswith("https://"):
-            ws_url = "wss://" + ws_url[8:]
-        elif not ws_url.startswith("ws://") and not ws_url.startswith("wss://"):
-            ws_url = "ws://" + ws_url
+        ws_url = convert_to_ws_url(base_url)
 
         self._ws_url = f"{ws_url}/ws"
         self._connect_timeout = connect_timeout_s

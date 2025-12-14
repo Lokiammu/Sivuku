@@ -235,7 +235,7 @@ class WebInterfaceManager:
 
 
 def create_web_interface_app(
-    env: Union[Callable[[], Environment], Type[Environment]],
+    env: Callable[[], Environment],
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     env_name: Optional[str] = None,
@@ -246,7 +246,7 @@ def create_web_interface_app(
     Create a FastAPI application with web interface for the given environment.
 
     Args:
-        env: Environment factory (callable or class) that creates new instances
+        env: Environment factory (callable) that creates new instances
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         env_name: Optional environment name for README loading
