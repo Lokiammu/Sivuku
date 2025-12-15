@@ -8,8 +8,7 @@
 HTTP server wrapper for Environment instances.
 
 This module provides utilities to wrap any Environment subclass and expose it
-over HTTP endpoints that HTTPEnvClient can consume. Also supports WebSocket
-connections for persistent sessions with multi-environment concurrency.
+over HTTP and WebSocket endpoints that EnvClient can consume.
 """
 
 from __future__ import annotations
@@ -66,8 +65,7 @@ class HTTPEnvServer:
     HTTP server wrapper for Environment instances.
 
     This class wraps an Environment and exposes its reset(), step(), and state
-    methods as HTTP endpoints compatible with HTTPEnvClient. Also supports
-    WebSocket connections for persistent sessions with multi-environment concurrency.
+    methods as HTTP and WebSocket endpoints compatible with EnvClient.
 
     The server expects:
     - Action deserialization: Converts JSON dict to Action subclass
