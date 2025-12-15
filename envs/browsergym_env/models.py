@@ -5,13 +5,13 @@ benchmarks including MiniWoB (training), WebArena (evaluation), VisualWebArena,
 and more under a single Gymnasium-compatible API.
 """
 
-from dataclasses import dataclass
 from typing import List, Optional
+
+from pydantic import Field
 
 from openenv.core.env_server.types import Action, Observation, State
 
 
-@dataclass(kw_only=True)
 class BrowserGymAction(Action):
     """Action to be executed in the BrowserGym environment.
 
@@ -26,11 +26,9 @@ class BrowserGymAction(Action):
     - "send_keys('Enter')"
     """
 
-    action_str: str
-    """Natural language action string (e.g., "click('Submit')")"""
+    action_str: str = Field(..., description="Natural language action string (e.g., \"click('Submit')\")")
 
 
-@dataclass(kw_only=True)
 class BrowserGymObservation(Observation):
     """Observation returned from the BrowserGym environment.
 
@@ -38,55 +36,42 @@ class BrowserGymObservation(Observation):
     or DOM), visual (screenshot), and page metadata.
     """
 
-    text: str = ""
-    """Text representation of the page (accessibility tree or DOM)"""
+    text: str = Field(default="", description="Text representation of the page (accessibility tree or DOM)")
 
-    url: str = ""
-    """Current URL of the page"""
+    url: str = Field(default="", description="Current URL of the page")
 
-    screenshot: Optional[List[List[List[int]]]] = None
-    """Screenshot as numpy array [height, width, channels] (if visual observation enabled)"""
+    screenshot: Optional[List[List[List[int]]]] = Field(
+        default=None,
+        description="Screenshot as numpy array [height, width, channels] (if visual observation enabled)"
+    )
 
-    goal: str = ""
-    """Task goal/instruction for the current episode"""
+    goal: str = Field(default="", description="Task goal/instruction for the current episode")
 
-    axtree_txt: str = ""
-    """Full accessibility tree as text"""
+    axtree_txt: str = Field(default="", description="Full accessibility tree as text")
 
-    pruned_html: str = ""
-    """Pruned HTML content (interactive elements only)"""
+    pruned_html: str = Field(default="", description="Pruned HTML content (interactive elements only)")
 
-    error: str = ""
-    """Error message if action execution failed"""
+    error: str = Field(default="", description="Error message if action execution failed")
 
-    last_action_error: bool = False
-    """Whether the last action resulted in an error"""
+    last_action_error: bool = Field(default=False, description="Whether the last action resulted in an error")
 
 
-@dataclass
 class BrowserGymState(State):
     """State of the BrowserGym environment.
 
     Tracks the current benchmark, task, and progress through an episode.
     """
 
-    benchmark: str = ""
-    """Benchmark name (e.g., 'miniwob', 'webarena', 'visualwebarena')"""
+    benchmark: str = Field(default="", description="Benchmark name (e.g., 'miniwob', 'webarena', 'visualwebarena')")
 
-    task_name: str = ""
-    """Specific task within the benchmark (e.g., 'click-test', 'click-button')"""
+    task_name: str = Field(default="", description="Specific task within the benchmark (e.g., 'click-test', 'click-button')")
 
-    task_id: Optional[str] = None
-    """Task ID for evaluation benchmarks (e.g., WebArena task number)"""
+    task_id: Optional[str] = Field(default=None, description="Task ID for evaluation benchmarks (e.g., WebArena task number)")
 
-    goal: str = ""
-    """Task goal/instruction"""
+    goal: str = Field(default="", description="Task goal/instruction")
 
-    current_url: str = ""
-    """Current URL of the active page"""
+    current_url: str = Field(default="", description="Current URL of the active page")
 
-    max_steps: Optional[int] = None
-    """Maximum steps allowed for this task"""
+    max_steps: Optional[int] = Field(default=None, description="Maximum steps allowed for this task")
 
-    cum_reward: float = 0.0
-    """Cumulative reward for the current episode"""
+    cum_reward: float = Field(default=0.0, description="Cumulative reward for the current episode")
