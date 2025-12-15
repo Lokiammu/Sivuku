@@ -155,15 +155,15 @@ result = __ENV_NAME__env.step(__ENV_CLASS_NAME__Action(message="Hello!"))
 
 Note: When connecting to an existing server, `__ENV_NAME__env.close()` will NOT stop the server.
 
-### WebSocket Client for Persistent Sessions
+### Using the Context Manager
 
-For long-running episodes or when you need lower latency, use the WebSocket client:
+The client supports context manager usage for automatic connection management:
 
 ```python
-from __ENV_NAME__ import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__EnvWS
+from __ENV_NAME__ import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Env
 
-# Connect via WebSocket (maintains persistent connection)
-with __ENV_CLASS_NAME__EnvWS(base_url="http://localhost:8000") as env:
+# Connect with context manager (auto-connects and closes)
+with __ENV_CLASS_NAME__Env(base_url="http://localhost:8000") as env:
     result = env.reset()
     print(f"Reset: {result.observation.echoed_message}")
     # Multiple steps with low latency
@@ -172,7 +172,7 @@ with __ENV_CLASS_NAME__EnvWS(base_url="http://localhost:8000") as env:
         print(f"Echoed: {result.observation.echoed_message}")
 ```
 
-WebSocket advantages:
+The client uses WebSocket connections for:
 - **Lower latency**: No HTTP connection overhead per request
 - **Persistent session**: Server maintains your environment state
 - **Efficient for episodes**: Better for many sequential steps
@@ -195,11 +195,11 @@ app = create_app(
 Then multiple clients can connect simultaneously:
 
 ```python
-from __ENV_NAME__ import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__EnvWS
+from __ENV_NAME__ import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Env
 from concurrent.futures import ThreadPoolExecutor
 
 def run_episode(client_id: int):
-    with __ENV_CLASS_NAME__EnvWS(base_url="http://localhost:8000") as env:
+    with __ENV_CLASS_NAME__Env(base_url="http://localhost:8000") as env:
         result = env.reset()
         for i in range(10):
             result = env.step(__ENV_CLASS_NAME__Action(message=f"Client {client_id}, step {i}"))
@@ -245,7 +245,7 @@ __ENV_NAME__/
 ├── openenv.yaml           # OpenEnv manifest
 ├── pyproject.toml         # Project metadata and dependencies
 ├── uv.lock                # Locked dependencies (generated)
-├── client.py              # __ENV_CLASS_NAME__Env (HTTP) and __ENV_CLASS_NAME__EnvWS (WebSocket) clients
+├── client.py              # __ENV_CLASS_NAME__Env client
 ├── models.py              # Action and Observation models
 └── server/
     ├── __init__.py        # Server module exports

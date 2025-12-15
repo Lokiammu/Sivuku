@@ -8,7 +8,7 @@
 FastAPI application for the __ENV_TITLE_NAME__ Environment.
 
 This module creates an HTTP server that exposes the __ENV_CLASS_NAME__Environment
-over HTTP and WebSocket endpoints, compatible with HTTPEnvClient and WebSocketEnvClient.
+over HTTP and WebSocket endpoints, compatible with EnvClient.
 
 Endpoints:
     - POST /reset: Reset the environment
