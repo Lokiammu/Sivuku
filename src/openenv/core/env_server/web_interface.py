@@ -13,7 +13,9 @@ including a two-pane layout for HumanAgent interaction and state observation.
 
 from __future__ import annotations
 
+import asyncio
 import json
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Type
 from datetime import datetime
 
@@ -152,6 +154,17 @@ class WebInterfaceManager:
             episode_id=None, step_count=0, current_observation=None, action_logs=[]
         )
         self.connected_clients: List[WebSocket] = []
+        # Thread pool for running sync code (e.g., Playwright sync API) in async context
+        self._executor = ThreadPoolExecutor(max_workers=1)
+
+    async def _run_sync_in_thread_pool(self, func, *args, **kwargs):
+        """Run a synchronous function in the thread pool executor.
+        
+        This is needed for environments using sync libraries (e.g., Playwright sync API)
+        that cannot be called directly from an async context.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(self._executor, lambda: func(*args, **kwargs))
 
     async def connect_websocket(self, websocket: WebSocket):
         """Connect a new WebSocket client."""
@@ -190,7 +203,9 @@ class WebInterfaceManager:
 
     async def reset_environment(self) -> Dict[str, Any]:
         """Reset the environment and update state."""
-        observation: Observation = self.env.reset()
+        # Run sync reset in thread pool to avoid blocking event loop
+        # and to support environments using sync libraries (e.g., Playwright)
+        observation: Observation = await self._run_sync_in_thread_pool(self.env.reset)
         state: State = self.env.state
 
         # Serialize observation once using shared utility
@@ -215,8 +230,11 @@ class WebInterfaceManager:
             action_data, self.action_cls
         )
 
-        # Execute step
-        observation: Observation = self.env.step(action)
+        # Run sync step in thread pool to avoid blocking event loop
+        # and to support environments using sync libraries (e.g., Playwright)
+        observation: Observation = await self._run_sync_in_thread_pool(
+            self.env.step, action
+        )
         state: State = self.env.state
 
         # Serialize observation once using shared utility
