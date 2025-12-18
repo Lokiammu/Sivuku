@@ -15,7 +15,9 @@ from envs.browsergym_env.client import BrowserGymEnv
 from envs.browsergym_env.models import BrowserGymAction
 
 # Skip all tests if gunicorn is not installed
-pytestmark = pytest.mark.skipif(shutil.which("gunicorn") is None, reason="gunicorn not installed")
+pytestmark = pytest.mark.skipif(
+    shutil.which("gunicorn") is None, reason="gunicorn not installed"
+)
 
 
 @pytest.fixture(scope="module")
@@ -208,7 +210,9 @@ def test_action_with_metadata(server):
     env = BrowserGymEnv(base_url=server, request_timeout_s=60)
     env.reset()
 
-    action = BrowserGymAction(action_str="click('button')", metadata={"test": "value", "number": 42})
+    action = BrowserGymAction(
+        action_str="click('button')", metadata={"test": "value", "number": 42}
+    )
     result = env.step(action)
 
     assert result.observation is not None

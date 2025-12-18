@@ -100,7 +100,9 @@ class GitServerClient:
         gitconfig_path.write_text(git_config)
 
         # Git credentials
-        git_credentials = f"http://{self.username}:{self.password}@{self.domain}:{self.port}\n"
+        git_credentials = (
+            f"http://{self.username}:{self.password}@{self.domain}:{self.port}\n"
+        )
         gitcreds_path = home_dir / ".git-credentials"
         gitcreds_path.write_text(git_credentials)
         gitcreds_path.chmod(0o600)
@@ -272,7 +274,12 @@ class GitServerClient:
             raise RuntimeError(f"Checkout failed: {result.stderr}")
 
         result = subprocess.run(
-            ["git", "reset", "--hard", f"origin/{commit}" if commit != "main" else commit],
+            [
+                "git",
+                "reset",
+                "--hard",
+                f"origin/{commit}" if commit != "main" else commit,
+            ],
             cwd=str(repo_path),
             capture_output=True,
             text=True,

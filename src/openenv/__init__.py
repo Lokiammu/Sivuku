@@ -10,6 +10,3 @@ try:
     __version__ = metadata.version("openenv")  # type: ignore[arg-type]
 except metadata.PackageNotFoundError:  # pragma: no cover - local dev
     __version__ = "0.0.0"
-
-
-

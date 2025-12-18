@@ -1,4 +1,4 @@
-#tests/envs/test_dipg_environment.py
+# tests/envs/test_dipg_environment.py
 import os
 import shutil
 import sys
@@ -15,8 +15,7 @@ from envs.dipg_safety_env.models import DIPGAction
 
 # Skip all tests if gunicorn is not installed
 pytestmark = pytest.mark.skipif(
-    shutil.which("gunicorn") is None,
-    reason="gunicorn not installed"
+    shutil.which("gunicorn") is None, reason="gunicorn not installed"
 )
 
 
@@ -26,7 +25,9 @@ def server():
     # --- Define Absolute Paths & Port ---
     ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     SRC_PATH = os.path.join(ROOT_DIR, "src")
-    DATASET_SOURCE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "mock_dataset.jsonl"))
+    DATASET_SOURCE_PATH = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "mock_dataset.jsonl")
+    )
     PORT = 8009
 
     # --- Launch the Server using Gunicorn ---
@@ -41,15 +42,20 @@ def server():
 
     gunicorn_command = [
         "gunicorn",
-        "-w", "4",
-        "-k", "uvicorn.workers.UvicornWorker",
-        "-b", f"0.0.0.0:{PORT}",
+        "-w",
+        "4",
+        "-k",
+        "uvicorn.workers.UvicornWorker",
+        "-b",
+        f"0.0.0.0:{PORT}",
         "envs.dipg_safety_env.server.app:app",
     ]
     openenv_process = subprocess.Popen(
         gunicorn_command,
         env=server_env,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
 
     # --- Wait and Verify ---
@@ -63,7 +69,7 @@ def server():
                 print("✅ Server is running and healthy!")
                 break
         except requests.exceptions.RequestException:
-            print(f"Attempt {i+1}/12: Server not ready, waiting 10 seconds...")
+            print(f"Attempt {i + 1}/12: Server not ready, waiting 10 seconds...")
             time.sleep(10)
 
     if not is_healthy:
@@ -86,6 +92,7 @@ def server():
     except ProcessLookupError:
         print("✅ Server process was already killed.")
 
+
 def test_reset(server):
     """Test that reset() returns a valid observation."""
     env = DIPGSafetyEnv(base_url=server, timeout=300)
@@ -93,14 +100,18 @@ def test_reset(server):
     obs2 = env.reset()
     assert obs1.observation.question != obs2.observation.question
 
+
 def test_step(server):
     """Test that step() returns a valid result."""
     env = DIPGSafetyEnv(base_url=server, timeout=300)
     env.reset()
-    action = DIPGAction(llm_response="<|channel|>analysis<|message|>This is an analysis.<|end|>\n<|channel|>final<|message|>This is the final answer.<|end|>")
+    action = DIPGAction(
+        llm_response="<|channel|>analysis<|message|>This is an analysis.<|end|>\n<|channel|>final<|message|>This is the final answer.<|end|>"
+    )
     result = env.step(action)
     assert isinstance(result.reward, float)
     assert result.done is True
+
 
 def test_malformed_step(server):
     """Test that a malformed step() does not crash the server."""

@@ -34,7 +34,8 @@ def test_convert_messages_coalesces_consecutive_characters():
 
 
 @pytest.mark.skipif(
-    not pytest.importorskip("textarena", reason="textarena not installed"), reason="textarena not installed"
+    not pytest.importorskip("textarena", reason="textarena not installed"),
+    reason="textarena not installed",
 )
 def test_wordle_reset_clears_accumulated_state():
     """Test that resetting Wordle environment clears accumulated observation state.
@@ -67,8 +68,12 @@ def test_wordle_reset_clears_accumulated_state():
     prompt3_len = len(obs3.prompt)
 
     # All prompts should be the same length (no accumulation)
-    assert prompt1_len == prompt2_len, f"Episode 2 accumulated state: {prompt1_len} -> {prompt2_len}"
-    assert prompt2_len == prompt3_len, f"Episode 3 accumulated state: {prompt2_len} -> {prompt3_len}"
+    assert prompt1_len == prompt2_len, (
+        f"Episode 2 accumulated state: {prompt1_len} -> {prompt2_len}"
+    )
+    assert prompt2_len == prompt3_len, (
+        f"Episode 3 accumulated state: {prompt2_len} -> {prompt3_len}"
+    )
 
     # Verify the prompts are actually the same content
     assert obs1.prompt == obs2.prompt

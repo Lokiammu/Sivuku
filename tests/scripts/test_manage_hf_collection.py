@@ -143,7 +143,9 @@ class TestDiscoverOpenenvSpaces:
         assert "owner2/openenv-space2" in result
 
         # Verify list_spaces was called with correct parameters
-        mock_list_spaces.assert_called_once_with(search="openenv", full=False, sort="trending_score", direction=-1)
+        mock_list_spaces.assert_called_once_with(
+            search="openenv", full=False, sort="trending_score", direction=-1
+        )
 
     @patch("manage_hf_collection.list_spaces")
     def test_discover_openenv_spaces_filters_non_docker(self, mock_list_spaces):
@@ -260,7 +262,9 @@ class TestAddSpacesToCollection:
         """Test adding empty list of spaces."""
         mock_api = Mock()
 
-        result = manage_hf_collection.add_spaces_to_collection(mock_api, [], dry_run=False)
+        result = manage_hf_collection.add_spaces_to_collection(
+            mock_api, [], dry_run=False
+        )
 
         assert result == 0
         mock_api.add_collection_item.assert_not_called()
@@ -270,7 +274,9 @@ class TestAddSpacesToCollection:
         mock_api = Mock()
         space_ids = ["owner1/space1", "owner2/space2"]
 
-        result = manage_hf_collection.add_spaces_to_collection(mock_api, space_ids, dry_run=True)
+        result = manage_hf_collection.add_spaces_to_collection(
+            mock_api, space_ids, dry_run=True
+        )
 
         assert result == 2
         mock_api.add_collection_item.assert_not_called()
@@ -280,14 +286,19 @@ class TestAddSpacesToCollection:
         mock_api = Mock()
         space_ids = ["owner1/space1", "owner2/space2"]
 
-        result = manage_hf_collection.add_spaces_to_collection(mock_api, space_ids, dry_run=False)
+        result = manage_hf_collection.add_spaces_to_collection(
+            mock_api, space_ids, dry_run=False
+        )
 
         assert result == 2
         assert mock_api.add_collection_item.call_count == 2
 
         # Verify calls were made with correct parameters
         calls = mock_api.add_collection_item.call_args_list
-        assert calls[0][1]["collection_slug"] == "openenv/environment-hub-68f16377abea1ea114fa0743"
+        assert (
+            calls[0][1]["collection_slug"]
+            == "openenv/environment-hub-68f16377abea1ea114fa0743"
+        )
         assert calls[0][1]["item_id"] == "owner1/space1"
         assert calls[0][1]["item_type"] == "space"
 
@@ -301,7 +312,9 @@ class TestAddSpacesToCollection:
 
         space_ids = ["owner1/space1"]
 
-        result = manage_hf_collection.add_spaces_to_collection(mock_api, space_ids, dry_run=False)
+        result = manage_hf_collection.add_spaces_to_collection(
+            mock_api, space_ids, dry_run=False
+        )
 
         # Should not count as success, but should not crash
         assert result == 0
@@ -318,7 +331,9 @@ class TestAddSpacesToCollection:
 
         space_ids = ["owner1/space1", "owner2/space2"]
 
-        result = manage_hf_collection.add_spaces_to_collection(mock_api, space_ids, dry_run=False)
+        result = manage_hf_collection.add_spaces_to_collection(
+            mock_api, space_ids, dry_run=False
+        )
 
         assert result == 1  # Only first one succeeded
 
@@ -331,7 +346,9 @@ class TestMain:
     @patch("manage_hf_collection.discover_openenv_spaces")
     @patch("manage_hf_collection.add_spaces_to_collection")
     @patch("sys.argv", ["manage_hf_collection.py", "--dry-run"])
-    def test_main_dry_run(self, mock_add_spaces, mock_discover, mock_get_collection, mock_setup_api):
+    def test_main_dry_run(
+        self, mock_add_spaces, mock_discover, mock_get_collection, mock_setup_api
+    ):
         """Test main function in dry-run mode."""
         mock_api = Mock()
         mock_setup_api.return_value = mock_api
@@ -351,7 +368,9 @@ class TestMain:
     @patch("manage_hf_collection.discover_openenv_spaces")
     @patch("manage_hf_collection.add_spaces_to_collection")
     @patch("sys.argv", ["manage_hf_collection.py"])
-    def test_main_finds_new_spaces(self, mock_add_spaces, mock_discover, mock_get_collection, mock_setup_api):
+    def test_main_finds_new_spaces(
+        self, mock_add_spaces, mock_discover, mock_get_collection, mock_setup_api
+    ):
         """Test main function correctly identifies new spaces."""
         mock_api = Mock()
         mock_setup_api.return_value = mock_api
@@ -371,7 +390,9 @@ class TestMain:
     @patch("manage_hf_collection.discover_openenv_spaces")
     @patch("manage_hf_collection.add_spaces_to_collection")
     @patch("sys.argv", ["manage_hf_collection.py", "--verbose"])
-    def test_main_verbose(self, mock_add_spaces, mock_discover, mock_get_collection, mock_setup_api):
+    def test_main_verbose(
+        self, mock_add_spaces, mock_discover, mock_get_collection, mock_setup_api
+    ):
         """Test main function with verbose logging."""
         mock_api = Mock()
         mock_setup_api.return_value = mock_api
@@ -393,7 +414,9 @@ class TestIdempotency:
     @patch("manage_hf_collection.discover_openenv_spaces")
     @patch("manage_hf_collection.add_spaces_to_collection")
     @patch("sys.argv", ["manage_hf_collection.py"])
-    def test_no_new_spaces_does_nothing(self, mock_add_spaces, mock_discover, mock_get_collection, mock_setup_api):
+    def test_no_new_spaces_does_nothing(
+        self, mock_add_spaces, mock_discover, mock_get_collection, mock_setup_api
+    ):
         """Test that running with no new spaces makes no changes."""
         mock_api = Mock()
         mock_setup_api.return_value = mock_api

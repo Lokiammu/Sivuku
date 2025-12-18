@@ -24,7 +24,7 @@ def test_browser_gym_action_with_metadata():
     """Test creating a BrowserGymAction with metadata."""
     action = BrowserGymAction(
         action_str="fill('username', 'john')",
-        metadata={"user": "test", "timestamp": 123456}
+        metadata={"user": "test", "timestamp": 123456},
     )
     assert action.action_str == "fill('username', 'john')"
     assert action.metadata["user"] == "test"

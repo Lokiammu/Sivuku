@@ -95,7 +95,9 @@ def run_server(
         else:
             # Print stderr for debugging
             stderr = process.stderr.read().decode() if process.stderr else ""
-            raise TimeoutError(f"Server failed to start within {startup_timeout}s. Stderr: {stderr}")
+            raise TimeoutError(
+                f"Server failed to start within {startup_timeout}s. Stderr: {stderr}"
+            )
 
         yield process
 
@@ -242,7 +244,9 @@ class TestProtocolHttpEndpoints:
         requests.post(f"{echo_server}/reset", json={})
 
         # Then step
-        response = requests.post(f"{echo_server}/step", json={"action": {"message": "Hello"}})
+        response = requests.post(
+            f"{echo_server}/step", json={"action": {"message": "Hello"}}
+        )
         assert response.status_code == 200
         data = response.json()
         assert "observation" in data
@@ -341,10 +345,16 @@ class TestConcurrencyMultipleSessions:
     def echo_server_concurrent(self):
         """Start echo environment server with concurrent sessions enabled."""
         # Pass MAX_CONCURRENT_ENVS env var to enable multiple sessions
-        with run_server("envs.echo_env.server.app", port=8102, env_vars={"MAX_CONCURRENT_ENVS": "10"}) as proc:
+        with run_server(
+            "envs.echo_env.server.app",
+            port=8102,
+            env_vars={"MAX_CONCURRENT_ENVS": "10"},
+        ) as proc:
             yield "http://127.0.0.1:8102"
 
-    @pytest.mark.skip(reason="Concurrency requires server configuration - run manually with MAX_CONCURRENT_ENVS > 1")
+    @pytest.mark.skip(
+        reason="Concurrency requires server configuration - run manually with MAX_CONCURRENT_ENVS > 1"
+    )
     def test_concurrency_two_independent_sessions(self, echo_server_concurrent):
         """Test that two clients can run independently."""
         from envs.echo_env.client import EchoEnv
@@ -370,7 +380,9 @@ class TestConcurrencyMultipleSessions:
                 assert state1.step_count == 3
                 assert state2.step_count == 1
 
-    @pytest.mark.skip(reason="Concurrency requires server configuration - run manually with MAX_CONCURRENT_ENVS > 1")
+    @pytest.mark.skip(
+        reason="Concurrency requires server configuration - run manually with MAX_CONCURRENT_ENVS > 1"
+    )
     def test_concurrency_session_isolation(self, echo_server_concurrent):
         """Test that session state is isolated between clients."""
         from envs.echo_env.client import EchoEnv

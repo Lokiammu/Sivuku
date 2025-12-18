@@ -65,8 +65,7 @@ def validate_env_structure(env_dir: Path, strict: bool = False) -> List[str]:
 
     if not has_pyproject:
         raise FileNotFoundError(
-            "No dependency specification found. "
-            "'pyproject.toml' is required."
+            "No dependency specification found. 'pyproject.toml' is required."
         )
 
     # Warnings for recommended structure
@@ -75,4 +74,3 @@ def validate_env_structure(env_dir: Path, strict: bool = False) -> List[str]:
         warnings.append("Recommended directory missing: outputs/")
 
     return warnings
-

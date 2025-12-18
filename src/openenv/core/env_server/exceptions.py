@@ -18,7 +18,7 @@ class OpenEnvError(Exception):
 class ConcurrencyConfigurationError(OpenEnvError):
     """
     Raised when an environment is misconfigured for concurrent sessions.
-    
+
     This error is raised during server startup when max_concurrent_envs > 1
     is specified for an environment that is not marked as SUPPORTS_CONCURRENT_SESSIONS.
     """
@@ -46,7 +46,7 @@ class ConcurrencyConfigurationError(OpenEnvError):
 class SessionCapacityError(OpenEnvError):
     """
     Raised when the server cannot accept new sessions due to capacity limits.
-    
+
     This error is raised when a new WebSocket connection is attempted but
     the server has already reached max_concurrent_envs active sessions.
     """
@@ -59,13 +59,13 @@ class SessionCapacityError(OpenEnvError):
     ):
         self.active_sessions = active_sessions
         self.max_sessions = max_sessions
-        
+
         if message is None:
             message = (
                 f"Server at capacity: {active_sessions}/{max_sessions} sessions active. "
                 f"Cannot accept new connections."
             )
-        
+
         super().__init__(message)
 
 
@@ -74,10 +74,10 @@ class SessionNotFoundError(OpenEnvError):
 
     def __init__(self, session_id: str, message: Optional[str] = None):
         self.session_id = session_id
-        
+
         if message is None:
             message = f"Session '{session_id}' not found."
-        
+
         super().__init__(message)
 
 
@@ -86,10 +86,10 @@ class SessionCreationError(OpenEnvError):
 
     def __init__(self, reason: str, message: Optional[str] = None):
         self.reason = reason
-        
+
         if message is None:
             message = f"Failed to create session: {reason}"
-        
+
         super().__init__(message)
 
 
