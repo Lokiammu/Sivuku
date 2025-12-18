@@ -10,6 +10,8 @@ Data models for the Echo Environment.
 The Echo environment is a simple test environment that echoes back messages.
 """
 
+from pydantic import Field
+
 # Support both in-repo and standalone imports
 try:
     # In-repo imports (when running from OpenEnv repository)
@@ -22,11 +24,11 @@ except ImportError:
 class EchoAction(Action):
     """Action for the Echo environment - just a message to echo."""
 
-    message: str
+    message: str = Field(..., min_length=1, description="Message to echo back")
 
 
 class EchoObservation(Observation):
     """Observation from the Echo environment - the echoed message."""
 
-    echoed_message: str
-    message_length: int = 0
+    echoed_message: str = Field(..., description="The echoed message from the environment")
+    message_length: int = Field(default=0, ge=0, description="Length of the echoed message")

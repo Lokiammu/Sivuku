@@ -9,7 +9,7 @@ with OpenEnv's Environment ABC. BrowserGym includes multiple benchmarks:
 """
 
 import importlib
-import os
+import logging
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -21,6 +21,57 @@ from browsergym_env.models import (
     BrowserGymObservation,
     BrowserGymState,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _get_axtree_txt(obs: Dict[str, Any]) -> str:
+    """Extract accessibility tree text from BrowserGym observation.
+
+    BrowserGym returns raw `axtree_object` which needs to be converted to text
+    using the `flatten_axtree_to_str` utility function.
+    """
+    # If already processed as text, return directly
+    if "axtree_txt" in obs and obs["axtree_txt"]:
+        return obs["axtree_txt"]
+
+    # Try to convert from raw axtree_object
+    if "axtree_object" in obs and obs["axtree_object"]:
+        try:
+            from browsergym.utils.obs import flatten_axtree_to_str
+
+            return flatten_axtree_to_str(obs["axtree_object"])
+        except ImportError:
+            logger.warning("browsergym.utils.obs not available, cannot convert axtree_object to text")
+        except Exception as e:
+            logger.warning(f"Failed to convert axtree_object to text: {e}")
+
+    return ""
+
+
+def _get_pruned_html(obs: Dict[str, Any]) -> str:
+    """Extract pruned HTML from BrowserGym observation.
+
+    BrowserGym returns raw `dom_object` which needs to be converted to text
+    and then pruned using the `flatten_dom_to_str` and `prune_html` utilities.
+    """
+    # If already processed as pruned_html, return directly
+    if "pruned_html" in obs and obs["pruned_html"]:
+        return obs["pruned_html"]
+
+    # Try to convert from raw dom_object
+    if "dom_object" in obs and obs["dom_object"]:
+        try:
+            from browsergym.utils.obs import flatten_dom_to_str, prune_html
+
+            dom_str = flatten_dom_to_str(obs["dom_object"])
+            return prune_html(dom_str)
+        except ImportError:
+            logger.warning("browsergym.utils.obs not available, cannot convert dom_object to pruned_html")
+        except Exception as e:
+            logger.warning(f"Failed to convert dom_object to pruned_html: {e}")
+
+    return ""
 
 
 _MINIWOB_LOAD_HELP = (
@@ -193,9 +244,7 @@ class BrowserGymEnvironment(Environment):
 
         # Execute action in gym environment
         try:
-            obs, reward, terminated, truncated, info = self.gym_env.step(
-                action.action_str
-            )
+            obs, reward, terminated, truncated, info = self.gym_env.step(action.action_str)
 
             self._last_obs = obs
             self._last_info = info
@@ -241,26 +290,42 @@ class BrowserGymEnvironment(Environment):
         Returns:
             BrowserGymObservation
         """
-        # Extract text observation (could be AXTree, DOM, or other)
-        text = ""
-        if "axtree_txt" in obs:
-            text = obs["axtree_txt"]
-        elif "pruned_html" in obs:
-            text = obs["pruned_html"]
-        elif "dom_txt" in obs:
-            text = obs["dom_txt"]
-        elif isinstance(obs, str):
+        # Generate text representations from raw BrowserGym objects
+        # BrowserGym returns axtree_object and dom_object which need conversion
+        axtree_txt = _get_axtree_txt(obs) if isinstance(obs, dict) else ""
+        pruned_html = _get_pruned_html(obs) if isinstance(obs, dict) else ""
+
+        # Extract text observation - prefer axtree_txt, fallback to pruned_html
+        text = axtree_txt or pruned_html
+        if not text and isinstance(obs, str):
             text = obs
 
-        # Extract URL
-        url = info.get("url", "")
-        if not url and "page" in info:
-            url = info["page"].get("url", "")
+        # Extract URL from obs (BrowserGym stores it there)
+        url = ""
+        if isinstance(obs, dict):
+            url = obs.get("url", "")
 
-        # Extract goal/instruction
-        goal = info.get("goal", "")
-        if not goal and "task" in info:
-            goal = info["task"].get("goal", "")
+        # Extract goal/instruction from goal_object or legacy goal field
+        goal = ""
+        if isinstance(obs, dict):
+            # New format: goal_object is a list of messages
+            goal_object = obs.get("goal_object", [])
+            if goal_object:
+                # Extract text content from goal messages
+                goal_texts = []
+                for msg in goal_object:
+                    if isinstance(msg, dict):
+                        content = msg.get("content", "")
+                        if isinstance(content, str):
+                            goal_texts.append(content)
+                        elif isinstance(content, list):
+                            for item in content:
+                                if isinstance(item, dict) and item.get("type") == "text":
+                                    goal_texts.append(item.get("text", ""))
+                goal = " ".join(goal_texts)
+            # Fallback to legacy goal field
+            if not goal:
+                goal = obs.get("goal", "")
 
         # Update state
         self._state.current_url = url
@@ -268,15 +333,22 @@ class BrowserGymEnvironment(Environment):
 
         # Extract additional observation modalities
         screenshot = obs.get("screenshot") if isinstance(obs, dict) else None
-        axtree_txt = obs.get("axtree_txt", "") if isinstance(obs, dict) else ""
-        pruned_html = obs.get("pruned_html", "") if isinstance(obs, dict) else ""
+
+        # Extract last_action_error from obs (BrowserGym includes this)
+        last_action_error = False
+        if isinstance(obs, dict):
+            last_action_error = bool(obs.get("last_action_error"))
 
         # Store full BrowserGym observation and info in metadata
         # This preserves timestamps, additional fields, and any future extensions
-        browsergym_metadata = {
-            "browsergym_obs": obs if isinstance(obs, dict) else {},
-            "browsergym_info": info,
-        }
+        # Note: We exclude large objects (dom_object, axtree_object) to reduce payload size
+        browsergym_metadata = {}
+        if isinstance(obs, dict):
+            # Include useful fields but exclude large raw objects
+            browsergym_metadata["browsergym_obs"] = {
+                k: v for k, v in obs.items() if k not in ("dom_object", "axtree_object", "screenshot")
+            }
+        browsergym_metadata["browsergym_info"] = info
 
         return BrowserGymObservation(
             text=text,
@@ -286,7 +358,7 @@ class BrowserGymEnvironment(Environment):
             axtree_txt=axtree_txt,
             pruned_html=pruned_html,
             error="",
-            last_action_error=False,
+            last_action_error=last_action_error,
             done=done,
             reward=reward,
             metadata=browsergym_metadata,
