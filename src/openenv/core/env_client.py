@@ -19,11 +19,11 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Generic, Optional, Type, TYPE_CHECKING, TypeVar
 
 from .client_types import StepResult, StateT
-from .containers.runtime import LocalDockerProvider
+from .containers.runtime import LocalDockerProvider, UVProvider
 from .utils import convert_to_ws_url
 
 if TYPE_CHECKING:
-    from .containers.runtime import ContainerProvider
+    from .containers.runtime import ContainerProvider, RuntimeProvider
     from websockets.sync.client import ClientConnection
 
 from websockets.sync.client import connect as ws_connect
@@ -62,7 +62,7 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
         base_url: str,
         connect_timeout_s: float = 10.0,
         message_timeout_s: float = 60.0,
-        provider: Optional["ContainerProvider"] = None,
+        provider: Optional["ContainerProvider | RuntimeProvider"] = None,
     ):
         """
         Initialize environment client.
@@ -72,7 +72,8 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
                      Will be converted to ws:// if http:// is provided.
             connect_timeout_s: Timeout for establishing WebSocket connection
             message_timeout_s: Timeout for receiving responses to messages
-            provider: Optional container provider for lifecycle management
+            provider: Optional container/runtime provider for lifecycle management.
+                     Can be a ContainerProvider (Docker) or RuntimeProvider (UV).
         """
         # Convert HTTP URL to WebSocket URL
         ws_url = convert_to_ws_url(base_url)
@@ -189,19 +190,84 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
     def from_hub(
         cls: Type[EnvClientT],
         repo_id: str,
-        provider: Optional["ContainerProvider"] = None,
-        **kwargs: Any,
+        *,
+        use_docker: bool = True,
+        provider: Optional["ContainerProvider | RuntimeProvider"] = None,
+        **provider_kwargs: Any,
     ) -> EnvClientT:
         """
-        Create a client by pulling from a Hugging Face model hub.
+        Create a client from a Hugging Face Space.
+
+        Args:
+            repo_id: Hugging Face space identifier ``{org}/{space}``.
+            use_docker: When ``True`` (default) pull from the HF registry and
+                launch via :class:`LocalDockerProvider`. When ``False`` run the
+                space locally with :class:`UVProvider`.
+            provider: Optional provider instance to reuse. Must be a
+                :class:`ContainerProvider` when ``use_docker=True`` and a
+                :class:`RuntimeProvider` otherwise.
+            provider_kwargs: Additional keyword arguments forwarded to
+                either the container provider's ``start_container`` (docker)
+                or to the ``UVProvider`` constructor/start (uv). When
+                ``use_docker=False``, the ``project_path`` argument can be
+                used to override the default git URL
+                (``git+https://huggingface.co/spaces/{repo_id}``).
+
+        Returns:
+            Connected client instance
+
+        Examples:
+            >>> # Pull and run from HF Docker registry
+            >>> env = MyEnv.from_hub("openenv/echo-env")
+            >>>
+            >>> # Run locally with UV (clones the space)
+            >>> env = MyEnv.from_hub("openenv/echo-env", use_docker=False)
+            >>>
+            >>> # Run from a local checkout
+            >>> env = MyEnv.from_hub(
+            ...     "openenv/echo-env",
+            ...     use_docker=False,
+            ...     project_path="/path/to/local/checkout"
+            ... )
         """
-        if provider is None:
-            provider = LocalDockerProvider()
+        # Extract start args that apply to both providers
+        start_args = {}
+        for key in ("port", "env_vars", "workers"):
+            if key in provider_kwargs:
+                start_args[key] = provider_kwargs.pop(key)
 
-        tag = kwargs.pop("tag", "latest")
-        base_url = f"registry.hf.space/{repo_id.replace('/', '-')}:{tag}"
+        if use_docker:
+            # Docker mode: pull from HF registry
+            docker_provider = provider or LocalDockerProvider()
+            tag = provider_kwargs.pop("tag", "latest")
+            image = f"registry.hf.space/{repo_id.replace('/', '-')}:{tag}"
+            base_url = docker_provider.start_container(image, **start_args, **provider_kwargs)
+            docker_provider.wait_for_ready(base_url)
 
-        return cls.from_docker_image(image=base_url, provider=provider, **kwargs)
+            client = cls(base_url=base_url, provider=docker_provider)
+            client.connect()
+            return client
+        else:
+            # UV mode: clone and run with uv
+            if provider is None:
+                uv_kwargs = dict(provider_kwargs)
+                project_path = uv_kwargs.pop("project_path", None)
+                if project_path is None:
+                    project_path = f"git+https://huggingface.co/spaces/{repo_id}"
+
+                provider = UVProvider(project_path=project_path, **uv_kwargs)
+            else:
+                if provider_kwargs:
+                    raise ValueError(
+                        "provider_kwargs cannot be used when supplying a provider instance"
+                    )
+
+            base_url = provider.start(**start_args)
+            provider.wait_for_ready()
+
+            client = cls(base_url=base_url, provider=provider)
+            client.connect()
+            return client
 
     @abstractmethod
     def _step_payload(self, action: ActT) -> Dict[str, Any]:
@@ -271,13 +337,17 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
         """
         Close the WebSocket connection and clean up resources.
 
-        If this client was created via from_docker_image(), this will also
-        stop and remove the associated container.
+        If this client was created via from_docker_image() or from_hub(),
+        this will also stop and remove the associated container/process.
         """
         self.disconnect()
 
         if self._provider is not None:
-            self._provider.stop_container()
+            # Handle both ContainerProvider and RuntimeProvider
+            if hasattr(self._provider, "stop_container"):
+                self._provider.stop_container()
+            elif hasattr(self._provider, "stop"):
+                self._provider.stop()
 
     def __enter__(self) -> "EnvClient":
         """Enter context manager, ensuring connection is established."""
