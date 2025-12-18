@@ -1,4 +1,13 @@
+import os
+import sys
 import pytest
+
+# Add the project root to the path for envs imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+# Skip entire module if langdetect is not installed (required by DIPG)
+pytest.importorskip("langdetect", reason="langdetect not installed")
+
 from envs.dipg_safety_env.server.dipg_environment import DIPGEnvironment
 
 @pytest.fixture

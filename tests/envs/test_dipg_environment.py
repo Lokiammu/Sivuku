@@ -1,13 +1,23 @@
 #tests/envs/test_dipg_environment.py
 import os
+import shutil
 import sys
 import subprocess
 import time
 import requests
 import pytest
 
+# Add the project root to the path for envs imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 from envs.dipg_safety_env.client import DIPGSafetyEnv
 from envs.dipg_safety_env.models import DIPGAction
+
+# Skip all tests if gunicorn is not installed
+pytestmark = pytest.mark.skipif(
+    shutil.which("gunicorn") is None,
+    reason="gunicorn not installed"
+)
 
 
 @pytest.fixture(scope="module")

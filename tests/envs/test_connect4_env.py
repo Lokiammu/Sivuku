@@ -4,22 +4,33 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-"""Test that PythonCodeActEnv.reset() properly resets executor state."""
+"""Test Connect4 environment client and server integration.
 
+NOTE: This is a legacy test file using unittest patterns with manual server lifecycle.
+For comprehensive Connect4 tests, see test_websockets.py::TestConnect4Environment.
+"""
+
+import os
 import sys
 from pathlib import Path
 
-import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+import pytest
+
+# Add the project root to the path for envs imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from envs.connect4_env import Connect4Action, Connect4Observation, Connect4State, Connect4Env
 import subprocess
-# subprocess.run(["python", "-m", "envs.connect4_env.server.app"], check=True,stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE   )
 
 import unittest
 import time
 import requests
 import signal
+
+
+# Skip this legacy test file - comprehensive tests in test_websockets.py
+pytestmark = pytest.mark.skip(reason="Legacy test file - see test_websockets.py for comprehensive Connect4 tests")
+
 
 class TestConnect4(unittest.TestCase):
     def __init__(self, methodName = "runTest"):

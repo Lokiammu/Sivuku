@@ -1,5 +1,11 @@
 """Unit tests for BrowserGym models."""
 
+import os
+import sys
+
+# Add the project root to the path for envs imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 from envs.browsergym_env.models import (
     BrowserGymAction,
     BrowserGymObservation,
