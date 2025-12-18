@@ -40,8 +40,8 @@ class Connect4Observation(Observation):
         reward: Reward for the last action.
     """
     
-    board: List[List[int]]
-    legal_actions: List[int]
+    board: List[List[int]] = Field(default_factory=list)
+    legal_actions: List[int] = Field(default_factory=list)
 
 
 class Connect4State(State):
