@@ -46,7 +46,7 @@ def validate(
 
         # Validate with detailed output
         $ openenv validate --verbose
-        
+
         # Validate specific environment
         $ openenv validate envs/echo_env
     """
@@ -59,11 +59,11 @@ def validate(
     if not env_path_obj.exists():
         typer.echo(f"Error: Path does not exist: {env_path_obj}", err=True)
         raise typer.Exit(1)
-    
+
     if not env_path_obj.is_dir():
         typer.echo(f"Error: Path is not a directory: {env_path_obj}", err=True)
         raise typer.Exit(1)
-    
+
     # Check for openenv.yaml to confirm this is an environment directory
     openenv_yaml = env_path_obj / "openenv.yaml"
     if not openenv_yaml.exists():

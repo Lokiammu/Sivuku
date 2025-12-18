@@ -22,10 +22,10 @@ def test_main_handles_keyboard_interrupt() -> None:
     """Test that main handles KeyboardInterrupt gracefully."""
     with patch("openenv.cli.__main__.app") as mock_app:
         mock_app.side_effect = KeyboardInterrupt()
-        
+
         with pytest.raises(SystemExit) as exc_info:
             main()
-        
+
         assert exc_info.value.code == 130
 
 
@@ -33,10 +33,10 @@ def test_main_handles_generic_exception() -> None:
     """Test that main handles generic exceptions gracefully."""
     with patch("openenv.cli.__main__.app") as mock_app:
         mock_app.side_effect = ValueError("Test error")
-        
+
         with pytest.raises(SystemExit) as exc_info:
             main()
-        
+
         assert exc_info.value.code == 1
 
 
@@ -47,4 +47,3 @@ def test_main_entry_point() -> None:
     with patch("openenv.cli.__main__.app") as mock_app:
         main()
         mock_app.assert_called_once()
-

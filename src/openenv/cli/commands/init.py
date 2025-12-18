@@ -63,7 +63,9 @@ def _validate_env_name(name: str) -> str:
 
     # Check if it starts with a number
     if name[0].isdigit():
-        raise typer.BadParameter(f"Environment name '{name}' cannot start with a number.")
+        raise typer.BadParameter(
+            f"Environment name '{name}' cannot start with a number."
+        )
 
     return name
 
@@ -293,7 +295,9 @@ def _copy_and_template_file(
             # Binary file, just copy
             dest_path.write_bytes(content)
     except Exception as e:
-        raise RuntimeError(f"Failed to copy template file {src_path} to {dest_path}: {e}") from e
+        raise RuntimeError(
+            f"Failed to copy template file {src_path} to {dest_path}: {e}"
+        ) from e
 
 
 def _copy_template_directory(
@@ -327,13 +331,17 @@ def _copy_template_directory(
             if not template_path.exists():
                 raise FileNotFoundError(f"Template directory not found: {template_pkg}")
         except Exception as e:
-            raise FileNotFoundError(f"Template directory not found: {template_pkg}") from e
+            raise FileNotFoundError(
+                f"Template directory not found: {template_pkg}"
+            ) from e
 
     if template_dir:
         template_path = template_path / template_dir
 
     if not template_path.exists() or not template_path.is_dir():
-        raise FileNotFoundError(f"Template directory not found: {template_pkg}.{template_dir}")
+        raise FileNotFoundError(
+            f"Template directory not found: {template_pkg}.{template_dir}"
+        )
 
     # Walk through all files in template directory using Path
     for item in template_path.rglob("*"):
@@ -391,7 +399,9 @@ def _generate_uv_lock(env_dir: Path) -> bool:
 def init(
     env_name: Annotated[
         str,
-        typer.Argument(help="Name of the environment to create (snake_case, e.g., 'my_env')"),
+        typer.Argument(
+            help="Name of the environment to create (snake_case, e.g., 'my_env')"
+        ),
     ],
     output_dir: Annotated[
         str | None,
@@ -436,7 +446,9 @@ def init(
         # Create environment directory
         env_dir.mkdir(parents=True, exist_ok=True)
 
-        console.print(f"[bold cyan]Creating OpenEnv environment '{env_name}'...[/bold cyan]")
+        console.print(
+            f"[bold cyan]Creating OpenEnv environment '{env_name}'...[/bold cyan]"
+        )
 
         # Copy template files from template structure
         template_pkg = "openenv.cli.templates.openenv_env"
@@ -449,28 +461,34 @@ def init(
         )
 
         console.print(f"[bold green]✓[/bold green] Created {len(created_files)} files")
-        
+
         # Generate uv.lock
         console.print("\n[bold]Generating uv.lock...[/bold]")
         if _generate_uv_lock(env_dir):
             console.print("[green]✓[/green] Generated uv.lock")
         else:
-            console.print(
-                "[yellow]⚠[/yellow] Could not generate uv.lock automatically"
-            )
+            console.print("[yellow]⚠[/yellow] Could not generate uv.lock automatically")
             console.print("    You can generate it manually with:")
             console.print(f"    cd {env_dir} && uv lock")
-        
-        console.print(f"\n[bold green]Environment created successfully at: {env_dir}[/bold green]")
+
+        console.print(
+            f"\n[bold green]Environment created successfully at: {env_dir}[/bold green]"
+        )
         console.print("\n[bold]Next steps:[/bold]")
         console.print(f"  cd {env_dir}")
-        console.print(f"  # Edit your environment implementation in server/{env_name}_environment.py")
+        console.print(
+            f"  # Edit your environment implementation in server/{env_name}_environment.py"
+        )
         console.print("  # Edit your models in models.py")
         console.print("  # Install dependencies: uv sync")
         console.print("\n  # To integrate into OpenEnv repo:")
         console.print(f"  # 1. Copy this directory to <repo_root>/envs/{env_name}_env")
-        console.print(f"  # 2. Build from repo root: docker build -t {env_name}_env:latest -f envs/{env_name}_env/server/Dockerfile .")
-        console.print(f"  # 3. Run your image: docker run -p 8000:8000 {env_name}_env:latest")
+        console.print(
+            f"  # 2. Build from repo root: docker build -t {env_name}_env:latest -f envs/{env_name}_env/server/Dockerfile ."
+        )
+        console.print(
+            f"  # 3. Run your image: docker run -p 8000:8000 {env_name}_env:latest"
+        )
 
     except Exception as e:
         # Cleanup on error

@@ -94,19 +94,19 @@ class Environment(ABC, Generic[ActT, ObsT, StateT]):
 
     Args:
         transform: Optional transform to apply to observations
-        
+
     Class Attributes:
         SUPPORTS_CONCURRENT_SESSIONS: Whether this environment supports concurrent sessions.
             When True, multiple WebSocket connections can each have their own
             environment instance (up to max_concurrent_envs). When False (default),
             the environment should only be used with a single session at a time.
-            
+
             Set this to True in your Environment subclass if:
             - The environment uses proper session isolation (e.g., unique working dirs)
             - No shared mutable state exists between instances
             - External resources (databases, APIs) can handle concurrent access
     """
-    
+
     # Class-level flag indicating whether this environment supports concurrent sessions
     SUPPORTS_CONCURRENT_SESSIONS: bool = False
 
@@ -130,7 +130,7 @@ class Environment(ABC, Generic[ActT, ObsT, StateT]):
         **kwargs: Any,
     ) -> ObsT:
         """Async version of reset. Default implementation calls sync reset.
-        
+
         Override to provide true async implementation.
         """
         return self.reset(seed=seed, episode_id=episode_id, **kwargs)
@@ -152,7 +152,7 @@ class Environment(ABC, Generic[ActT, ObsT, StateT]):
         **kwargs: Any,
     ) -> ObsT:
         """Async version of step. Default implementation calls sync step.
-        
+
         Override to provide true async implementation.
         """
         return self.step(action, timeout_s=timeout_s, **kwargs)
@@ -187,7 +187,7 @@ class Environment(ABC, Generic[ActT, ObsT, StateT]):
 
     def close(self) -> None:
         """Clean up resources used by the environment.
-        
+
         Override this method to implement custom cleanup logic.
         Called when the environment is being destroyed or reset.
         """

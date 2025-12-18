@@ -29,12 +29,13 @@ app.command(name="init", help="Initialize a new OpenEnv environment")(init.init)
 app.command(name="build", help="Build Docker images for OpenEnv environments")(
     build.build
 )
-app.command(name="validate", help="Validate environment structure and deployment readiness")(
-    validate.validate
-)
-app.command(name="push", help="Push an OpenEnv environment to Hugging Face Spaces or custom registry")(
-    push.push
-)
+app.command(
+    name="validate", help="Validate environment structure and deployment readiness"
+)(validate.validate)
+app.command(
+    name="push",
+    help="Push an OpenEnv environment to Hugging Face Spaces or custom registry",
+)(push.push)
 app.command(name="serve", help="Serve environments locally (TODO: Phase 4)")(
     serve.serve
 )

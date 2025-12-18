@@ -123,7 +123,9 @@ class LocalDockerProvider(ContainerProvider):
             FileNotFoundError,
             subprocess.TimeoutExpired,
         ):
-            raise RuntimeError("Docker is not available. Please install Docker Desktop or Docker Engine.")
+            raise RuntimeError(
+                "Docker is not available. Please install Docker Desktop or Docker Engine."
+            )
 
     def start_container(
         self,
