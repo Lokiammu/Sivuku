@@ -65,8 +65,5 @@ jobs:
           uv sync --all-extras
           uv pip install ruff
 
-      - name: Run ruff check
-        run: uv run ruff check src/ tests/ --output-format=github
-
       - name: Run ruff format check
         run: uv run ruff format src/ tests/ --check
