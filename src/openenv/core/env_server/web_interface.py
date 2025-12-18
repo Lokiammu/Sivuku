@@ -134,9 +134,7 @@ class WebInterfaceManager:
             name=env.__class__.__name__,
             description=f"{env.__class__.__name__} environment",
         )
-        self.episode_state = EpisodeState(
-            episode_id=None, step_count=0, current_observation=None, action_logs=[]
-        )
+        self.episode_state = EpisodeState(episode_id=None, step_count=0, current_observation=None, action_logs=[])
         self.connected_clients: List[WebSocket] = []
 
     async def connect_websocket(self, websocket: WebSocket):
@@ -262,7 +260,7 @@ def create_web_interface_app(
 
     # Create the base environment app
     app = create_fastapi_app(env, action_cls, observation_cls, max_concurrent_envs, concurrency_config)
-    
+
     # Create a test instance for metadata
     env_instance = env()
 
@@ -286,7 +284,7 @@ def create_web_interface_app(
     @app.websocket("/ws/ui")
     async def websocket_ui_endpoint(websocket: WebSocket):
         """WebSocket endpoint for web UI real-time updates.
-        
+
         Note: This endpoint is separate from /ws which is used for
         concurrent environment sessions. This endpoint is specifically
         for the web interface state updates.
@@ -1329,11 +1327,7 @@ def _determine_input_type_from_schema(field_info: Dict[str, Any], field_name: st
 
     if schema_type == "string":
         # Check if it should be a textarea
-        if (
-            field_info.get("maxLength", 0) > 100
-            or "message" in field_name.lower()
-            or "code" in field_name.lower()
-        ):
+        if field_info.get("maxLength", 0) > 100 or "message" in field_name.lower() or "code" in field_name.lower():
             return "textarea"
         return "text"
 
