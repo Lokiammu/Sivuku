@@ -299,3 +299,65 @@ class KubernetesProvider(ContainerProvider):
     """
 
     pass
+
+
+class RuntimeProvider(ABC):
+    """
+    Abstract base class for runtime providers that are not container providers.
+    Providers implement this interface to support different runtime platforms:
+    - UVProvider: Runs environments via `uv run`
+
+    The provider manages a single runtime lifecycle and provides the base URL
+    for connecting to it.
+
+    Example:
+        >>> provider = UVProvider(project_path="/path/to/env")
+        >>> base_url = provider.start()
+        >>> print(base_url)  # http://localhost:8000
+        >>> provider.stop()
+    """
+
+    @abstractmethod
+    def start(
+        self,
+        port: Optional[int] = None,
+        env_vars: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> str:
+        """
+        Start a runtime from the specified image.
+
+        Args:
+            image: Runtime image name
+            port: Port to expose (if None, provider chooses)
+            env_vars: Environment variables for the runtime
+            **kwargs: Additional runtime options
+        """
+
+    @abstractmethod
+    def stop(self) -> None:
+        """
+        Stop the runtime.
+        """
+        pass
+
+    @abstractmethod
+    def wait_for_ready(self, timeout_s: float = 30.0) -> None:
+        """
+        Wait for the runtime to be ready to accept requests.
+        """
+        pass
+
+    def __enter__(self) -> "RuntimeProvider":
+        """
+        Enter the runtime provider.
+        """
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        """
+        Exit the runtime provider.
+        """
+        self.stop()
+        return False
