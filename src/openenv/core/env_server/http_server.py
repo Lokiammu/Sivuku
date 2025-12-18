@@ -255,7 +255,9 @@ class HTTPEnvServer:
             try:
                 env = self._env_factory()
             except Exception as e:
-                factory_name = getattr(self._env_factory, "__name__", str(self._env_factory))
+                factory_name = getattr(
+                    self._env_factory, "__name__", str(self._env_factory)
+                )
                 raise EnvironmentFactoryError(factory_name) from e
 
             self._sessions[session_id] = env
@@ -340,6 +342,7 @@ class HTTPEnvServer:
     def is_concurrency_safe(self) -> bool:
         """Return whether the environment is marked as concurrency safe."""
         import inspect
+
         if inspect.isclass(self._env_factory):
             return getattr(self._env_factory, "SUPPORTS_CONCURRENT_SESSIONS", False)
         else:
@@ -368,7 +371,7 @@ class HTTPEnvServer:
         ) -> ResetResponse:
             """Reset endpoint - returns initial observation."""
             _env = self._env_factory()
-            
+
             try:
                 kwargs = request.model_dump(exclude_unset=True)
 
@@ -403,7 +406,7 @@ class HTTPEnvServer:
                 )
 
             _env = self._env_factory()
-            
+
             try:
                 kwargs = request.model_dump(exclude_unset=True, exclude={"action"})
 
@@ -413,7 +416,9 @@ class HTTPEnvServer:
                     sig = inspect.signature(_env.step_async)
                 else:
                     sig = inspect.signature(_env.step)
-                valid_kwargs = self._get_valid_kwargs(sig, kwargs, skip_params={"action"})
+                valid_kwargs = self._get_valid_kwargs(
+                    sig, kwargs, skip_params={"action"}
+                )
 
                 if is_async:
                     observation = await _env.step_async(action, **valid_kwargs)
@@ -516,7 +521,7 @@ The response includes:
                 return _env.state
             finally:
                 _env.close()
-        
+
         def get_metadata_handler() -> EnvironmentMetadata:
             _env = self._env_factory()
             try:
@@ -560,7 +565,6 @@ version, author, and documentation links.
             ),
         ]
         register_get_endpoints(app, get_endpoints)
-
 
         # Register combined schema endpoint
         @app.get(
@@ -655,12 +659,17 @@ all schema information needed to interact with the environment.
                             case "reset":
                                 msg = WSResetMessage(**message_dict)
 
-                                is_async = session_env.reset_async.__func__ is not Environment.reset_async
+                                is_async = (
+                                    session_env.reset_async.__func__
+                                    is not Environment.reset_async
+                                )
 
                                 if is_async:
                                     sig = inspect.signature(session_env.reset_async)
                                     valid_kwargs = self._get_valid_kwargs(sig, msg.data)
-                                    observation = await session_env.reset_async(**valid_kwargs)
+                                    observation = await session_env.reset_async(
+                                        **valid_kwargs
+                                    )
                                 else:
                                     sig = inspect.signature(session_env.reset)
                                     valid_kwargs = self._get_valid_kwargs(sig, msg.data)
@@ -678,7 +687,10 @@ all schema information needed to interact with the environment.
                                 msg = WSStepMessage(**message_dict)
                                 action = deserialize_action(msg.data, self.action_cls)
 
-                                is_async = session_env.step_async.__func__ is not Environment.step_async
+                                is_async = (
+                                    session_env.step_async.__func__
+                                    is not Environment.step_async
+                                )
 
                                 if is_async:
                                     observation = await session_env.step_async(action)

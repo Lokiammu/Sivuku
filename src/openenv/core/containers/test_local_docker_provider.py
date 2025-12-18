@@ -19,6 +19,7 @@ import requests
 
 from openenv.core.containers.runtime import LocalDockerProvider
 
+
 # TODO: Remove this test or make it a functional test sicne this will be tested in e2e test for echo env
 def test_local_docker_provider():
     """Test LocalDockerProvider end-to-end."""
@@ -87,7 +88,9 @@ def test_local_docker_provider():
         print(f"  Length: {data['observation']['message_length']}")
         print(f"  Reward: {data['reward']}")
         assert response.status_code == 200
-        assert data["observation"]["echoed_message"] == "Hello from LocalDockerProvider!"
+        assert (
+            data["observation"]["echoed_message"] == "Hello from LocalDockerProvider!"
+        )
         assert data["observation"]["message_length"] == 31
         print("✓ Step test passed\n")
 
@@ -107,11 +110,11 @@ def test_local_docker_provider():
         for i in range(3):
             response = requests.post(
                 f"{base_url}/step",
-                json={"action": {"message": f"Message {i+1}"}},
+                json={"action": {"message": f"Message {i + 1}"}},
                 headers={"Content-Type": "application/json"},
             )
             assert response.status_code == 200
-            print(f"  Step {i+1}: ✓")
+            print(f"  Step {i + 1}: ✓")
 
         # Check state updated
         response = requests.get(f"{base_url}/state")
@@ -130,6 +133,7 @@ def test_local_docker_provider():
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -197,8 +201,7 @@ def test_provider_with_env_vars():
 
         print("Starting container with environment variables...")
         base_url = provider.start_container(
-            "echo-env:latest",
-            env_vars={"DEBUG": "true", "LOG_LEVEL": "info"}
+            "echo-env:latest", env_vars={"DEBUG": "true", "LOG_LEVEL": "info"}
         )
         print(f"✓ Started at: {base_url}")
 

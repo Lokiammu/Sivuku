@@ -37,7 +37,7 @@ def validate_multi_mode_deployment(env_path: Path) -> tuple[bool, list[str]]:
     if not pyproject_path.exists():
         issues.append("Missing pyproject.toml")
         return False, issues
-    
+
     # Check uv.lock exists
     lockfile_path = env_path / "uv.lock"
     if not lockfile_path.exists():
@@ -53,7 +53,9 @@ def validate_multi_mode_deployment(env_path: Path) -> tuple[bool, list[str]]:
                 timeout=5,
             )
             if result.returncode != 0:
-                issues.append("uv.lock is out of date with pyproject.toml - run 'uv lock' to update")
+                issues.append(
+                    "uv.lock is out of date with pyproject.toml - run 'uv lock' to update"
+                )
         except (subprocess.TimeoutExpired, FileNotFoundError):
             # If uv is not available or times out, skip this check
             pass
@@ -80,13 +82,17 @@ def validate_multi_mode_deployment(env_path: Path) -> tuple[bool, list[str]]:
 
     # Check required dependencies
     deps = [dep.lower() for dep in pyproject.get("project", {}).get("dependencies", [])]
-    has_openenv = any(dep.startswith("openenv") and not dep.startswith("openenv-core") for dep in deps)
+    has_openenv = any(
+        dep.startswith("openenv") and not dep.startswith("openenv-core") for dep in deps
+    )
     has_legacy_core = any(dep.startswith("openenv-core") for dep in deps)
 
     if not (has_openenv or has_legacy_core):
         issues.append("Missing required dependency: openenv>=0.2.0")
     elif has_legacy_core and not has_openenv:
-        issues.append("Dependency on openenv-core is deprecated; use openenv>=0.2.0 instead")
+        issues.append(
+            "Dependency on openenv-core is deprecated; use openenv>=0.2.0 instead"
+        )
 
     # Check server/app.py exists
     server_app = env_path / "server" / "app.py"

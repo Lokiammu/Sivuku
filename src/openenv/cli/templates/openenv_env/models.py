@@ -26,4 +26,3 @@ class __ENV_CLASS_NAME__Observation(Observation):
 
     echoed_message: str = Field(default="", description="The echoed message")
     message_length: int = Field(default=0, description="Length of the echoed message")
-

@@ -17,9 +17,7 @@ from typing import Any, Dict, Type
 from .types import Action, Observation
 
 
-def deserialize_action(
-    action_data: Dict[str, Any], action_cls: Type[Action]
-) -> Action:
+def deserialize_action(action_data: Dict[str, Any], action_cls: Type[Action]) -> Action:
     """
     Convert JSON dict to Action instance using Pydantic validation.
 
@@ -80,7 +78,7 @@ def deserialize_action_with_preprocessing(
                     value = []
             if isinstance(value, list):
                 try:
-                    import torch # type: ignore
+                    import torch  # type: ignore
 
                     processed_data[key] = torch.tensor(value, dtype=torch.long)
                 except ImportError:

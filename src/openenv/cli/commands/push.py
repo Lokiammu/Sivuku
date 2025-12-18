@@ -67,7 +67,11 @@ def _ensure_hf_authenticated() -> str:
         user_info = whoami()
         # Handle both dict and object return types
         if isinstance(user_info, dict):
-            username = user_info.get("name") or user_info.get("fullname") or user_info.get("username")
+            username = (
+                user_info.get("name")
+                or user_info.get("fullname")
+                or user_info.get("username")
+            )
         else:
             # If it's an object, try to get name attribute
             username = (
@@ -83,7 +87,9 @@ def _ensure_hf_authenticated() -> str:
         return username
     except Exception:
         # Not authenticated, prompt for login
-        console.print("[bold yellow]Not authenticated with Hugging Face. Please login...[/bold yellow]")
+        console.print(
+            "[bold yellow]Not authenticated with Hugging Face. Please login...[/bold yellow]"
+        )
 
         try:
             login()
@@ -91,7 +97,11 @@ def _ensure_hf_authenticated() -> str:
             user_info = whoami()
             # Handle both dict and object return types
             if isinstance(user_info, dict):
-                username = user_info.get("name") or user_info.get("fullname") or user_info.get("username")
+                username = (
+                    user_info.get("name")
+                    or user_info.get("fullname")
+                    or user_info.get("username")
+                )
             else:
                 username = (
                     getattr(user_info, "name", None)
@@ -105,7 +115,9 @@ def _ensure_hf_authenticated() -> str:
             console.print(f"[bold green]✓[/bold green] Authenticated as: {username}")
             return username
         except Exception as e:
-            raise typer.BadParameter(f"Hugging Face authentication failed: {e}. Please run login manually.") from e
+            raise typer.BadParameter(
+                f"Hugging Face authentication failed: {e}. Please run login manually."
+            ) from e
 
 
 def _prepare_staging_directory(
@@ -207,9 +219,13 @@ def _prepare_staging_directory(
         if enable_interface and not web_interface_env_exists:
             changes.append("enabled web interface")
         if changes:
-            console.print(f"[bold green]✓[/bold green] Updated Dockerfile: {', '.join(changes)}")
+            console.print(
+                f"[bold green]✓[/bold green] Updated Dockerfile: {', '.join(changes)}"
+            )
     else:
-        console.print("[bold yellow]⚠[/bold yellow] No Dockerfile found at server/Dockerfile")
+        console.print(
+            "[bold yellow]⚠[/bold yellow] No Dockerfile found at server/Dockerfile"
+        )
 
     # Ensure README has proper HF frontmatter (only if interface enabled)
     if enable_interface:
@@ -248,7 +264,9 @@ tags:
 
 """
                     readme_path.write_text(frontmatter + readme_content)
-                console.print("[bold green]✓[/bold green] Updated README with HF Space frontmatter")
+                console.print(
+                    "[bold green]✓[/bold green] Updated README with HF Space frontmatter"
+                )
         else:
             console.print("[bold yellow]⚠[/bold yellow] No README.md found")
 
@@ -293,7 +311,9 @@ def _upload_to_hf_space(
             ignore_patterns=[".git", "__pycache__", "*.pyc"],
         )
         console.print("[bold green]✓[/bold green] Upload completed successfully")
-        console.print(f"[bold]Space URL:[/bold] https://huggingface.co/spaces/{repo_id}")
+        console.print(
+            f"[bold]Space URL:[/bold] https://huggingface.co/spaces/{repo_id}"
+        )
     except Exception as e:
         console.print(f"[bold red]✗[/bold red] Upload failed: {e}")
         raise typer.Exit(1) from e
@@ -303,7 +323,9 @@ def _upload_to_hf_space(
 def push(
     directory: Annotated[
         str | None,
-        typer.Argument(help="Directory containing the OpenEnv environment (default: current directory)"),
+        typer.Argument(
+            help="Directory containing the OpenEnv environment (default: current directory)"
+        ),
     ] = None,
     repo_id: Annotated[
         str | None,
@@ -380,7 +402,7 @@ def push(
 
         # Push to specific HuggingFace repo
         $ openenv push --repo-id my-org/my-env
-        
+
         # Push privately with custom base image
         $ openenv push --private --base-image ghcr.io/meta-pytorch/openenv-base:latest
     """
@@ -391,7 +413,7 @@ def push(
             file=sys.stderr,
         )
         raise typer.Exit(1)
-    
+
     # Determine if web interface should be enabled
     if no_interface:
         enable_interface = False
@@ -403,7 +425,7 @@ def push(
     else:
         # HuggingFace: enable interface by default
         enable_interface = True
-    
+
     # Determine directory
     if directory:
         env_dir = Path(directory).resolve()
@@ -412,7 +434,7 @@ def push(
 
     if not env_dir.exists() or not env_dir.is_dir():
         raise typer.BadParameter(f"Directory does not exist: {env_dir}")
-    
+
     # Check for openenv.yaml to confirm this is an environment directory
     openenv_yaml = env_dir / "openenv.yaml"
     if not openenv_yaml.exists():
@@ -425,7 +447,9 @@ def push(
         raise typer.Exit(1)
 
     # Validate OpenEnv environment
-    console.print(f"[bold cyan]Validating OpenEnv environment in {env_dir}...[/bold cyan]")
+    console.print(
+        f"[bold cyan]Validating OpenEnv environment in {env_dir}...[/bold cyan]"
+    )
     env_name, manifest = _validate_openenv_directory(env_dir)
     console.print(f"[bold green]✓[/bold green] Found OpenEnv environment: {env_name}")
 
@@ -434,40 +458,42 @@ def push(
         console.print("[bold cyan]Preparing to push to custom registry...[/bold cyan]")
         if enable_interface:
             console.print("[bold cyan]Web interface will be enabled[/bold cyan]")
-        
+
         # Import build functions
         from .build import _build_docker_image, _push_docker_image
-        
+
         # Prepare build args for custom registry deployment
         build_args = {}
         if enable_interface:
             build_args["ENABLE_WEB_INTERFACE"] = "true"
-        
+
         # Build Docker image from the environment directory
         tag = f"{registry}/{env_name}"
         console.print(f"[bold cyan]Building Docker image: {tag}[/bold cyan]")
-        
+
         success = _build_docker_image(
             env_path=env_dir,
             tag=tag,
             build_args=build_args if build_args else None,
         )
-        
+
         if not success:
             console.print("[bold red]✗ Docker build failed[/bold red]")
             raise typer.Exit(1)
-        
+
         console.print("[bold green]✓ Docker build successful[/bold green]")
-        
+
         # Push to registry
         console.print(f"[bold cyan]Pushing to registry: {registry}[/bold cyan]")
-        
-        success = _push_docker_image(tag, registry=None)  # Tag already includes registry
-        
+
+        success = _push_docker_image(
+            tag, registry=None
+        )  # Tag already includes registry
+
         if not success:
             console.print("[bold red]✗ Docker push failed[/bold red]")
             raise typer.Exit(1)
-        
+
         console.print("\n[bold green]✓ Deployment complete![/bold green]")
         console.print(f"[bold]Image:[/bold] {tag}")
         return
@@ -481,20 +507,28 @@ def push(
 
     # Validate repo_id format
     if "/" not in repo_id or repo_id.count("/") != 1:
-        raise typer.BadParameter(f"Invalid repo-id format: {repo_id}. Expected format: 'username/repo-name'")
+        raise typer.BadParameter(
+            f"Invalid repo-id format: {repo_id}. Expected format: 'username/repo-name'"
+        )
 
     # Initialize Hugging Face API
     api = HfApi()
 
     # Prepare staging directory
-    deployment_type = "with web interface" if enable_interface else "without web interface"
-    console.print(f"[bold cyan]Preparing files for Hugging Face deployment ({deployment_type})...[/bold cyan]")
+    deployment_type = (
+        "with web interface" if enable_interface else "without web interface"
+    )
+    console.print(
+        f"[bold cyan]Preparing files for Hugging Face deployment ({deployment_type})...[/bold cyan]"
+    )
     with tempfile.TemporaryDirectory() as tmpdir:
         staging_dir = Path(tmpdir) / "staging"
         _prepare_staging_directory(
-            env_dir, env_name, staging_dir, 
+            env_dir,
+            env_name,
+            staging_dir,
             base_image=base_image,
-            enable_interface=enable_interface
+            enable_interface=enable_interface,
         )
 
         # Create/verify space

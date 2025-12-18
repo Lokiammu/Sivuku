@@ -6,13 +6,14 @@
 
 """Utility functions for OpenEnv core."""
 
+
 def convert_to_ws_url(url: str) -> str:
     """
     Convert an HTTP/HTTPS URL to a WS/WSS URL.
-    
+
     Args:
         url: The URL to convert.
-        
+
     Returns:
         The converted WebSocket URL.
     """

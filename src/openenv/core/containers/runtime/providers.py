@@ -118,7 +118,11 @@ class LocalDockerProvider(ContainerProvider):
                 capture_output=True,
                 timeout=5,
             )
-        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        except (
+            subprocess.CalledProcessError,
+            FileNotFoundError,
+            subprocess.TimeoutExpired,
+        ):
             raise RuntimeError(
                 "Docker is not available. Please install Docker Desktop or Docker Engine."
             )
@@ -154,10 +158,13 @@ class LocalDockerProvider(ContainerProvider):
 
         # Build docker run command
         cmd = [
-            "docker", "run",
+            "docker",
+            "run",
             "-d",  # Detached
-            "--name", self._container_name,
-            "-p", f"{port}:8000",  # Map port
+            "--name",
+            self._container_name,
+            "-p",
+            f"{port}:8000",  # Map port
         ]
 
         # Add environment variables
@@ -290,4 +297,5 @@ class KubernetesProvider(ContainerProvider):
         >>> # Pod running in k8s, accessible via service or port-forward
         >>> provider.stop_container()
     """
+
     pass
