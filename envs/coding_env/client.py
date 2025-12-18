@@ -2,11 +2,13 @@
 CodingEnv
 ---------
 Client-side wrapper for the Coding environment server.
-Talks HTTP to a single base_url exposing: /reset and /step.
+
+This client maintains a persistent WebSocket connection to the environment
+server, enabling efficient multi-step interactions with lower latency.
 
 - users instantiate CodingEnv with a base_url provided by the higher-level
   vector/orchestration layer.
-- Environment authors ship the Docker image that serves the HTTP API.
+- Environment authors ship the Docker image that serves the API.
 
 (Seeds, episode IDs, request IDs, capabilities can be added later in the payloads.)
 """
@@ -14,13 +16,12 @@ Talks HTTP to a single base_url exposing: /reset and /step.
 from __future__ import annotations
 
 from openenv.core.client_types import StepResult
+from openenv.core.env_client import EnvClient
 
-from openenv.core.http_env_client import HTTPEnvClient
-
-from coding_env.models import CodeAction, CodeObservation, CodeState
+from .models import CodeAction, CodeObservation, CodeState
 
 
-class CodingEnv(HTTPEnvClient[CodeAction, CodeObservation]):
+class CodingEnv(EnvClient[CodeAction, CodeObservation, CodeState]):
     # --- HTTPEnvClient abstract hooks ---
 
     def _step_payload(self, action: CodeAction) -> dict:

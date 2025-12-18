@@ -5,10 +5,10 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-FinRL Environment HTTP Client.
+FinRL Environment Client.
 
 This module provides the client for connecting to a FinRL Environment server
-over HTTP.
+via WebSocket for persistent sessions.
 """
 
 from typing import Any, Dict
@@ -16,80 +16,68 @@ from typing import Any, Dict
 from openenv.core.client_types import StepResult
 
 from openenv.core.env_server.types import State
-from openenv.core.http_env_client import HTTPEnvClient
+from openenv.core.env_client import EnvClient
 
 from .models import FinRLAction, FinRLObservation
 
 
-class FinRLEnv(HTTPEnvClient[FinRLAction, FinRLObservation]):
+class FinRLEnv(EnvClient[FinRLAction, FinRLObservation, State]):
     """
-    HTTP client for the FinRL Environment.
+    Client for the FinRL Environment.
 
-    This client connects to a FinRLEnvironment HTTP server and provides
-    methods to interact with it for stock trading RL tasks.
+    This client maintains a persistent WebSocket connection to the environment
+    server, enabling efficient multi-step interactions for stock trading RL tasks.
 
     Example:
         >>> # Connect to a running server
-        >>> client = FinRLEnv(base_url="http://localhost:8000")
-        >>> result = client.reset()
-        >>> print(result.observation.state)
-        >>> print(result.observation.portfolio_value)
-        >>>
-        >>> # Execute a trading action
-        >>> action = FinRLAction(actions=[0.5, -0.3])  # Buy stock 0, sell stock 1
-        >>> result = client.step(action)
-        >>> print(result.reward)
-        >>> print(result.observation.portfolio_value)
+        >>> with FinRLEnv(base_url="http://localhost:8000") as client:
+        ...     result = client.reset()
+        ...     print(result.observation.state)
+        ...     print(result.observation.portfolio_value)
+        ...
+        ...     # Execute a trading action
+        ...     action = FinRLAction(actions=[0.5, -0.3])  # Buy stock 0, sell stock 1
+        ...     result = client.step(action)
+        ...     print(result.reward)
+        ...     print(result.observation.portfolio_value)
 
     Example with Docker:
         >>> # Automatically start container and connect
         >>> client = FinRLEnv.from_docker_image("finrl-env:latest")
-        >>> result = client.reset()
-        >>> result = client.step(FinRLAction(actions=[0.1]))
-        >>> client.close()
+        >>> try:
+        ...     result = client.reset()
+        ...     result = client.step(FinRLAction(actions=[0.1]))
+        ... finally:
+        ...     client.close()
 
     Example training loop:
         >>> import numpy as np
         >>> from envs.finrl_env import FinRLEnv, FinRLAction
         >>>
-        >>> client = FinRLEnv(base_url="http://localhost:8000")
-        >>>
-        >>> # Training loop
-        >>> for episode in range(10):
-        >>>     result = client.reset()
-        >>>     done = False
-        >>>     episode_reward = 0
-        >>>
-        >>>     while not done:
-        >>>         # Get state
-        >>>         state = result.observation.state
-        >>>
-        >>>         # Simple random policy (replace with your RL agent)
-        >>>         num_stocks = len(state) // 7  # Simplified calculation
-        >>>         actions = np.random.uniform(-1, 1, size=num_stocks).tolist()
-        >>>
-        >>>         # Execute action
-        >>>         result = client.step(FinRLAction(actions=actions))
-        >>>
-        >>>         episode_reward += result.reward or 0
-        >>>         done = result.done
-        >>>
-        >>>     print(f"Episode {episode}: reward={episode_reward:.2f}, "
-        >>>           f"final value={result.observation.portfolio_value:.2f}")
-        >>>
-        >>> client.close()
+        >>> with FinRLEnv(base_url="http://localhost:8000") as client:
+        ...     # Training loop
+        ...     for episode in range(10):
+        ...         result = client.reset()
+        ...         done = False
+        ...         episode_reward = 0
+        ...
+        ...         while not done:
+        ...             # Get state
+        ...             state = result.observation.state
+        ...
+        ...             # Simple random policy (replace with your RL agent)
+        ...             num_stocks = len(state) // 7  # Simplified calculation
+        ...             actions = np.random.uniform(-1, 1, size=num_stocks).tolist()
+        ...
+        ...             # Execute action
+        ...             result = client.step(FinRLAction(actions=actions))
+        ...
+        ...             episode_reward += result.reward or 0
+        ...             done = result.done
+        ...
+        ...         print(f"Episode {episode}: reward={episode_reward:.2f}, "
+        ...               f"final value={result.observation.portfolio_value:.2f}")
     """
-
-    def get_config(self) -> Dict[str, Any]:
-        """
-        Get the environment configuration from the server.
-
-        Returns:
-            Dictionary containing environment configuration
-        """
-        response = self.session.get(f"{self.base_url}/config")
-        response.raise_for_status()
-        return response.json()
 
     def _step_payload(self, action: FinRLAction) -> Dict:
         """

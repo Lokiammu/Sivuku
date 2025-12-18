@@ -22,8 +22,8 @@ Core components for OpenEnv - a framework for building HTTP-based agentic enviro
 
 ## Features
 
-- **HTTPEnvClient**: Generic HTTP client for interacting with remote environments
-- **HTTPEnvServer**: FastAPI-based server wrapper for exposing environments over HTTP
+- **EnvClient**: Generic client for interacting with remote environments
+- **HTTPEnvServer**: FastAPI-based server wrapper for exposing environments over HTTP/WebSocket
 - **Container Providers**: Pluggable architecture for running containers (Docker, Kubernetes, etc.)
 - **Type System**: Strongly-typed Action/Observation/State interfaces
 - **Web Interface**: Optional web UI for interacting with environments
@@ -44,7 +44,7 @@ pip install "openenv[core]"
 ### Creating an Environment Client
 
 ```python
-from openenv.core import HTTPEnvClient, StepResult
+from openenv.core import EnvClient, StepResult
 from dataclasses import dataclass
 
 @dataclass
@@ -55,7 +55,7 @@ class MyAction:
 class MyObservation:
     response: str
 
-class MyEnvClient(HTTPEnvClient[MyAction, MyObservation]):
+class MyEnvClient(EnvClient[MyAction, MyObservation]):
     def _step_payload(self, action: MyAction) -> dict:
         return {"text": action.text}
 
@@ -141,7 +141,7 @@ provider.stop_container()
 
 ## API Reference
 
-### HTTPEnvClient
+### EnvClient
 
 Base class for environment clients with these abstract methods:
 

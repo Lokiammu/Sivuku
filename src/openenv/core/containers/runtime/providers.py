@@ -8,7 +8,7 @@
 Container provider abstractions for running environment servers.
 
 This module provides a pluggable architecture for different container providers
-(local Docker, Kubernetes, cloud providers, etc.) to be used with HTTPEnvClient.
+(local Docker, Kubernetes, cloud providers, etc.) to be used with EnvClient.
 """
 
 from __future__ import annotations

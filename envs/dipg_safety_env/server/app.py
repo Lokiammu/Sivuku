@@ -1,4 +1,11 @@
 # envs/dipg_safety_env/server/app.py
+"""
+FastAPI application for the DIPG Safety Environment.
+
+This module creates an HTTP server that exposes the DIPGEnvironment
+over HTTP and WebSocket endpoints, compatible with EnvClient.
+"""
+
 import os
 from openenv.core.env_server import create_app
 from .dipg_environment import DIPGEnvironment
@@ -49,33 +56,27 @@ PROOF_CHANNEL_START = os.environ.get("PROOF_CHANNEL_START", "<|channel|>proof<|m
 FINAL_CHANNEL_START = os.environ.get("FINAL_CHANNEL_START", "<|channel|>final<|message|>")
 CHANNEL_END = os.environ.get("CHANNEL_END", "<|end|>")
 
-# Create the environment instance, passing all reward configurations to it.
-env = DIPGEnvironment(
-    dataset_path=DATASET_PATH,
-    # V1
-    conflict_reward=CONFLICT_REWARD,
-    abstain_reward=ABSTAIN_REWARD,
-    hallucination_penalty=HALLUCINATION_PENALTY,
-    missing_answer_penalty=MISSING_ANSWER_PENALTY,
-    # V2
-    hallucinated_trace_penalty=HALLUCINATED_TRACE_PENALTY,
-    proof_inconsistency_penalty=PROOF_INCONSISTENCY_PENALTY,
-    incorrect_answer_penalty=INCORRECT_ANSWER_PENALTY,
-    conflict_penalty=CONFLICT_PENALTY,
-    abstain_penalty=ABSTAIN_PENALTY,
-    missing_trace_penalty=MISSING_TRACE_PENALTY,
-    correct_abstention_reward=CORRECT_ABSTENTION_REWARD,
-    verifiable_trace_reward=VERIFIABLE_TRACE_REWARD,
-    correct_synthesis_reward=CORRECT_SYNTHESIS_REWARD,
-    exact_format_reward=EXACT_FORMAT_REWARD,
-    format_mismatch_penalty=FORMAT_MISMATCH_PENALTY,
-    no_hallucination_reward=NO_HALLUCINATION_REWARD,
-    # Channels
-    analysis_channel_start=ANALYSIS_CHANNEL_START,
-    proof_channel_start=PROOF_CHANNEL_START,
-    final_channel_start=FINAL_CHANNEL_START,
-    channel_end=CHANNEL_END,
-)
 
-# The rest is the same.
-app = create_app(env, DIPGAction, DIPGObservation, env_name="dipg_safety_env")
+# Factory function to create DIPGEnvironment instances
+def create_dipg_environment():
+    """Factory function that creates DIPGEnvironment with config."""
+    return DIPGEnvironment(
+        dataset_path=DATASET_PATH,
+        conflict_reward=CONFLICT_REWARD,
+        conflict_penalty=CONFLICT_PENALTY,
+        abstain_reward=ABSTAIN_REWARD,
+        abstain_penalty=ABSTAIN_PENALTY,
+        format_mismatch_penalty=FORMAT_MISMATCH_PENALTY,
+        exact_format_reward=EXACT_FORMAT_REWARD,
+        hallucination_penalty=HALLUCINATION_PENALTY,
+        no_hallucination_reward=NO_HALLUCINATION_REWARD,
+        missing_answer_penalty=MISSING_ANSWER_PENALTY,
+        analysis_channel_start=ANALYSIS_CHANNEL_START,
+        final_channel_start=FINAL_CHANNEL_START,
+        channel_end=CHANNEL_END,
+    )
+
+
+# Create the FastAPI app
+# Pass the factory function instead of an instance for WebSocket session support
+app = create_app(create_dipg_environment, DIPGAction, DIPGObservation, env_name="dipg_safety_env")

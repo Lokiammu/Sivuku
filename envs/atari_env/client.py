@@ -5,10 +5,10 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-Atari Environment HTTP Client.
+Atari Environment Client.
 
 This module provides the client for connecting to an Atari Environment server
-over HTTP.
+via WebSocket for persistent sessions.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from typing import Any, Dict, TYPE_CHECKING
 
 from openenv.core.client_types import StepResult
 
-from openenv.core.http_env_client import HTTPEnvClient
+from openenv.core.env_client import EnvClient
 
 from .models import AtariAction, AtariObservation, AtariState
 
@@ -25,28 +25,30 @@ if TYPE_CHECKING:
     from openenv.core.containers.runtime import ContainerProvider
 
 
-class AtariEnv(HTTPEnvClient[AtariAction, AtariObservation]):
+class AtariEnv(EnvClient[AtariAction, AtariObservation, AtariState]):
     """
-    HTTP client for Atari Environment.
+    Client for Atari Environment.
 
-    This client connects to an AtariEnvironment HTTP server and provides
-    methods to interact with it: reset(), step(), and state access.
+    This client maintains a persistent WebSocket connection to the environment
+    server, enabling efficient multi-step interactions with lower latency.
 
     Example:
         >>> # Connect to a running server
-        >>> client = AtariEnv(base_url="http://localhost:8000")
-        >>> result = client.reset()
-        >>> print(result.observation.screen_shape)
-        >>>
-        >>> # Take an action
-        >>> result = client.step(AtariAction(action_id=2))  # UP
-        >>> print(result.reward, result.done)
+        >>> with AtariEnv(base_url="http://localhost:8000") as client:
+        ...     result = client.reset()
+        ...     print(result.observation.screen_shape)
+        ...
+        ...     result = client.step(AtariAction(action_id=2))  # UP
+        ...     print(result.reward, result.done)
 
     Example with Docker:
         >>> # Automatically start container and connect
         >>> client = AtariEnv.from_docker_image("atari-env:latest")
-        >>> result = client.reset()
-        >>> result = client.step(AtariAction(action_id=0))  # NOOP
+        >>> try:
+        ...     result = client.reset()
+        ...     result = client.step(AtariAction(action_id=0))  # NOOP
+        ... finally:
+        ...     client.close()
     """
 
     def _step_payload(self, action: AtariAction) -> Dict[str, Any]:

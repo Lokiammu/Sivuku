@@ -8,7 +8,7 @@
 FastAPI application for the Coding Environment.
 
 This module creates an HTTP server that exposes the PythonCodeActEnv
-over HTTP endpoints, making it compatible with HTTPEnvClient.
+over HTTP and WebSocket endpoints, compatible with EnvClient.
 
 Usage:
     # Development (with auto-reload):
@@ -26,11 +26,9 @@ from openenv.core.env_server import create_app
 from coding_env.models import CodeAction, CodeObservation
 from coding_env.server.python_codeact_env import PythonCodeActEnv
 
-# Create the environment instance
-env = PythonCodeActEnv()
-
 # Create the app with web interface and README integration
-app = create_app(env, CodeAction, CodeObservation, env_name="coding_env")
+# Pass the class (factory) instead of an instance for WebSocket session support
+app = create_app(PythonCodeActEnv, CodeAction, CodeObservation, env_name="coding_env")
 
 
 if __name__ == "__main__":

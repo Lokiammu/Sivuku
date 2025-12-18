@@ -7,13 +7,10 @@
 """Core components for agentic environments."""
 
 # Re-export main components from submodules for convenience
-from .env_server import *
-from .client_types import StepResult
-from .http_env_client import HTTPEnvClient
+from .env_server import *  # noqa: F403
+from . import env_server
+from .env_client import EnvClient
 
 # Note: MCP module doesn't export anything yet
 
-__all__ = [
-    "HTTPEnvClient",
-    "StepResult",
-]
+__all__ = ["EnvClient"] + env_server.__all__  # type: ignore

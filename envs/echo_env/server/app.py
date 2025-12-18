@@ -8,7 +8,7 @@
 FastAPI application for the Echo Environment.
 
 This module creates an HTTP server that exposes the EchoEnvironment
-over HTTP endpoints, making it compatible with HTTPEnvClient.
+over HTTP and WebSocket endpoints, compatible with EnvClient.
 
 Usage:
     # Development (with auto-reload):
@@ -33,11 +33,9 @@ except ImportError:
     from models import EchoAction, EchoObservation
     from server.echo_environment import EchoEnvironment
 
-# Create the environment instance
-env = EchoEnvironment()
-
 # Create the app with web interface and README integration
-app = create_app(env, EchoAction, EchoObservation, env_name="echo_env")
+# Pass the class (factory) instead of an instance for WebSocket session support
+app = create_app(EchoEnvironment, EchoAction, EchoObservation, env_name="echo_env")
 
 
 def main():

@@ -8,18 +8,21 @@
 HTTP server wrapper for Environment instances.
 
 This module provides utilities to wrap any Environment subclass and expose it
-over HTTP endpoints that HTTPEnvClient can consume.
+over HTTP and WebSocket endpoints that EnvClient can consume.
 """
 
 from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import os
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Type
+from typing import Any, Callable, Dict, Optional, Type, Union
 
-from fastapi import Body, FastAPI, HTTPException, status
+from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect, status
 from pydantic import ValidationError
 
 from .interfaces import Environment
@@ -39,6 +42,21 @@ from .types import (
     EnvironmentMetadata,
     SchemaResponse,
     HealthResponse,
+    WSResetMessage,
+    WSStepMessage,
+    WSStateMessage,
+    WSCloseMessage,
+    WSObservationResponse,
+    WSStateResponse,
+    WSErrorResponse,
+    ConcurrencyConfig,
+    ServerCapacityStatus,
+    SessionInfo,
+)
+from .exceptions import (
+    ConcurrencyConfigurationError,
+    SessionCapacityError,
+    EnvironmentFactoryError,
 )
 
 
@@ -47,7 +65,7 @@ class HTTPEnvServer:
     HTTP server wrapper for Environment instances.
 
     This class wraps an Environment and exposes its reset(), step(), and state
-    methods as HTTP endpoints compatible with HTTPEnvClient.
+    methods as HTTP and WebSocket endpoints compatible with EnvClient.
 
     The server expects:
     - Action deserialization: Converts JSON dict to Action subclass
@@ -56,9 +74,15 @@ class HTTPEnvServer:
     Example:
         >>> from core.env_server import HTTPEnvServer
         >>> from envs.coding_env.server import CodeExecutionEnvironment
+        >>> from envs.coding_env.models import CodeAction, CodeObservation
         >>>
-        >>> env = CodeExecutionEnvironment()
-        >>> server = HTTPEnvServer(env)
+        >>> # Pass environment class (factory pattern)
+        >>> server = HTTPEnvServer(
+        ...     env=CodeExecutionEnvironment,
+        ...     action_cls=CodeAction,
+        ...     observation_cls=CodeObservation,
+        ...     max_concurrent_envs=4,
+        ... )
         >>>
         >>> # Register routes with FastAPI
         >>> from fastapi import FastAPI
@@ -68,31 +92,128 @@ class HTTPEnvServer:
 
     def __init__(
         self,
-        env: Environment,
+        env: Callable[[], Environment],
         action_cls: Type[Action],
         observation_cls: Type[Observation],
+        max_concurrent_envs: Optional[int] = None,
+        concurrency_config: Optional[ConcurrencyConfig] = None,
     ):
         """
         Initialize HTTP server wrapper.
 
         Args:
-            env: The Environment instance to wrap
+            env: Environment factory (callable) that creates new instances.
+                 Will be called to create a new environment for each WebSocket session.
             action_cls: The Action subclass this environment expects
             observation_cls: The Observation subclass this environment returns
+            max_concurrent_envs: Maximum number of concurrent WebSocket sessions.
+                                 Mutually exclusive with concurrency_config.
+            concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
+                                Mutually exclusive with max_concurrent_envs.
+
+        Raises:
+            ValueError: If both max_concurrent_envs and concurrency_config are provided.
+            ConcurrencyConfigurationError: If max_concurrent_envs > 1 for an
+                environment that is not marked as SUPPORTS_CONCURRENT_SESSIONS.
         """
-        self.env = env
+        # Validate that env is callable
+        if not callable(env):
+            raise TypeError(
+                f"env must be a callable (class or factory function), got {type(env)}. "
+                f"Pass the environment class (e.g., MyEnvironment) not an instance (e.g., MyEnvironment())."
+            )
+
+        self._env_factory: Callable[[], Environment] = env
+
+        # Handle concurrency configuration
+        if max_concurrent_envs is not None and concurrency_config is not None:
+            raise ValueError(
+                "Cannot specify both 'max_concurrent_envs' and 'concurrency_config'. "
+                "Please use only one method to configure concurrency."
+            )
+
+        if concurrency_config is not None:
+            self._concurrency_config = concurrency_config
+        elif max_concurrent_envs is not None:
+            self._concurrency_config = ConcurrencyConfig(
+                max_concurrent_envs=max_concurrent_envs,
+                session_timeout=None,
+            )
+        else:
+            # Default configuration
+            self._concurrency_config = ConcurrencyConfig(
+                max_concurrent_envs=1,
+                session_timeout=None,
+            )
+
+        self._max_concurrent_envs = self._concurrency_config.max_concurrent_envs
+
+        # Validate concurrency configuration
+        self._validate_concurrency_safety()
+
         self.action_cls = action_cls
         self.observation_cls = observation_cls
-        # Create thread pool for running sync code in async context
-        # This is needed for environments using sync libraries (e.g., Playwright sync API)
-        self._executor = ThreadPoolExecutor(max_workers=1)
 
-    async def _run_sync_in_thread_pool(self, func, *args, **kwargs):
+        # Session management for WebSocket connections
+        self._sessions: Dict[str, Environment] = {}
+        self._session_executors: Dict[str, ThreadPoolExecutor] = {}
+        self._session_info: Dict[str, SessionInfo] = {}
+        self._session_lock = asyncio.Lock()
+
+        # Create thread pool for running sync code in async context
+        # This is needed for environments using sync libraries (e.g., Playwright)
+        self._executor = ThreadPoolExecutor(max_workers=32)
+
+    def _validate_concurrency_safety(self) -> None:
+        """
+        Validate that the environment supports the configured concurrency level.
+
+        Raises:
+            ConcurrencyConfigurationError: If max_concurrent_envs > 1 for an
+                environment that is not marked as SUPPORTS_CONCURRENT_SESSIONS.
+        """
+        if self._max_concurrent_envs <= 1:
+            return
+
+        if inspect.isclass(self._env_factory):
+            env_cls = self._env_factory
+        else:
+            _temp_env = self._env_factory()
+            env_cls = type(_temp_env)
+            _temp_env.close()
+            del _temp_env
+
+        if not getattr(env_cls, "SUPPORTS_CONCURRENT_SESSIONS", False):
+            raise ConcurrencyConfigurationError(
+                environment_name=env_cls.__name__,
+                max_concurrent_envs=self._max_concurrent_envs,
+            )
+
+    def get_capacity_status(self) -> ServerCapacityStatus:
+        """
+        Get the current capacity status of the server.
+
+        Returns:
+            ServerCapacityStatus with current session counts and availability.
+        """
+        return ServerCapacityStatus.from_counts(
+            active=len(self._sessions),
+            max_sessions=self._max_concurrent_envs,
+        )
+
+    async def _run_sync_in_thread_pool(
+        self, func: Callable[..., Observation], *args, **kwargs
+    ) -> Observation:
         """Run a synchronous function in the thread pool executor."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(self._executor, lambda: func(*args, **kwargs))
 
-    def _get_valid_kwargs(self, sig, kwargs, skip_params=None):
+    def _get_valid_kwargs(
+        self,
+        sig: inspect.Signature,
+        kwargs: Dict[str, Any],
+        skip_params: Optional[set[str]] = None,
+    ) -> Dict[str, Any]:
         """Filter kwargs to only include parameters accepted by the function signature."""
         if skip_params is None:
             skip_params = set()
@@ -110,6 +231,129 @@ class HTTPEnvServer:
 
         return valid_kwargs
 
+    async def _create_session(self) -> tuple[str, Environment]:
+        """
+        Create a new WebSocket session with its own environment instance.
+
+        Returns:
+            Tuple of (session_id, environment)
+
+        Raises:
+            SessionCapacityError: If max concurrent sessions reached
+            EnvironmentFactoryError: If the factory fails to create an environment
+        """
+        async with self._session_lock:
+            if len(self._sessions) >= self._max_concurrent_envs:
+                raise SessionCapacityError(
+                    active_sessions=len(self._sessions),
+                    max_sessions=self._max_concurrent_envs,
+                )
+
+            session_id = str(uuid.uuid4())
+            current_time = time.time()
+
+            try:
+                env = self._env_factory()
+            except Exception as e:
+                factory_name = getattr(self._env_factory, "__name__", str(self._env_factory))
+                raise EnvironmentFactoryError(factory_name) from e
+
+            self._sessions[session_id] = env
+
+            self._session_executors[session_id] = ThreadPoolExecutor(max_workers=1)
+
+            # Track session metadata
+            self._session_info[session_id] = SessionInfo(
+                session_id=session_id,
+                created_at=current_time,
+                last_activity_at=current_time,
+                step_count=0,
+                environment_type=type(env).__name__,
+            )
+
+            return session_id, env
+
+    async def _destroy_session(self, session_id: str) -> None:
+        """
+        Destroy a WebSocket session and cleanup resources.
+
+        Args:
+            session_id: The session ID to destroy
+        """
+        async with self._session_lock:
+            if session_id in self._sessions:
+                env = self._sessions.pop(session_id)
+                env.close()
+
+            if session_id in self._session_executors:
+                executor = self._session_executors.pop(session_id)
+                executor.shutdown(wait=False)
+
+            self._session_info.pop(session_id, None)
+
+    def _update_session_activity(
+        self, session_id: str, increment_step: bool = False
+    ) -> None:
+        """
+        Update session activity timestamp and optionally increment step count.
+
+        Args:
+            session_id: The session ID to update
+            increment_step: If True, increment the step count
+        """
+        if session_id in self._session_info:
+            self._session_info[session_id].last_activity_at = time.time()
+            if increment_step:
+                self._session_info[session_id].step_count += 1
+
+    def get_session_info(self, session_id: str) -> Optional[SessionInfo]:
+        """
+        Get information about a specific session.
+
+        Args:
+            session_id: The session ID to query
+
+        Returns:
+            SessionInfo if the session exists, None otherwise
+        """
+        return self._session_info.get(session_id)
+
+    async def _run_in_session_executor(
+        self, session_id: str, func: Callable[..., Observation], *args, **kwargs
+    ) -> Observation:
+        """Run a synchronous function in the session's thread pool executor."""
+        executor = self._session_executors.get(session_id, self._executor)
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(executor, lambda: func(*args, **kwargs))
+
+    @property
+    def active_sessions(self) -> int:
+        """Return the number of active WebSocket sessions."""
+        return len(self._sessions)
+
+    @property
+    def max_concurrent_envs(self) -> int:
+        """Return the maximum number of concurrent environments."""
+        return self._max_concurrent_envs
+
+    @property
+    def is_concurrency_safe(self) -> bool:
+        """Return whether the environment is marked as concurrency safe."""
+        import inspect
+        if inspect.isclass(self._env_factory):
+            return getattr(self._env_factory, "SUPPORTS_CONCURRENT_SESSIONS", False)
+        else:
+            _temp_env = self._env_factory()
+            result = getattr(_temp_env, "SUPPORTS_CONCURRENT_SESSIONS", False)
+            _temp_env.close()
+            del _temp_env
+            return result
+
+    @property
+    def concurrency_config(self) -> ConcurrencyConfig:
+        """Return the concurrency configuration."""
+        return self._concurrency_config
+
     def register_routes(self, app: FastAPI) -> None:
         """
         Register HTTP routes on a FastAPI application.
@@ -123,49 +367,64 @@ class HTTPEnvServer:
             request: ResetRequest = Body(default_factory=ResetRequest),
         ) -> ResetResponse:
             """Reset endpoint - returns initial observation."""
-            # Handle optional parameters
-            # Start with all fields from the request, including extra ones
-            kwargs = request.model_dump(exclude_unset=True)
+            _env = self._env_factory()
+            
+            try:
+                kwargs = request.model_dump(exclude_unset=True)
 
-            # Pass arguments only if environment accepts them
-            sig = inspect.signature(self.env.reset)
-            valid_kwargs = self._get_valid_kwargs(sig, kwargs)
+                is_async = _env.reset_async.__func__ is not Environment.reset_async
 
-            # Run synchronous reset in thread pool to avoid blocking event loop
-            observation = await self._run_sync_in_thread_pool(
-                self.env.reset, **valid_kwargs
-            )
-            return ResetResponse(**serialize_observation(observation))
+                if is_async:
+                    sig = inspect.signature(_env.reset_async)
+                else:
+                    sig = inspect.signature(_env.reset)
+                valid_kwargs = self._get_valid_kwargs(sig, kwargs)
+
+                if is_async:
+                    observation = await _env.reset_async(**valid_kwargs)
+                else:
+                    observation = await self._run_sync_in_thread_pool(
+                        _env.reset, **valid_kwargs
+                    )
+                return ResetResponse(**serialize_observation(observation))
+            finally:
+                _env.close()
 
         # Helper function to handle step endpoint
         async def step_handler(request: StepRequest) -> StepResponse:
             """Step endpoint - executes action and returns observation."""
             action_data = request.action
 
-            # Deserialize action with Pydantic validation
             try:
                 action = deserialize_action(action_data, self.action_cls)
             except ValidationError as e:
-                # Return HTTP 422 with detailed validation errors
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=e.errors()
                 )
 
-            # Handle optional parameters
-            # Start with all fields from the request, including extra ones, but exclude 'action'
-            kwargs = request.model_dump(exclude_unset=True, exclude={"action"})
+            _env = self._env_factory()
+            
+            try:
+                kwargs = request.model_dump(exclude_unset=True, exclude={"action"})
 
-            # Pass arguments only if environment accepts them
-            sig = inspect.signature(self.env.step)
-            valid_kwargs = self._get_valid_kwargs(sig, kwargs, skip_params={"action"})
+                is_async = _env.step_async.__func__ is not Environment.step_async
 
-            # Run synchronous step in thread pool to avoid blocking event loop
-            observation = await self._run_sync_in_thread_pool(
-                self.env.step, action, **valid_kwargs
-            )
+                if is_async:
+                    sig = inspect.signature(_env.step_async)
+                else:
+                    sig = inspect.signature(_env.step)
+                valid_kwargs = self._get_valid_kwargs(sig, kwargs, skip_params={"action"})
 
-            # Return serialized observation
-            return StepResponse(**serialize_observation(observation))
+                if is_async:
+                    observation = await _env.step_async(action, **valid_kwargs)
+                else:
+                    observation = await self._run_sync_in_thread_pool(
+                        _env.step, action, **valid_kwargs
+                    )
+
+                return StepResponse(**serialize_observation(observation))
+            finally:
+                _env.close()
 
         # Register routes using the helpers
         @app.post(
@@ -251,24 +510,36 @@ The response includes:
         async def step(request: StepRequest) -> StepResponse:
             return await step_handler(request)
 
-        # Configure and register GET endpoints declaratively
+        def get_state_handler() -> State:
+            _env = self._env_factory()
+            try:
+                return _env.state
+            finally:
+                _env.close()
+        
+        def get_metadata_handler() -> EnvironmentMetadata:
+            _env = self._env_factory()
+            try:
+                return _env.get_metadata()
+            finally:
+                _env.close()
+
         get_endpoints = [
             GetEndpointConfig(
                 path="/state",
-                handler=lambda: self.env.state,
+                handler=get_state_handler,
                 response_model=State,
                 tag="State Management",
                 summary="Get current environment state",
                 description="""
 Retrieve the current internal state of the environment.
 
-This endpoint allows inspection of the environment state without modifying it.
 The structure of the state object is defined by the environment's State model.
                 """,
             ),
             GetEndpointConfig(
                 path="/metadata",
-                handler=self.env.get_metadata,
+                handler=get_metadata_handler,
                 response_model=EnvironmentMetadata,
                 tag="Environment Info",
                 summary="Get environment metadata",
@@ -289,6 +560,7 @@ version, author, and documentation links.
             ),
         ]
         register_get_endpoints(app, get_endpoints)
+
 
         # Register combined schema endpoint
         @app.get(
@@ -339,12 +611,171 @@ all schema information needed to interact with the environment.
                 state=State.model_json_schema(),
             )
 
+        # Register WebSocket endpoint for persistent sessions
+        @app.websocket("/ws")
+        async def websocket_endpoint(websocket: WebSocket):
+            """
+            WebSocket endpoint for persistent environment sessions.
+
+            Each WebSocket connection gets its own environment instance.
+
+            Message Protocol:
+            - Client sends: WSResetMessage | WSStepMessage | WSStateMessage | WSCloseMessage
+            - Server responds: WSObservationResponse | WSStateResponse | WSErrorResponse
+            """
+            await websocket.accept()
+
+            session_id = None
+            session_env = None
+
+            try:
+                # Create session with dedicated environment
+                session_id, session_env = await self._create_session()
+
+                while True:
+                    # Receive message from client
+                    raw_message = await websocket.receive_text()
+
+                    try:
+                        message_dict = json.loads(raw_message)
+                    except json.JSONDecodeError as e:
+                        error_resp = WSErrorResponse(
+                            data={
+                                "message": f"Invalid JSON: {e}",
+                                "code": "INVALID_JSON",
+                            }
+                        )
+                        await websocket.send_text(error_resp.model_dump_json())
+                        continue
+
+                    msg_type = message_dict.get("type", "")
+
+                    try:
+                        match msg_type:
+                            case "reset":
+                                msg = WSResetMessage(**message_dict)
+
+                                is_async = session_env.reset_async.__func__ is not Environment.reset_async
+
+                                if is_async:
+                                    sig = inspect.signature(session_env.reset_async)
+                                    valid_kwargs = self._get_valid_kwargs(sig, msg.data)
+                                    observation = await session_env.reset_async(**valid_kwargs)
+                                else:
+                                    sig = inspect.signature(session_env.reset)
+                                    valid_kwargs = self._get_valid_kwargs(sig, msg.data)
+                                    observation = await self._run_in_session_executor(
+                                        session_id, session_env.reset, **valid_kwargs
+                                    )
+
+                                self._update_session_activity(session_id)
+
+                                response = WSObservationResponse(
+                                    data=serialize_observation(observation)
+                                )
+
+                            case "step":
+                                msg = WSStepMessage(**message_dict)
+                                action = deserialize_action(msg.data, self.action_cls)
+
+                                is_async = session_env.step_async.__func__ is not Environment.step_async
+
+                                if is_async:
+                                    observation = await session_env.step_async(action)
+                                else:
+                                    observation = await self._run_in_session_executor(
+                                        session_id, session_env.step, action
+                                    )
+
+                                self._update_session_activity(
+                                    session_id, increment_step=True
+                                )
+
+                                response = WSObservationResponse(
+                                    data=serialize_observation(observation)
+                                )
+
+                            case "state":
+                                msg = WSStateMessage(**message_dict)
+                                state = session_env.state
+                                if hasattr(state, "model_dump"):
+                                    state_data = state.model_dump()
+                                else:
+                                    state_data = dict(state) if state else {}
+
+                                response = WSStateResponse(data=state_data)
+
+                            case "close":
+                                msg = WSCloseMessage(**message_dict)
+                                break
+
+                            case _:
+                                response = WSErrorResponse(
+                                    data={
+                                        "message": f"Unknown message type: {msg_type}",
+                                        "code": "UNKNOWN_TYPE",
+                                    }
+                                )
+
+                        await websocket.send_text(response.model_dump_json())
+
+                    except ValidationError as e:
+                        error_resp = WSErrorResponse(
+                            data={
+                                "message": "Invalid message",
+                                "code": "VALIDATION_ERROR",
+                                "errors": e.errors(),
+                            }
+                        )
+                        await websocket.send_text(error_resp.model_dump_json())
+                    except Exception as e:
+                        error_resp = WSErrorResponse(
+                            data={"message": str(e), "code": "EXECUTION_ERROR"}
+                        )
+                        await websocket.send_text(error_resp.model_dump_json())
+
+            except WebSocketDisconnect:
+                pass
+            except SessionCapacityError as e:
+                error_resp = WSErrorResponse(
+                    data={
+                        "message": str(e),
+                        "code": "CAPACITY_REACHED",
+                        "active_sessions": e.active_sessions,
+                        "max_sessions": e.max_sessions,
+                    }
+                )
+                await websocket.send_text(error_resp.model_dump_json())
+            except EnvironmentFactoryError as e:
+                error_resp = WSErrorResponse(
+                    data={
+                        "message": str(e),
+                        "code": "FACTORY_ERROR",
+                        "factory_name": e.factory_name,
+                    }
+                )
+                await websocket.send_text(error_resp.model_dump_json())
+            except Exception as e:
+                error_resp = WSErrorResponse(
+                    data={"message": str(e), "code": "SESSION_ERROR"}
+                )
+                await websocket.send_text(error_resp.model_dump_json())
+            finally:
+                if session_id:
+                    await self._destroy_session(session_id)
+                try:
+                    await websocket.close()
+                except RuntimeError:
+                    pass
+
 
 def create_app(
-    env: Environment,
+    env: Callable[[], Environment],
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     env_name: Optional[str] = None,
+    max_concurrent_envs: Optional[int] = None,
+    concurrency_config: Optional[ConcurrencyConfig] = None,
 ) -> FastAPI:
     """
     Create a FastAPI application with or without web interface.
@@ -353,10 +784,14 @@ def create_app(
     including README integration for better user experience.
 
     Args:
-        env: The Environment instance to serve
+        env: Environment factory (callable) that creates new instances
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         env_name: Optional environment name for README loading
+        max_concurrent_envs: Maximum concurrent WebSocket sessions.
+                             Mutually exclusive with concurrency_config.
+        concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
+                            Mutually exclusive with max_concurrent_envs.
 
     Returns:
         FastAPI application instance with or without web interface and README integration
@@ -373,18 +808,43 @@ def create_app(
         # Import web interface only when needed
         from .web_interface import create_web_interface_app
 
-        return create_web_interface_app(env, action_cls, observation_cls, env_name)
+        return create_web_interface_app(
+            env,
+            action_cls,
+            observation_cls,
+            env_name,
+            max_concurrent_envs,
+            concurrency_config,
+        )
     else:
         # Use standard FastAPI app without web interface
-        return create_fastapi_app(env, action_cls, observation_cls)
+        return create_fastapi_app(
+            env, action_cls, observation_cls, max_concurrent_envs, concurrency_config
+        )
 
 
 def create_fastapi_app(
-    env: Environment,
+    env: Callable[[], Environment],
     action_cls: Type[Action],
     observation_cls: Type[Observation],
+    max_concurrent_envs: Optional[int] = None,
+    concurrency_config: Optional[ConcurrencyConfig] = None,
 ) -> FastAPI:
-    """Create a FastAPI application with comprehensive documentation."""
+    """
+    Create a FastAPI application with comprehensive documentation.
+
+    Args:
+        env: Environment factory (callable) that creates new instances
+        action_cls: The Action subclass this environment expects
+        observation_cls: The Observation subclass this environment returns
+        max_concurrent_envs: Maximum concurrent WebSocket sessions.
+                             Mutually exclusive with concurrency_config.
+        concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
+                            Mutually exclusive with max_concurrent_envs.
+
+    Returns:
+        FastAPI application instance
+    """
     try:
         from fastapi import FastAPI
     except ImportError:
@@ -452,6 +912,12 @@ HTTP API for interacting with OpenEnv environments through a standardized interf
         },
     )
 
-    server = HTTPEnvServer(env, action_cls, observation_cls)
+    server = HTTPEnvServer(
+        env,
+        action_cls,
+        observation_cls,
+        max_concurrent_envs,
+        concurrency_config=concurrency_config,
+    )
     server.register_routes(app)
     return app

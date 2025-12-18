@@ -1,8 +1,9 @@
-"""HTTP client for the BrowserGym environment."""
+"""Client for the BrowserGym environment."""
 
 from typing import Any, Dict
 
-from openenv.core.http_env_client import HTTPEnvClient, StepResult
+from openenv.core.client_types import StepResult
+from openenv.core.env_client import EnvClient
 from .models import (
     BrowserGymAction,
     BrowserGymObservation,
@@ -10,8 +11,8 @@ from .models import (
 )
 
 
-class BrowserGymEnv(HTTPEnvClient[BrowserGymAction, BrowserGymObservation]):
-    """Client for interacting with the BrowserGym environment over HTTP.
+class BrowserGymEnv(EnvClient[BrowserGymAction, BrowserGymObservation, BrowserGymState]):
+    """Client for interacting with the BrowserGym environment.
 
     BrowserGym provides unified access to multiple web navigation benchmarks:
     - MiniWoB++: 100+ training tasks (no external infrastructure needed!)

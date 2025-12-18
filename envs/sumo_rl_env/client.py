@@ -5,47 +5,46 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-HTTP client for SUMO-RL environment.
+Client for SUMO-RL environment.
 
 This module provides a client to interact with the SUMO traffic signal
-control environment over HTTP.
+control environment via WebSocket for persistent sessions.
 """
 
 from typing import Any, Dict
 
 from openenv.core.client_types import StepResult
 
-from openenv.core.http_env_client import HTTPEnvClient
+from openenv.core.env_client import EnvClient
 
 from .models import SumoAction, SumoObservation, SumoState
 
 
-class SumoRLEnv(HTTPEnvClient[SumoAction, SumoObservation]):
+class SumoRLEnv(EnvClient[SumoAction, SumoObservation, SumoState]):
     """
-    HTTP client for SUMO-RL traffic signal control environment.
+    Client for SUMO-RL traffic signal control environment.
 
-    This client communicates with a SUMO environment server to control
-    traffic signals using reinforcement learning.
+    This client maintains a persistent WebSocket connection to a SUMO
+    environment server to control traffic signals using reinforcement learning.
 
     Example:
         >>> # Start container and connect
         >>> env = SumoRLEnv.from_docker_image("sumo-rl-env:latest")
-        >>>
-        >>> # Reset environment
-        >>> result = env.reset()
-        >>> print(f"Observation shape: {result.observation.observation_shape}")
-        >>> print(f"Action space: {result.observation.action_mask}")
-        >>>
-        >>> # Take action
-        >>> result = env.step(SumoAction(phase_id=1))
-        >>> print(f"Reward: {result.reward}, Done: {result.done}")
-        >>>
-        >>> # Get state
-        >>> state = env.state()
-        >>> print(f"Sim time: {state.sim_time}, Total vehicles: {state.total_vehicles}")
-        >>>
-        >>> # Cleanup
-        >>> env.close()
+        >>> try:
+        ...     # Reset environment
+        ...     result = env.reset()
+        ...     print(f"Observation shape: {result.observation.observation_shape}")
+        ...     print(f"Action space: {result.observation.action_mask}")
+        ...
+        ...     # Take action
+        ...     result = env.step(SumoAction(phase_id=1))
+        ...     print(f"Reward: {result.reward}, Done: {result.done}")
+        ...
+        ...     # Get state
+        ...     state = env.state()
+        ...     print(f"Sim time: {state.sim_time}, Total vehicles: {state.total_vehicles}")
+        ... finally:
+        ...     env.close()
 
     Example with custom network:
         >>> # Use custom SUMO network via volume mount

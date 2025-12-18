@@ -15,7 +15,33 @@ from .serialization import (
     deserialize_action_with_preprocessing,
     serialize_observation,
 )
-from .types import Action, Observation, State, SchemaResponse, HealthResponse
+from .types import (
+    Action,
+    Observation,
+    State,
+    SchemaResponse,
+    HealthResponse,
+    BaseMessage,
+    WSIncomingMessage,
+    WSResetMessage,
+    WSStepMessage,
+    WSStateMessage,
+    WSCloseMessage,
+    WSObservationResponse,
+    WSStateResponse,
+    WSErrorResponse,
+    ConcurrencyConfig,
+    ServerCapacityStatus,
+    SessionInfo,
+)
+from .exceptions import (
+    OpenEnvError,
+    ConcurrencyConfigurationError,
+    SessionCapacityError,
+    SessionNotFoundError,
+    SessionCreationError,
+    EnvironmentFactoryError,
+)
 from .web_interface import create_web_interface_app, WebInterfaceManager
 
 __all__ = [
@@ -30,6 +56,27 @@ __all__ = [
     "State",
     "SchemaResponse",
     "HealthResponse",
+    # WebSocket message types
+    "BaseMessage",
+    "WSIncomingMessage",
+    "WSResetMessage",
+    "WSStepMessage",
+    "WSStateMessage",
+    "WSCloseMessage",
+    "WSObservationResponse",
+    "WSStateResponse",
+    "WSErrorResponse",
+    # Concurrency types
+    "ConcurrencyConfig",
+    "ServerCapacityStatus",
+    "SessionInfo",
+    # Exceptions
+    "OpenEnvError",
+    "ConcurrencyConfigurationError",
+    "SessionCapacityError",
+    "SessionNotFoundError",
+    "SessionCreationError",
+    "EnvironmentFactoryError",
     # Base transforms
     "CompositeTransform",
     "NullTransform",
