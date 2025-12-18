@@ -283,9 +283,14 @@ def create_web_interface_app(
         """Get environment metadata."""
         return web_manager.metadata.model_dump()
 
-    @app.websocket("/ws")
-    async def websocket_endpoint(websocket: WebSocket):
-        """WebSocket endpoint for real-time updates."""
+    @app.websocket("/ws/ui")
+    async def websocket_ui_endpoint(websocket: WebSocket):
+        """WebSocket endpoint for web UI real-time updates.
+        
+        Note: This endpoint is separate from /ws which is used for
+        concurrent environment sessions. This endpoint is specifically
+        for the web interface state updates.
+        """
         await web_manager.connect_websocket(websocket)
         try:
             while True:
@@ -943,7 +948,7 @@ def get_web_interface_html(action_cls: Type[Action], metadata: Optional[Environm
             
             connectWebSocket() {{
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${{protocol}}//${{window.location.host}}/ws`;
+                const wsUrl = `${{protocol}}//${{window.location.host}}/ws/ui`;
                 
                 this.ws = new WebSocket(wsUrl);
                 
