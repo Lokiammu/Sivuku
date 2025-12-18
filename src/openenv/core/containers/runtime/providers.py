@@ -458,7 +458,11 @@ class DockerSwarmProvider(ContainerProvider):
 
     def wait_for_ready(self, base_url: str, timeout_s: float = 30.0) -> None:
         """
-        Wait for *all* replicas to become healthy by polling /health.
+        Wait for at least one replica to become healthy by polling /health.
+
+        Note: With Swarm's load balancer, requests round-robin across replicas,
+        so this only verifies that at least one replica is responding. Some
+        replicas may still be starting when this returns.
         """
         import time
         import requests
