@@ -8,7 +8,7 @@
 FastAPI application for the FinRL Environment.
 
 This module creates an HTTP server that exposes the FinRLEnvironment
-over HTTP endpoints, making it compatible with HTTPEnvClient.
+over HTTP and WebSocket endpoints, compatible with EnvClient.
 
 The server expects environment configuration to be provided either:
 1. Through environment variables (FINRL_CONFIG_PATH)
@@ -32,7 +32,7 @@ import os
 from pathlib import Path
 
 import pandas as pd
-from openenv.core.env_server import create_fastapi_app
+from openenv.core.env_server import create_app
 
 from ..models import FinRLAction, FinRLObservation
 from .finrl_environment import FinRLEnvironment
@@ -116,11 +116,16 @@ def load_finrl_config():
 # Load configuration
 finrl_env_class, finrl_config = load_finrl_config()
 
-# Create the environment instance
-env = FinRLEnvironment(finrl_env_class=finrl_env_class, finrl_env_config=finrl_config)
+
+# Factory function to create FinRLEnvironment instances
+def create_finrl_environment():
+    """Factory function that creates FinRLEnvironment with config."""
+    return FinRLEnvironment(finrl_env_class=finrl_env_class, finrl_env_config=finrl_config)
+
 
 # Create the FastAPI app with routes
-app = create_fastapi_app(env, FinRLAction, FinRLObservation)
+# Pass the factory function instead of an instance for WebSocket session support
+app = create_app(create_finrl_environment, FinRLAction, FinRLObservation, env_name="finrl_env")
 
 
 @app.get("/config")

@@ -4,14 +4,14 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-"""HTTP client for the generic TextArena environment."""
+"""Client for the generic TextArena environment."""
 
 from __future__ import annotations
 
 from typing import Any, Dict, TYPE_CHECKING
 
 from openenv.core.client_types import StepResult
-from openenv.core.http_env_client import HTTPEnvClient
+from openenv.core.env_client import EnvClient
 
 from .models import (
     TextArenaAction,
@@ -24,8 +24,8 @@ if TYPE_CHECKING:
     from openenv.core.containers.runtime import ContainerProvider
 
 
-class TextArenaEnv(HTTPEnvClient[TextArenaAction, TextArenaObservation]):
-    """HTTP client for the TextArena environment server."""
+class TextArenaEnv(EnvClient[TextArenaAction, TextArenaObservation, TextArenaState]):
+    """Client for the TextArena environment server."""
 
     def _step_payload(self, action: TextArenaAction) -> Dict[str, Any]:
         return {"message": action.message}

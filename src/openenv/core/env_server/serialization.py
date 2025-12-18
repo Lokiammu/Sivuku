@@ -80,7 +80,7 @@ def deserialize_action_with_preprocessing(
                     value = []
             if isinstance(value, list):
                 try:
-                    import torch
+                    import torch # type: ignore
 
                     processed_data[key] = torch.tensor(value, dtype=torch.long)
                 except ImportError:
@@ -109,9 +109,9 @@ def serialize_observation(observation: Observation) -> Dict[str, Any]:
         observation: Observation instance
 
     Returns:
-        Dictionary compatible with HTTPEnvClient._parse_result()
+        Dictionary compatible with EnvClient._parse_result()
 
-    The format matches what HTTPEnvClient expects:
+    The format matches what EnvClient expects:
     {
         "observation": {...},  # Observation fields
         "reward": float | None,
@@ -131,7 +131,7 @@ def serialize_observation(observation: Observation) -> Dict[str, Any]:
     reward = observation.reward
     done = observation.done
 
-    # Return in HTTPEnvClient expected format
+    # Return in EnvClient expected format
     return {
         "observation": obs_dict,
         "reward": reward,

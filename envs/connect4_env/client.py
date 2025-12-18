@@ -5,10 +5,10 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-Connect4 Environment HTTP Client.
+Connect4 Environment Client.
 
 This module provides the client for connecting to a Connect4 Environment server
-over HTTP.
+via WebSocket for persistent sessions.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any, Dict, TYPE_CHECKING
 
 from openenv.core.client_types import StepResult
-from openenv.core.http_env_client import HTTPEnvClient
+from openenv.core.env_client import EnvClient
 
 from .models import Connect4Action, Connect4Observation, Connect4State
 
@@ -24,21 +24,20 @@ if TYPE_CHECKING:
     from openenv.core.containers.runtime import ContainerProvider
 
 
-class Connect4Env(HTTPEnvClient[Connect4Action, Connect4Observation]):
+class Connect4Env(EnvClient[Connect4Action, Connect4Observation, Connect4State]):
     """
-    HTTP client for Connect4 Environment.
+    Client for Connect4 Environment.
 
-    This client connects to a Connect4Environment HTTP server and provides
-    methods to interact with it: reset(), step(), and state access.
+    This client maintains a persistent WebSocket connection to the environment
+    server, enabling efficient multi-step interactions with lower latency.
 
     Example:
-        >>> client = Connect4Env(base_url="http://localhost:8000")
-        >>> result = client.reset()
-        >>> print(result.observation.board)
-        >>>
-        >>> # Take an action
-        >>> result = client.step(Connect4Action(column=3))
-        >>> print(result.reward, result.done)
+        >>> with Connect4Env(base_url="http://localhost:8000") as client:
+        ...     result = client.reset()
+        ...     print(result.observation.board)
+        ...
+        ...     result = client.step(Connect4Action(column=3))
+        ...     print(result.reward, result.done)
     """
 
     def _step_payload(self, action: Connect4Action) -> Dict[str, Any]:

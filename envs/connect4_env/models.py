@@ -12,14 +12,12 @@ via the OpenEnv interface.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
-import numpy as np
-from typing import List
+from typing import List, Dict, Any
+from pydantic import Field
 
 from openenv.core.env_server import Action, Observation, State
 
 
-@dataclass
 class Connect4Action(Action):
     """
     Action for Connect4 environment.
@@ -30,7 +28,6 @@ class Connect4Action(Action):
     column: int
 
 
-@dataclass(kw_only=True)
 class Connect4Observation(Observation):
     """
     Observation for Connect4 environment.
@@ -43,15 +40,10 @@ class Connect4Observation(Observation):
         reward: Reward for the last action.
     """
     
-    board: List[List[int]]
-    legal_actions: List[int]
-    done: bool = False
-    reward: float = 0.0
-    metadata: dict = field(default_factory=dict)
-    
+    board: List[List[int]] = Field(default_factory=list)
+    legal_actions: List[int] = Field(default_factory=list)
 
 
-@dataclass(kw_only=True)
 class Connect4State(State):
     """
     State for Connect4 environment.
@@ -62,7 +54,5 @@ class Connect4State(State):
         next_player: Whose turn it is (1 or -1).
         step_count: Number of steps taken in the game.
     """
-    episode_id: str
-    board: List[List[int]] = field(default_factory=lambda: np.zeros((6,7), dtype=int).tolist())
+    board: List[List[int]] = Field(default_factory=lambda: [[0]*7 for _ in range(6)])
     next_player: int = 1
-    step_count: int = 0

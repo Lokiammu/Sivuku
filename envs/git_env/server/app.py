@@ -44,16 +44,21 @@ if not gitea_username:
 if not gitea_password:
     raise RuntimeError("GITEA_PASSWORD environment variable is required")
 
-# Create the environment instance (connects to external Gitea)
-env = GitTaskEnvironment(
-    gitea_url=gitea_url,
-    username=gitea_username,
-    password=gitea_password,
-    workspace_dir=workspace_dir,
-)
+
+# Factory function to create GitTaskEnvironment instances
+def create_git_environment():
+    """Factory function that creates GitTaskEnvironment with config."""
+    return GitTaskEnvironment(
+        gitea_url=gitea_url,
+        username=gitea_username,
+        password=gitea_password,
+        workspace_dir=workspace_dir,
+    )
+
 
 # Create the app with web interface and README integration
-app = create_app(env, GitAction, GitObservation, env_name="git_env")
+# Pass the factory function instead of an instance for WebSocket session support
+app = create_app(create_git_environment, GitAction, GitObservation, env_name="git_env")
 
 
 if __name__ == "__main__":

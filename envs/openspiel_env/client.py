@@ -5,10 +5,10 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-OpenSpielEnv HTTP Client.
+OpenSpielEnv Client.
 
 This module provides the client for connecting to an OpenSpiel Environment server
-over HTTP.
+via WebSocket for persistent sessions.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from openenv.core.client_types import StepResult
 
-from openenv.core.http_env_client import HTTPEnvClient
+from openenv.core.env_client import EnvClient
 
 from .models import OpenSpielAction, OpenSpielObservation, OpenSpielState
 
@@ -25,28 +25,30 @@ if TYPE_CHECKING:
     from openenv.core.containers.runtime import ContainerProvider
 
 
-class OpenSpielEnv(HTTPEnvClient[OpenSpielAction, OpenSpielObservation]):
+class OpenSpielEnv(EnvClient[OpenSpielAction, OpenSpielObservation, OpenSpielState]):
     """
-    HTTP client for OpenSpiel Environment.
+    Client for OpenSpiel Environment.
 
-    This client connects to an OpenSpielEnvironment HTTP server and provides
-    methods to interact with it: reset(), step(), and state access.
+    This client maintains a persistent WebSocket connection to the environment
+    server, enabling efficient multi-step interactions with lower latency.
 
     Example:
         >>> # Connect to a running server
-        >>> client = OpenSpielEnv(base_url="http://localhost:8000")
-        >>> result = client.reset()
-        >>> print(result.observation.info_state)
-        >>>
-        >>> # Take an action
-        >>> result = client.step(OpenSpielAction(action_id=1, game_name="catch"))
-        >>> print(result.observation.reward)
+        >>> with OpenSpielEnv(base_url="http://localhost:8000") as client:
+        ...     result = client.reset()
+        ...     print(result.observation.info_state)
+        ...
+        ...     result = client.step(OpenSpielAction(action_id=1, game_name="catch"))
+        ...     print(result.observation.reward)
 
     Example with Docker:
         >>> # Automatically start container and connect
         >>> client = OpenSpielEnv.from_docker_image("openspiel-env:latest")
-        >>> result = client.reset()
-        >>> result = client.step(OpenSpielAction(action_id=0))
+        >>> try:
+        ...     result = client.reset()
+        ...     result = client.step(OpenSpielAction(action_id=0))
+        ... finally:
+        ...     client.close()
     """
 
     def _step_payload(self, action: OpenSpielAction) -> Dict[str, Any]:

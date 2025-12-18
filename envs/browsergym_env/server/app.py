@@ -15,19 +15,24 @@ viewport_height = int(os.environ.get("BROWSERGYM_VIEWPORT_HEIGHT", "720"))
 timeout = float(os.environ.get("BROWSERGYM_TIMEOUT", "10000"))
 port = int(os.environ.get("BROWSERGYM_PORT", "8000"))
 
-# Create the environment instance
-env = BrowserGymEnvironment(
-    benchmark=benchmark,
-    task_name=task_name,
-    headless=headless,
-    viewport_width=viewport_width,
-    viewport_height=viewport_height,
-    timeout=timeout,
-)
+
+# Factory function to create BrowserGymEnvironment instances
+def create_browsergym_environment():
+    """Factory function that creates BrowserGymEnvironment with config."""
+    return BrowserGymEnvironment(
+        benchmark=benchmark,
+        task_name=task_name,
+        headless=headless,
+        viewport_width=viewport_width,
+        viewport_height=viewport_height,
+        timeout=timeout,
+    )
+
 
 # Create the FastAPI app
+# Pass the factory function instead of an instance for WebSocket session support
 app = create_app(
-    env,
+    create_browsergym_environment,
     BrowserGymAction,
     BrowserGymObservation,
     env_name="browsergym_env",

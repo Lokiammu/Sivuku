@@ -5,13 +5,11 @@ benchmarks including MiniWoB (training), WebArena (evaluation), VisualWebArena,
 and more under a single Gymnasium-compatible API.
 """
 
-from dataclasses import dataclass
 from typing import List, Optional
 
 from openenv.core.env_server.types import Action, Observation, State
 
 
-@dataclass(kw_only=True)
 class BrowserGymAction(Action):
     """Action to be executed in the BrowserGym environment.
 
@@ -30,7 +28,6 @@ class BrowserGymAction(Action):
     """Natural language action string (e.g., "click('Submit')")"""
 
 
-@dataclass(kw_only=True)
 class BrowserGymObservation(Observation):
     """Observation returned from the BrowserGym environment.
 
@@ -63,7 +60,6 @@ class BrowserGymObservation(Observation):
     """Whether the last action resulted in an error"""
 
 
-@dataclass
 class BrowserGymState(State):
     """State of the BrowserGym environment.
 

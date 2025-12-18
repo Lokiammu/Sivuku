@@ -3,7 +3,7 @@
 import json
 import random
 from pathlib import Path
-from openenv.core.http_env_client import StepResult
+from openenv.core.client_types import StepResult
 from openenv.core.env_server import Environment
 from ..models import DIPGAction, DIPGObservation, DIPGState
 import re
