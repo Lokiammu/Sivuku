@@ -248,7 +248,9 @@ class LocalDockerProvider(ContainerProvider):
 
             time.sleep(0.5)
 
-        raise TimeoutError(f"Container at {base_url} did not become ready within {timeout_s}s")
+        raise TimeoutError(
+            f"Container at {base_url} did not become ready within {timeout_s}s"
+        )
 
     def _find_available_port(self) -> int:
         """
@@ -474,7 +476,9 @@ class DockerSwarmProvider(ContainerProvider):
 
             time.sleep(0.5)
 
-        raise TimeoutError(f"Swarm service at {base_url} did not become ready within {timeout_s}s")
+        raise TimeoutError(
+            f"Swarm service at {base_url} did not become ready within {timeout_s}s"
+        )
 
     def _ensure_docker_available(self) -> None:
         import subprocess
@@ -491,7 +495,9 @@ class DockerSwarmProvider(ContainerProvider):
             FileNotFoundError,
             subprocess.TimeoutExpired,
         ) as exc:
-            raise RuntimeError("Docker is not available. Please install Docker Desktop or Docker Engine.") from exc
+            raise RuntimeError(
+                "Docker is not available. Please install Docker Desktop or Docker Engine."
+            ) from exc
 
     def _ensure_swarm_initialized(self) -> None:
         import subprocess
