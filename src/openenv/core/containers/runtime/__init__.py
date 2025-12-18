@@ -8,6 +8,7 @@
 
 from .providers import (
     ContainerProvider,
+    DockerSwarmProvider,
     KubernetesProvider,
     LocalDockerProvider,
     RuntimeProvider,
@@ -16,6 +17,7 @@ from .uv_provider import UVProvider
 
 __all__ = [
     "ContainerProvider",
+    "DockerSwarmProvider",
     "LocalDockerProvider",
     "KubernetesProvider",
     "RuntimeProvider",
