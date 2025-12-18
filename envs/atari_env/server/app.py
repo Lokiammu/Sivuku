@@ -8,7 +8,7 @@
 FastAPI application for the Atari Environment.
 
 This module creates an HTTP server that exposes Atari games
-over HTTP endpoints, making them compatible with HTTPEnvClient.
+over HTTP and WebSocket endpoints, compatible with EnvClient.
 
 Usage:
     # Development (with auto-reload):
@@ -52,19 +52,24 @@ difficulty = os.getenv("ATARI_DIFFICULTY")
 mode = int(mode) if mode is not None else None
 difficulty = int(difficulty) if difficulty is not None else None
 
-# Create the environment instance
-env = AtariEnvironment(
-    game_name=game_name,
-    obs_type=obs_type,
-    full_action_space=full_action_space,
-    mode=mode,
-    difficulty=difficulty,
-    repeat_action_probability=repeat_action_prob,
-    frameskip=frameskip,
-)
+
+# Factory function to create AtariEnvironment instances
+def create_atari_environment():
+    """Factory function that creates AtariEnvironment with config."""
+    return AtariEnvironment(
+        game_name=game_name,
+        obs_type=obs_type,
+        full_action_space=full_action_space,
+        mode=mode,
+        difficulty=difficulty,
+        repeat_action_probability=repeat_action_prob,
+        frameskip=frameskip,
+    )
+
 
 # Create the FastAPI app with web interface and README integration
-app = create_app(env, AtariAction, AtariObservation, env_name="atari_env")
+# Pass the factory function instead of an instance for WebSocket session support
+app = create_app(create_atari_environment, AtariAction, AtariObservation, env_name="atari_env")
 
 
 if __name__ == "__main__":

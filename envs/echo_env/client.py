@@ -5,10 +5,10 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-Echo Environment HTTP Client.
+Echo Environment Client.
 
 This module provides the client for connecting to an Echo Environment server
-over HTTP.
+via WebSocket for persistent sessions.
 """
 
 from typing import Any, Dict
@@ -18,39 +18,42 @@ try:
     # In-repo imports (when running from OpenEnv repository)
     from openenv.core.client_types import StepResult
     from openenv.core.env_server.types import State
-    from openenv.core.http_env_client import HTTPEnvClient
+    from openenv.core.env_client import EnvClient
     from .models import EchoAction, EchoObservation
 except ImportError:
     # Standalone imports (when environment is standalone with openenv from pip)
     from openenv.core.client_types import StepResult
     from openenv.core.env_server.types import State
-    from openenv.core.http_env_client import HTTPEnvClient
+    from openenv.core.env_client import EnvClient
     from models import EchoAction, EchoObservation
 
 
-class EchoEnv(HTTPEnvClient[EchoAction, EchoObservation]):
+class EchoEnv(EnvClient[EchoAction, EchoObservation, State]):
     """
-    HTTP client for the Echo Environment.
+    Client for the Echo Environment.
 
-    This client connects to an EchoEnvironment HTTP server and provides
-    methods to interact with it: reset(), step(), and state access.
+    This client maintains a persistent WebSocket connection to the environment
+    server, enabling efficient multi-step interactions with lower latency.
+    Each client instance has its own dedicated environment session on the server.
 
     Example:
         >>> # Connect to a running server
-        >>> client = EchoEnv(base_url="http://localhost:8000")
-        >>> result = client.reset()
-        >>> print(result.observation.echoed_message)
-        >>>
-        >>> # Send a message
-        >>> result = client.step(EchoAction(message="Hello!"))
-        >>> print(result.observation.echoed_message)
-        >>> print(result.reward)
+        >>> with EchoEnv(base_url="http://localhost:8000") as client:
+        ...     result = client.reset()
+        ...     print(result.observation.echoed_message)
+        ...
+        ...     result = client.step(EchoAction(message="Hello!"))
+        ...     print(result.observation.echoed_message)
+        ...     print(result.reward)
 
     Example with Docker:
         >>> # Automatically start container and connect
         >>> client = EchoEnv.from_docker_image("echo-env:latest")
-        >>> result = client.reset()
-        >>> result = client.step(EchoAction(message="Test"))
+        >>> try:
+        ...     result = client.reset()
+        ...     result = client.step(EchoAction(message="Test"))
+        ... finally:
+        ...     client.close()
     """
 
     def _step_payload(self, action: EchoAction) -> Dict:

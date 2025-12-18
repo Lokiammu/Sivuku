@@ -3,7 +3,9 @@
 GitEnv Client
 -------------
 Client-side wrapper for the Git environment server.
-Talks HTTP to a single base_url exposing: /reset and /step.
+
+This client maintains a persistent WebSocket connection to the environment
+server, enabling efficient multi-step interactions with lower latency.
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from openenv.core.client_types import StepResult
-from openenv.core.http_env_client import HTTPEnvClient
+from openenv.core.env_client import EnvClient
 
 from .models import GitAction, GitObservation, GitState
 
@@ -19,12 +21,12 @@ if TYPE_CHECKING:
     from openenv.core.containers.runtime import ContainerProvider
 
 
-class GitEnv(HTTPEnvClient[GitAction, GitObservation]):
+class GitEnv(EnvClient[GitAction, GitObservation, GitState]):
     """
     Client for Git Environment with Gitea server.
 
-    This client communicates with the Git environment server over HTTP,
-    allowing agents to perform Git operations through a simple API.
+    This client maintains a persistent WebSocket connection to the environment
+    server, enabling efficient multi-step interactions for Git operations.
 
     The environment connects to a shared external Gitea service. Repositories
     must be pre-migrated to Gitea before use.
@@ -32,25 +34,25 @@ class GitEnv(HTTPEnvClient[GitAction, GitObservation]):
     Example:
         >>> # From Docker image
         >>> client = GitEnv.from_docker_image("git-env:latest")
-        >>> result = client.reset()
-        >>>
-        >>> # List available repositories
-        >>> from envs.git_env import GitAction
-        >>> result = client.step(GitAction(action_type="list_repos"))
-        >>> print(result.observation.repos)
-        >>>
-        >>> # Clone repository to workspace
-        >>> result = client.step(GitAction(action_type="clone_repo", repo_name="OpenEnv"))
-        >>>
-        >>> # Execute git commands
-        >>> result = client.step(GitAction(
-        ...     action_type="execute_git_command",
-        ...     command="status",
-        ...     working_dir="OpenEnv"
-        ... ))
-        >>>
-        >>> # Cleanup
-        >>> client.close()
+        >>> try:
+        ...     result = client.reset()
+        ...
+        ...     # List available repositories
+        ...     from envs.git_env import GitAction
+        ...     result = client.step(GitAction(action_type="list_repos"))
+        ...     print(result.observation.repos)
+        ...
+        ...     # Clone repository to workspace
+        ...     result = client.step(GitAction(action_type="clone_repo", repo_name="OpenEnv"))
+        ...
+        ...     # Execute git commands
+        ...     result = client.step(GitAction(
+        ...         action_type="execute_git_command",
+        ...         command="status",
+        ...         working_dir="OpenEnv"
+        ...     ))
+        ... finally:
+        ...     client.close()
     """
 
     def _step_payload(self, action: GitAction) -> dict:

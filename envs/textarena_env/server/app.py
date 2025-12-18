@@ -35,15 +35,22 @@ download_nltk = os.getenv("TEXTARENA_DOWNLOAD_NLTK", "1") in {"1", "true", "True
 
 extra_kwargs = _parse_env_kwargs()
 
-environment = TextArenaEnvironment(
-    env_id=env_id,
-    num_players=num_players,
-    max_turns=max_turns,
-    download_nltk=download_nltk,
-    env_kwargs=extra_kwargs,
-)
 
-app = create_app(environment, TextArenaAction, TextArenaObservation, env_name="textarena_env")
+# Factory function to create TextArenaEnvironment instances
+def create_textarena_environment():
+    """Factory function that creates TextArenaEnvironment with config."""
+    return TextArenaEnvironment(
+        env_id=env_id,
+        num_players=num_players,
+        max_turns=max_turns,
+        download_nltk=download_nltk,
+        env_kwargs=extra_kwargs,
+    )
+
+
+# Create the FastAPI app
+# Pass the factory function instead of an instance for WebSocket session support
+app = create_app(create_textarena_environment, TextArenaAction, TextArenaObservation, env_name="textarena_env")
 
 
 if __name__ == "__main__":

@@ -5,10 +5,10 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-Chat Environment HTTP Client.
+Chat Environment Client.
 
 This module provides the client for connecting to a Chat Environment server
-over HTTP.
+via WebSocket for persistent sessions.
 """
 
 from typing import Any, Dict
@@ -17,40 +17,42 @@ import torch
 from openenv.core.client_types import StepResult
 
 from openenv.core.env_server.interfaces import Message
-from openenv.core.env_server.types import State
-from openenv.core.http_env_client import HTTPEnvClient
+from openenv.core.env_client import EnvClient
 
 from .models import ChatAction, ChatObservation, ChatState
 
 
-class ChatEnv(HTTPEnvClient[ChatAction, ChatObservation]):
+class ChatEnv(EnvClient[ChatAction, ChatObservation, ChatState]):
     """
-    HTTP client for the Chat Environment.
+    Client for the Chat Environment.
 
-    This client connects to a ChatEnvironment HTTP server and provides
-    methods to interact with it: reset(), step(), and state access.
+    This client maintains a persistent WebSocket connection to the environment
+    server, enabling efficient multi-step interactions with lower latency.
 
-    Note: Since ChatEnvironment works with PyTorch tensors, the HTTP layer
+    Note: Since ChatEnvironment works with PyTorch tensors, the client
     serializes tokens as lists for transport and deserializes them back to tensors.
 
     Example:
         >>> # Connect to a running server
-        >>> client = ChatEnv(base_url="http://localhost:8000")
-        >>> result = client.reset()
-        >>> print(result.observation.messages)
-        >>>
-        >>> # Send an action with tokens
-        >>> import torch
-        >>> tokens = torch.tensor([[1, 2, 3, 4, 5]])
-        >>> result = client.step(ChatAction(tokens=tokens))
-        >>> print(result.observation.messages)
-        >>> print(result.reward)
+        >>> with ChatEnv(base_url="http://localhost:8000") as client:
+        ...     result = client.reset()
+        ...     print(result.observation.messages)
+        ...
+        ...     # Send an action with tokens
+        ...     import torch
+        ...     tokens = torch.tensor([[1, 2, 3, 4, 5]])
+        ...     result = client.step(ChatAction(tokens=tokens))
+        ...     print(result.observation.messages)
+        ...     print(result.reward)
 
     Example with Docker:
         >>> # Automatically start container and connect
         >>> client = ChatEnv.from_docker_image("chat-env:latest")
-        >>> result = client.reset()
-        >>> result = client.step(ChatAction(tokens=torch.tensor([[1, 2, 3]])))
+        >>> try:
+        ...     result = client.reset()
+        ...     result = client.step(ChatAction(tokens=torch.tensor([[1, 2, 3]])))
+        ... finally:
+        ...     client.close()
     """
 
     def _step_payload(self, action: ChatAction) -> Dict:

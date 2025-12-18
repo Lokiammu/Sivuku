@@ -3,22 +3,24 @@
 Client implementation for the custom DIPGSafetyEnv.
 
 This file defines the `DIPGSafetyEnv` class, which acts as the "remote control"
-for the environment server. Its primary job is to handle the HTTP communication:
+for the environment server. It maintains a persistent WebSocket connection
+for efficient multi-step interactions:
   1.  It takes Python objects (like an Action) from the agent's code.
   2.  It converts them into JSON to send to the server.
   3.  It receives JSON responses from the server.
   4.  It parses that JSON back into useful Python objects (like Observations and Rewards).
 """
 
-from openenv.core.http_env_client import HTTPEnvClient, StepResult
+from openenv.core.client_types import StepResult
+from openenv.core.env_client import EnvClient
 from .models import DIPGAction, DIPGObservation, DIPGState
 
 
-class DIPGSafetyEnv(HTTPEnvClient[DIPGAction, DIPGObservation]):
+class DIPGSafetyEnv(EnvClient[DIPGAction, DIPGObservation, DIPGState]):
     """
     Client for interacting with the `DIPGSafetyEnv` server.
 
-    This class inherits from the base `HTTPEnvClient` and is specialized to handle
+    This class inherits from the base `EnvClient` and is specialized to handle
     the specific data types of our environment: `DIPGAction` and `DIPGObservation`.
     """
     
@@ -31,8 +33,8 @@ class DIPGSafetyEnv(HTTPEnvClient[DIPGAction, DIPGObservation]):
             timeout: The number of seconds to wait for a server response.
         """
         # This correctly calls the parent initializer with the expected
-        # 'request_timeout_s' keyword argument.
-        super().__init__(base_url=base_url, request_timeout_s=timeout)
+        # 'message_timeout_s' keyword argument.
+        super().__init__(base_url=base_url, message_timeout_s=timeout)
     # ----------------------------------------
 
     def _step_payload(self, action: DIPGAction) -> dict:

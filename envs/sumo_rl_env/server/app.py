@@ -13,7 +13,7 @@ via the OpenEnv API using SUMO (Simulation of Urban MObility).
 
 import os
 
-from openenv.core.env_server import create_fastapi_app
+from openenv.core.env_server import create_app
 
 from ..models import SumoAction, SumoObservation
 from .sumo_environment import SumoEnvironment
@@ -29,19 +29,23 @@ max_green = int(os.getenv("SUMO_MAX_GREEN", "50"))
 reward_fn = os.getenv("SUMO_REWARD_FN", "diff-waiting-time")
 sumo_seed = int(os.getenv("SUMO_SEED", "42"))
 
-# Create single environment instance
-# This is reused for all HTTP requests (avoids TraCI connection issues)
-env = SumoEnvironment(
-    net_file=net_file,
-    route_file=route_file,
-    num_seconds=num_seconds,
-    delta_time=delta_time,
-    yellow_time=yellow_time,
-    min_green=min_green,
-    max_green=max_green,
-    reward_fn=reward_fn,
-    sumo_seed=sumo_seed,
-)
+
+# Factory function to create SumoEnvironment instances
+def create_sumo_environment():
+    """Factory function that creates SumoEnvironment with config."""
+    return SumoEnvironment(
+        net_file=net_file,
+        route_file=route_file,
+        num_seconds=num_seconds,
+        delta_time=delta_time,
+        yellow_time=yellow_time,
+        min_green=min_green,
+        max_green=max_green,
+        reward_fn=reward_fn,
+        sumo_seed=sumo_seed,
+    )
+
 
 # Create FastAPI app
-app = create_fastapi_app(env, SumoAction, SumoObservation)
+# Pass the factory function instead of an instance for WebSocket session support
+app = create_app(create_sumo_environment, SumoAction, SumoObservation, env_name="sumo_rl_env")

@@ -8,7 +8,7 @@
 FastAPI application for the Chat Environment.
 
 This module creates an HTTP server that exposes the ChatEnvironment
-over HTTP endpoints, making it compatible with HTTPEnvClient.
+over HTTP and WebSocket endpoints, compatible with EnvClient.
 
 Note: This server requires a tokenizer to be initialized. The tokenizer
 must be specified when starting the server.
@@ -27,7 +27,6 @@ Usage:
 import os
 
 from openenv.core.env_server import create_app
-from openenv.core.env_server.web_interface import create_web_interface_app
 
 from ..models import ChatAction, ChatObservation
 from .chat_environment import ChatEnvironment
@@ -64,12 +63,17 @@ def get_tokenizer():
 # Get system prompt from environment
 system_prompt = os.environ.get("SYSTEM_PROMPT", None)
 
-# Create the environment instance with tokenizer
-tokenizer = get_tokenizer()
-env = ChatEnvironment(tokenizer=tokenizer, system_prompt=system_prompt)
+
+# Factory function to create ChatEnvironment instances
+def create_chat_environment():
+    """Factory function that creates ChatEnvironment with tokenizer."""
+    tokenizer = get_tokenizer()
+    return ChatEnvironment(tokenizer=tokenizer, system_prompt=system_prompt)
+
 
 # Create the FastAPI app with web interface and README integration
-app = create_app(env, ChatAction, ChatObservation, env_name="chat_env")
+# Pass the factory function instead of an instance for WebSocket session support
+app = create_app(create_chat_environment, ChatAction, ChatObservation, env_name="chat_env")
 
 
 if __name__ == "__main__":

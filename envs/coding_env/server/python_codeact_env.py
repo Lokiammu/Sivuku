@@ -14,9 +14,9 @@ Python code actions using PyExecutor.
 import uuid
 
 from openenv.core.env_server.interfaces import Action, Environment, Observation
-from coding_env.server.python_executor import PyExecutor
+from .python_executor import PyExecutor
 
-from coding_env.models import CodeAction, CodeObservation, CodeState
+from ..models import CodeAction, CodeObservation, CodeState
 from .transforms import create_safe_coding_transform
 
 
