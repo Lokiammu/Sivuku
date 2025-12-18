@@ -10,7 +10,7 @@ A typical workflow looks like:
 
 1. Scaffold a new environment with `openenv init`.
 2. Customize your models, environment logic, and FastAPI server.
-3. Implement a typed `HTTPEnvClient`.
+3. Implement a typed `EnvClient` (WebSocket-based for persistent sessions).
 4. Configure dependencies and the Dockerfile once.
 5. Use the CLI (`openenv build`, `openenv validate`, `openenv push`) to package and share your work.
 
@@ -119,29 +119,52 @@ class MyEnvironment(Environment):
 
 ### 4. Create the FastAPI Server
 
-`server/app.py` should expose the environment through `create_fastapi_app`:
+`server/app.py` should expose the environment through `create_app`.
+
+**Important:** You must pass a class or factory function (not an instance) to enable WebSocket-based concurrent sessions:
 
 ```python
 # server/app.py
-from openenv.core.env_server import create_fastapi_app
+from openenv.core.env_server import create_app
 from ..models import MyAction, MyObservation
 from .my_environment import MyEnvironment
 
-env = MyEnvironment()
-app = create_fastapi_app(env, MyAction, MyObservation)
+# Pass the class (factory) - each WebSocket session gets its own instance
+app = create_app(MyEnvironment, MyAction, MyObservation, env_name="my_env")
+```
+
+For environments with constructor arguments, create a factory function:
+
+```python
+# server/app.py
+import os
+from openenv.core.env_server import create_app
+from ..models import MyAction, MyObservation
+from .my_environment import MyEnvironment
+
+# Read config from environment variables
+api_key = os.getenv("MY_API_KEY")
+timeout = int(os.getenv("MY_TIMEOUT", "30"))
+
+def create_my_environment():
+    """Factory function that creates MyEnvironment with config."""
+    return MyEnvironment(api_key=api_key, timeout=timeout)
+
+# Pass the factory function
+app = create_app(create_my_environment, MyAction, MyObservation, env_name="my_env")
 ```
 
 ### 5. Implement the Client
 
-`client.py` extends `HTTPEnvClient` so users can interact with your server over HTTP or Docker:
+`client.py` extends `EnvClient` so users can interact with your server via WebSocket for persistent sessions:
 
 ```python
 # client.py
-from openenv.core.http_env_client import HTTPEnvClient
-from openenv.core.types import StepResult
+from openenv.core.env_client import EnvClient
+from openenv.core.client_types import StepResult
 from .models import MyAction, MyObservation, MyState
 
-class MyEnv(HTTPEnvClient[MyAction, MyObservation]):
+class MyEnv(EnvClient[MyAction, MyObservation, MyState]):
     def _step_payload(self, action: MyAction) -> dict:
         return {"command": action.command, "parameters": action.parameters}
 
@@ -156,6 +179,8 @@ class MyEnv(HTTPEnvClient[MyAction, MyObservation]):
     def _parse_state(self, payload: dict) -> MyState:
         return MyState(**payload)
 ```
+
+The `EnvClient` maintains a persistent WebSocket connection to the server, enabling efficient multi-step interactions with lower latency compared to HTTP. Each client instance gets its own dedicated environment session on the server.
 
 ### 6. Configure Dependencies & Dockerfile
 
@@ -322,22 +347,29 @@ client = MyEnv.from_hub("my-org/my-env")
 # Or, connect to the local server
 client = MyEnv(base_url="http://localhost:8000")
 
-# Reset
-result = client.reset()
-print(result.observation.result)  # "Ready"
+# Use context manager for automatic cleanup (recommended)
+with client:
+    # Reset
+    result = client.reset()
+    print(result.observation.result)  # "Ready"
 
-# Execute actions
-result = client.step(MyAction(command="test", parameters={}))
-print(result.observation.result)
-print(result.observation.success)
+    # Execute actions
+    result = client.step(MyAction(command="test", parameters={}))
+    print(result.observation.result)
+    print(result.observation.success)
 
-# Get state
-state = client.state()
-print(state.episode_id)
-print(state.step_count)
+    # Get state
+    state = client.state()
+    print(state.episode_id)
+    print(state.step_count)
 
-# Cleanup
-client.close()
+# Or manually manage the connection
+try:
+    client = MyEnv(base_url="http://localhost:8000")
+    result = client.reset()
+    result = client.step(MyAction(command="test", parameters={}))
+finally:
+    client.close()
 ```
 
 ## Nice work! You've now built and used your own OpenEnv environment.
