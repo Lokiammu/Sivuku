@@ -241,7 +241,9 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
             docker_provider = provider or LocalDockerProvider()
             tag = provider_kwargs.pop("tag", "latest")
             image = f"registry.hf.space/{repo_id.replace('/', '-')}:{tag}"
-            base_url = docker_provider.start_container(image, **start_args, **provider_kwargs)
+            base_url = docker_provider.start_container(
+                image, **start_args, **provider_kwargs
+            )
             docker_provider.wait_for_ready(base_url)
 
             client = cls(base_url=base_url, provider=docker_provider)

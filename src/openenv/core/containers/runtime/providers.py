@@ -248,7 +248,9 @@ class LocalDockerProvider(ContainerProvider):
 
             time.sleep(0.5)
 
-        raise TimeoutError(f"Container at {base_url} did not become ready within {timeout_s}s")
+        raise TimeoutError(
+            f"Container at {base_url} did not become ready within {timeout_s}s"
+        )
 
     def _find_available_port(self) -> int:
         """
