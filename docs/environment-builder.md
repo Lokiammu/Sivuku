@@ -58,33 +58,26 @@ my_env/
     └── Dockerfile
 ```
 
-Python classes are generated for the action, observation, and state, and a client is generated for the environment. For example, you will find `MyEnvironment`, `MyAction`, `MyObservation`, and `MyState` in the `my_env` directory based on the name of the environment you provided.
+Python classes are generated for the action, observation, environment, and client. For example, you will find `MyEnvironment`, `MyAction`, `MyObservation`, and `MyEnv` (client) in the `my_env` directory based on the name you provided. The environment uses the core `State` class from `openenv.core.env_server.types`.
 
 ### 2. Define Models
 
-Edit `models.py` to describe your action, observation, and state dataclasses:
+Edit `models.py` to describe your action and observation using Pydantic:
 
 ```python
 # models.py
-from dataclasses import dataclass
-from openenv.core.env_server import Action, Observation, State
+from pydantic import Field
+from openenv.core.env_server.types import Action, Observation
 
-@dataclass
 class MyAction(Action):
     """Your custom action."""
-    command: str
-    parameters: dict
+    command: str = Field(..., description="Command to execute")
+    parameters: dict = Field(default_factory=dict, description="Command parameters")
 
-@dataclass
 class MyObservation(Observation):
     """Your custom observation."""
-    result: str
-    success: bool
-
-@dataclass
-class MyState(State):
-    """Custom state fields."""
-    custom_field: int = 0
+    result: str = Field(..., description="Result of the action")
+    success: bool = Field(..., description="Whether the action succeeded")
 ```
 
 ### 3. Implement Environment Logic
@@ -93,27 +86,27 @@ Customize `server/my_environment.py` by extending `Environment`:
 
 ```python
 # server/my_environment.py
-import uuid
-from openenv.core.env_server import Environment
-from ..models import MyAction, MyObservation, MyState
+from uuid import uuid4
+from openenv.core.env_server.interfaces import Environment
+from openenv.core.env_server.types import State
+from models import MyAction, MyObservation
 
 class MyEnvironment(Environment):
     def __init__(self):
-        super().__init__()
-        self._state = MyState()
+        self._state = State(episode_id=str(uuid4()), step_count=0)
 
     def reset(self) -> MyObservation:
-        self._state = MyState(episode_id=str(uuid.uuid4()))
-        return MyObservation(result="Ready", success=True)
+        self._state = State(episode_id=str(uuid4()), step_count=0)
+        return MyObservation(result="Ready", success=True, done=False, reward=0.0)
 
     def step(self, action: MyAction) -> MyObservation:
         # Implement your logic here
         self._state.step_count += 1
         result = self._execute_command(action.command)
-        return MyObservation(result=result, success=True)
+        return MyObservation(result=result, success=True, done=False, reward=1.0)
 
     @property
-    def state(self) -> MyState:
+    def state(self) -> State:
         return self._state
 ```
 
@@ -169,15 +162,24 @@ class MyEnv(EnvClient[MyAction, MyObservation, MyState]):
         return {"command": action.command, "parameters": action.parameters}
 
     def _parse_result(self, payload: dict) -> StepResult[MyObservation]:
-        obs = MyObservation(**payload["observation"])
+        obs_data = payload.get("observation", {})
+        obs = MyObservation(
+            result=obs_data.get("result", ""),
+            success=obs_data.get("success", False),
+            done=payload.get("done", False),
+            reward=payload.get("reward"),
+        )
         return StepResult(
             observation=obs,
             reward=payload.get("reward"),
             done=payload.get("done", False),
         )
 
-    def _parse_state(self, payload: dict) -> MyState:
-        return MyState(**payload)
+    def _parse_state(self, payload: dict) -> State:
+        return State(
+            episode_id=payload.get("episode_id"),
+            step_count=payload.get("step_count", 0),
+        )
 ```
 
 The `EnvClient` maintains a persistent WebSocket connection to the server, enabling efficient multi-step interactions with lower latency compared to HTTP. Each client instance gets its own dedicated environment session on the server.
