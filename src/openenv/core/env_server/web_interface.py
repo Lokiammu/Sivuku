@@ -13,17 +13,22 @@ including a two-pane layout for HumanAgent interaction and state observation.
 
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List, Optional, Type
 from datetime import datetime
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
-from pydantic import Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from .interfaces import Environment
-from .serialization import deserialize_action_with_preprocessing, serialize_observation
-from .types import Action, Observation, State, EnvironmentMetadata, ConcurrencyConfig, BaseMessage
+from .serialization import (
+    deserialize_action_with_preprocessing,
+    serialize_observation,
+)
+from .types import Action, Observation, State, EnvironmentMetadata
 
 
 def load_environment_metadata(env: Environment, env_name: Optional[str] = None) -> EnvironmentMetadata:
@@ -96,8 +101,10 @@ def _load_readme_from_filesystem(env_name: Optional[str]) -> Optional[str]:
     return None
 
 
-class ActionLog(BaseMessage):
+class ActionLog(BaseModel):
     """Log entry for an action taken."""
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     timestamp: str = Field(description="Timestamp when action was taken")
     action: Dict[str, Any] = Field(description="Action that was taken")
@@ -107,8 +114,10 @@ class ActionLog(BaseMessage):
     step_count: int = Field(description="Step count when this action was taken")
 
 
-class EpisodeState(BaseMessage):
+class EpisodeState(BaseModel):
     """Current episode state for the web interface."""
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     episode_id: Optional[str] = Field(default=None, description="Current episode ID")
     step_count: int = Field(description="Current step count in episode")
@@ -134,8 +143,24 @@ class WebInterfaceManager:
             name=env.__class__.__name__,
             description=f"{env.__class__.__name__} environment",
         )
-        self.episode_state = EpisodeState(episode_id=None, step_count=0, current_observation=None, action_logs=[])
+        self.episode_state = EpisodeState(
+            episode_id=None,
+            step_count=0,
+            current_observation=None,
+            action_logs=[],
+        )
         self.connected_clients: List[WebSocket] = []
+        # Thread pool for running sync code (e.g., Playwright sync API) in async context
+        self._executor = ThreadPoolExecutor(max_workers=1)
+
+    async def _run_sync_in_thread_pool(self, func, *args, **kwargs):
+        """Run a synchronous function in the thread pool executor.
+
+        This is needed for environments using sync libraries (e.g., Playwright sync API)
+        that cannot be called directly from an async context.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(self._executor, lambda: func(*args, **kwargs))
 
     async def connect_websocket(self, websocket: WebSocket):
         """Connect a new WebSocket client."""
@@ -174,7 +199,9 @@ class WebInterfaceManager:
 
     async def reset_environment(self) -> Dict[str, Any]:
         """Reset the environment and update state."""
-        observation: Observation = self.env.reset()
+        # Run sync reset in thread pool to avoid blocking event loop
+        # and to support environments using sync libraries (e.g., Playwright)
+        observation: Observation = await self._run_sync_in_thread_pool(self.env.reset)
         state: State = self.env.state
 
         # Serialize observation once using shared utility
@@ -197,8 +224,9 @@ class WebInterfaceManager:
         # Deserialize action with preprocessing for web interface special cases
         action: Action = deserialize_action_with_preprocessing(action_data, self.action_cls)
 
-        # Execute step
-        observation: Observation = self.env.step(action)
+        # Run sync step in thread pool to avoid blocking event loop
+        # and to support environments using sync libraries (e.g., Playwright)
+        observation: Observation = await self._run_sync_in_thread_pool(self.env.step, action)
         state: State = self.env.state
 
         # Serialize observation once using shared utility
@@ -233,25 +261,19 @@ class WebInterfaceManager:
 
 
 def create_web_interface_app(
-    env: Callable[[], Environment],
+    env: Environment,
     action_cls: Type[Action],
     observation_cls: Type[Observation],
     env_name: Optional[str] = None,
-    max_concurrent_envs: Optional[int] = None,
-    concurrency_config: Optional[ConcurrencyConfig] = None,
 ) -> FastAPI:
     """
     Create a FastAPI application with web interface for the given environment.
 
     Args:
-        env: Environment factory (callable) that creates new instances
+        env: The Environment instance to serve
         action_cls: The Action subclass this environment expects
         observation_cls: The Observation subclass this environment returns
         env_name: Optional environment name for README loading
-        max_concurrent_envs: Maximum concurrent WebSocket sessions.
-                             Mutually exclusive with concurrency_config.
-        concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
-                            Mutually exclusive with max_concurrent_envs.
 
     Returns:
         FastAPI application instance with web interface
@@ -259,16 +281,13 @@ def create_web_interface_app(
     from .http_server import create_fastapi_app
 
     # Create the base environment app
-    app = create_fastapi_app(env, action_cls, observation_cls, max_concurrent_envs, concurrency_config)
-
-    # Create a test instance for metadata
-    env_instance = env()
+    app = create_fastapi_app(env, action_cls, observation_cls)
 
     # Load environment metadata
-    metadata = load_environment_metadata(env_instance, env_name)
+    metadata = load_environment_metadata(env, env_name)
 
     # Create web interface manager
-    web_manager = WebInterfaceManager(env_instance, action_cls, observation_cls, metadata)
+    web_manager = WebInterfaceManager(env, action_cls, observation_cls, metadata)
 
     # Add web interface routes
     @app.get("/web", response_class=HTMLResponse)
@@ -284,10 +303,9 @@ def create_web_interface_app(
     @app.websocket("/ws/ui")
     async def websocket_ui_endpoint(websocket: WebSocket):
         """WebSocket endpoint for web UI real-time updates.
-
-        Note: This endpoint is separate from /ws which is used for
-        concurrent environment sessions. This endpoint is specifically
-        for the web interface state updates.
+        
+        Note: Uses /ws/ui to avoid conflict with /ws in http_server.py
+        which is used for concurrent environment sessions.
         """
         await web_manager.connect_websocket(websocket)
         try:
@@ -305,13 +323,12 @@ def create_web_interface_app(
     @app.post("/web/step")
     async def web_step(request: Dict[str, Any]):
         """Step endpoint for web interface."""
+        # Check if this is a message-based request (chat environment)
         if "message" in request:
             message = request["message"]
-            if hasattr(web_manager.env, "message_to_action"):
-                action = getattr(web_manager.env, "message_to_action")(message)
-                action_data = {"tokens": action.tokens.tolist()}
-            else:
-                action_data = request.get("action", {})
+            # Convert message to action using the environment's message_to_action method
+            action = web_manager.env.message_to_action(message)
+            action_data = {"tokens": action.tokens.tolist()}
         else:
             action_data = request.get("action", {})
 
@@ -334,7 +351,6 @@ def get_web_interface_html(action_cls: Type[Action], metadata: Optional[Environm
         for field_name, field_info in action_cls.model_fields.items():
             if (
                 field_name == "tokens"
-                and field_info.annotation is not None
                 and hasattr(field_info.annotation, "__name__")
                 and "Tensor" in field_info.annotation.__name__
             ):
@@ -1240,7 +1256,9 @@ def get_web_interface_html(action_cls: Type[Action], metadata: Optional[Environm
     )
 
 
-def _generate_instructions_section(metadata: Optional[EnvironmentMetadata]) -> str:
+def _generate_instructions_section(
+    metadata: Optional[EnvironmentMetadata],
+) -> str:
     """Generate the instructions section with environment documentation."""
     if not metadata or not metadata.readme_content:
         return ""
