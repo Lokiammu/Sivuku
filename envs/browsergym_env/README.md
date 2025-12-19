@@ -43,7 +43,7 @@ BrowserGym provides a complete pipeline for developing web agents: train on simp
 ### No Setup Required! 🎉
 
 ```python
-from envs.browsergym_env import BrowserGymEnv, BrowserGymAction
+from browsergym_env import BrowserGymEnv, BrowserGymAction
 
 # Create environment for MiniWoB training task
 env = BrowserGymEnv.from_docker_image(
