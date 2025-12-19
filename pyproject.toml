@@ -45,8 +45,8 @@ cli = [
     "tomli-w>=1.2.0",
 ]
 all = [
-    "openenv[core]",
-    "openenv[cli]",
+    "openenv-core[core]",
+    "openenv-core[cli]",
 ]
 
 [project.scripts]
