@@ -18,7 +18,7 @@ The `openenv.core` package provides the core abstractions for building and runni
 
 ### Client contracts
 
-::: openenv.core.http_env_client
+::: openenv.core.env_client
 
 ### Shared dataclasses
 
