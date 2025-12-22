@@ -16,7 +16,7 @@ pip install openenv-core
 Let's start by using the Echo Environment. This is a simple environment that echoes back messages.
 
 ```python
-from envs.echo_env import EchoAction, EchoEnv
+from echo_env import EchoAction, EchoEnv
 
 # Automatically start container and connect
 client = EchoEnv.from_docker_image("echo-env:latest")
@@ -39,7 +39,7 @@ client.close()  # Stops and removes container
 You can also use environments from Hugging Face. To do this, you can use the `from_hub` method of the environment class.
 
 ```python
-from envs.echo_env import EchoEnv
+from echo_env import EchoEnv
 
 client = EchoEnv.from_hub("meta-pytorch/echo-env")
 ```
@@ -49,7 +49,7 @@ In the background, the environment will be pulled from Hugging Face and a contai
 You can also connect to the remote space on Hugging Face by passing the base URL to the environment class.
 
 ```python
-from envs.echo_env import EchoEnv
+from echo_env import EchoEnv
 
 client = EchoEnv(base_url="https://openenv-echo-env.hf.space")
 ```
@@ -59,7 +59,7 @@ client = EchoEnv(base_url="https://openenv-echo-env.hf.space")
 You can also use environments from Docker containers. To do this, you can use the `from_docker_image` method of the environment class.
 
 ```python
-from envs.echo_env import EchoEnv
+from echo_env import EchoEnv
 
 client = EchoEnv.from_docker_image("registry.hf.space/openenv-echo-env:latest")
 ```
@@ -75,7 +75,7 @@ docker run -p 8000:8000 registry.hf.space/openenv-echo-env:latest
 Then you can use the environment via its HTTP interface.
 
 ```python
-from envs.echo_env import EchoEnv
+from echo_env import EchoEnv
 
 client = EchoEnv(base_url="http://localhost:8000")
 ```
@@ -101,7 +101,7 @@ uvicorn server.app:app --host 0.0.0.0 --port 8000
 Then you can use the environment via its HTTP interface.
 
 ```python
-from envs.echo_env import EchoEnv
+from echo_env import EchoEnv
 
 client = EchoEnv(base_url="http://localhost:8000")
 ```

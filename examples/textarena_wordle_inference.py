@@ -33,8 +33,8 @@ from typing import Iterable, List
 
 from openai import OpenAI
 
-from envs.textarena_env import TextArenaAction, TextArenaEnv
-from envs.textarena_env.models import TextArenaMessage
+from textarena_env import TextArenaAction, TextArenaEnv
+from textarena_env.models import TextArenaMessage
 
 # ---------------------------------------------------------------------------
 # Configuration
