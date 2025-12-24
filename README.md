@@ -11,6 +11,37 @@ An e2e framework for creating, deploying and using isolated execution environmen
 
 **🚀 Featured Example:** Train LLMs to play BlackJack using [torchforge](https://github.com/meta-pytorch/torchforge) (PyTorch's agentic RL framework): [`examples/grpo_blackjack/`](examples/grpo_blackjack/)
 
+## Quick Start
+
+Install OpenEnv with pip from this repo like so: 
+
+```sh
+pip install https://github.com/meta-pytorch/OpenEnv.git
+```
+
+You can then use an OpenEnv from the Hugging Face hub like so:
+
+```python
+from envs.echo_env import EchoAction, EchoEnv
+
+# Automatically start container and connect
+client = EchoEnv.from_hub("openenv/echo-env")
+
+# Reset the environment
+result = client.reset()
+print(result.observation.echoed_message)  # "Echo environment ready!"
+
+# Send messages
+result = client.step(EchoAction(message="Hello, World!"))
+print(result.observation.echoed_message)  # "Hello, World!"
+print(result.reward)  # 1.3 (based on message length)
+
+# Cleanup
+client.close()  # Stops and removes container
+```
+
+For a detailed quick start, check out the [docs page](https://meta-pytorch.org/OpenEnv/quickstart/).
+
 ## OpenEnv on partner platforms:
 
 - [Lightning AI Studio](https://lightning.ai/environments?section=featured)
