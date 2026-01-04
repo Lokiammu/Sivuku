@@ -122,7 +122,8 @@ class WildfireEnvironment(Environment):
         # Initialize burn timers before creating state
         burn_timers = [0] * (w * h)
         
-        self._state = WildfireState(
+        # Use model_construct to bypass Pydantic validation for dataclass/Pydantic compatibility
+        self._state = WildfireState.model_construct(
             episode_id=str(uuid.uuid4()),
             step_count=0,
             total_burned=0,
