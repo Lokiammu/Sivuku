@@ -577,7 +577,7 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
             
             connectWebSocket() {{
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${{protocol}}//${{window.location.host}}/ws`;
+                const wsUrl = `${{protocol}}//${{window.location.host}}/ws/ui`;
                 
                 this.ws = new WebSocket(wsUrl);
                 

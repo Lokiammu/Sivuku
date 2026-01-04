@@ -61,7 +61,7 @@ if enable_web:
         """Get environment metadata."""
         return asdict(metadata)
 
-    @app.websocket("/ws")
+    @app.websocket("/ws/ui")
     async def websocket_endpoint(websocket: WebSocket):
         """WebSocket endpoint for real-time updates."""
         await web_manager.connect_websocket(websocket)
