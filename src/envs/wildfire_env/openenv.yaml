@@ -1,6 +1,0 @@
-name: wildfire_env
-version: "0.1.0"
-description: "Wildfire containment environment for OpenEnv"
-action: WildfireAction
-observation: WildfireObservation
-

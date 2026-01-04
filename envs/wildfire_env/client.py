@@ -1,12 +1,16 @@
 # Support both in-repo and standalone imports
 try:
     # In-repo imports (when running from OpenEnv repository)
-    from core.http_env_client import HTTPEnvClient
-    from core.client_types import StepResult
+    from openenv.core.http_env_client import HTTPEnvClient
+    from openenv.core.client_types import StepResult
     from .models import WildfireAction, WildfireObservation, WildfireState
 except ImportError:
     # Standalone imports (when environment is standalone with openenv-core from pip)
-    from openenv_core.http_env_client import HTTPEnvClient
+    try:
+        from openenv_core.http_env_client import HTTPEnvClient
+    except ImportError:
+        # Fallback to local compatibility shim if package doesn't have it yet
+        from .http_env_client_compat import HTTPEnvClient
     from openenv_core.client_types import StepResult
     from wildfire_env.models import WildfireAction, WildfireObservation, WildfireState
 

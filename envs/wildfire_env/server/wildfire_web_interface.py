@@ -12,7 +12,7 @@ from dataclasses import asdict
 # Support both in-repo and standalone imports
 try:
     # In-repo imports (when running from OpenEnv repository)
-    from core.env_server.types import EnvironmentMetadata
+    from openenv.core.env_server.types import EnvironmentMetadata
     from ..models import WildfireAction
 except ImportError:
     # Standalone imports (when environment is standalone with openenv-core from pip)
@@ -720,6 +720,50 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                     
                     const result = await response.json();
                     console.log('Step result:', result);
+                    console.log('Step result observation:', result.observation);
+                    console.log('Step result observation grid:', result.observation?.grid);
+                    
+                    // Update UI immediately from the response (don't wait for WebSocket)
+                    if (result.observation) {{
+                        const obs = result.observation;
+                        // Update grid if available - check both direct grid and nested observation structure
+                        let gridData = obs.grid;
+                        let gridWidth = obs.width;
+                        let gridHeight = obs.height;
+                        
+                        // If grid is missing but we have dimensions, try to get from nested structure
+                        if ((!gridData || gridData.length === 0) && gridWidth && gridHeight) {{
+                            console.warn('Grid data is empty in observation, checking nested structure...');
+                            // The observation might be nested differently - check the full structure
+                            console.log('Full observation structure:', JSON.stringify(obs, null, 2));
+                        }}
+                        
+                        if (gridData && Array.isArray(gridData) && gridData.length > 0 && gridWidth && gridHeight) {{
+                            console.log('Updating grid from step response:', gridWidth, 'x', gridHeight, 'cells:', gridData.length);
+                            this.renderGrid(gridData, gridWidth, gridHeight);
+                        }} else {{
+                            console.warn('Grid data not available in step response - will rely on WebSocket update');
+                        }}
+                        // Update stats
+                        if (obs.remaining_water !== undefined) {{
+                            document.getElementById('water-remaining').textContent = obs.remaining_water;
+                        }}
+                        if (obs.remaining_breaks !== undefined) {{
+                            document.getElementById('breaks-remaining').textContent = obs.remaining_breaks;
+                        }}
+                        if (obs.burning_count !== undefined) {{
+                            document.getElementById('burning-count').textContent = obs.burning_count;
+                        }}
+                        if (obs.wind_dir) {{
+                            document.getElementById('wind-dir').textContent = obs.wind_dir;
+                        }}
+                        if (obs.humidity !== undefined) {{
+                            document.getElementById('humidity').textContent = obs.humidity.toFixed(2);
+                        }}
+                        if (obs.step !== undefined) {{
+                            document.getElementById('step-count').textContent = obs.step;
+                        }}
+                    }}
                 }} catch (error) {{
                     console.error('Error submitting action:', error);
                     alert('Error submitting action: ' + error.message);

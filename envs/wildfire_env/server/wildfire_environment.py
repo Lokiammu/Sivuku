@@ -87,7 +87,10 @@ class WildfireEnvironment(Environment):
         # burn lifetime in ticks (balanced model)
         self.burn_lifetime = 3
 
-        self._state = WildfireState()
+        # Initialize state with minimal defaults (will be properly set in reset())
+        # We can't use WildfireState() directly due to Pydantic/dataclass conflicts,
+        # so we'll initialize it in reset() and handle None case in state property
+        self._state: WildfireState | None = None
 
     # --- Core API ---
 
@@ -116,7 +119,11 @@ class WildfireEnvironment(Environment):
             if 0 <= i < len(grid):
                 grid[i] = 2
 
-        self._state = WildfireState(
+        # Initialize burn timers before creating state
+        burn_timers = [0] * (w * h)
+        
+        # Use model_construct to bypass Pydantic validation for dataclass/Pydantic compatibility
+        self._state = WildfireState.model_construct(
             episode_id=str(uuid.uuid4()),
             step_count=0,
             total_burned=0,
@@ -129,10 +136,8 @@ class WildfireEnvironment(Environment):
             remaining_water=self.init_water,
             remaining_breaks=self.init_breaks,
             grid=grid,
+            burn_timers=burn_timers,
         )
-
-        # per-cell burn timers (persist across steps)
-        self._state.burn_timers = [0] * (w * h)
 
         obs = self._make_observation(reward_hint=0.0)
         return obs
@@ -391,7 +396,8 @@ class WildfireEnvironment(Environment):
         st = self._state
         burning = self._burning_count()
         burned = sum(1 for v in st.grid if v == 0)
-        return WildfireObservation(
+        # Use model_construct to bypass Pydantic validation for dataclass/Pydantic compatibility
+        return WildfireObservation.model_construct(
             grid=st.grid[:],
             width=self.w,
             height=self.h,
@@ -409,5 +415,23 @@ class WildfireEnvironment(Environment):
     @property
     def state(self) -> WildfireState:
         """Return the current environment state."""
+        if self._state is None:
+            # Initialize with minimal defaults if accessed before reset()
+            # Use model_construct to bypass Pydantic validation for dataclass/Pydantic compatibility
+            self._state = WildfireState.model_construct(
+                episode_id="",
+                step_count=0,
+                total_burned=0,
+                total_extinguished=0,
+                last_action="reset",
+                width=0,
+                height=0,
+                wind_dir="CALM",
+                humidity=0.25,
+                remaining_water=self.init_water,
+                remaining_breaks=self.init_breaks,
+                grid=[],
+                burn_timers=[],
+            )
         return self._state
 
