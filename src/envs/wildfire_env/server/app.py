@@ -7,9 +7,9 @@ from dataclasses import asdict
 # Support both in-repo and standalone imports
 try:
     # In-repo imports (when running from OpenEnv repository)
-    from core.env_server import create_fastapi_app
-    from core.env_server.web_interface import load_environment_metadata, WebInterfaceManager
-    from core.env_server.types import Action, Observation
+    from openenv.core.env_server import create_fastapi_app
+    from openenv.core.env_server.web_interface import load_environment_metadata, WebInterfaceManager
+    from openenv.core.env_server.types import Action, Observation
     from ..models import WildfireAction, WildfireObservation
     from .wildfire_environment import WildfireEnvironment
     from .wildfire_web_interface import get_wildfire_web_interface_html
