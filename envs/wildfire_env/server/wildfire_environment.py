@@ -396,7 +396,8 @@ class WildfireEnvironment(Environment):
         st = self._state
         burning = self._burning_count()
         burned = sum(1 for v in st.grid if v == 0)
-        return WildfireObservation(
+        # Use model_construct to bypass Pydantic validation for dataclass/Pydantic compatibility
+        return WildfireObservation.model_construct(
             grid=st.grid[:],
             width=self.w,
             height=self.h,
