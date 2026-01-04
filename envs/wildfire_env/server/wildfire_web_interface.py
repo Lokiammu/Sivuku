@@ -12,7 +12,7 @@ from dataclasses import asdict
 # Support both in-repo and standalone imports
 try:
     # In-repo imports (when running from OpenEnv repository)
-    from core.env_server.types import EnvironmentMetadata
+    from openenv.core.env_server.types import EnvironmentMetadata
     from ..models import WildfireAction
 except ImportError:
     # Standalone imports (when environment is standalone with openenv-core from pip)
