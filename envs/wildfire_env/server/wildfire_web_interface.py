@@ -711,6 +711,12 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
             }}
             
             async submitAction() {{
+                // Check if environment has been reset
+                if (!this.isInitialized) {{
+                    alert('Please click "Reset Environment" first to initialize the environment before taking actions.');
+                    return;
+                }}
+                
                 const formData = new FormData(document.getElementById('action-form'));
                 const action = {{}};
                 
@@ -808,6 +814,10 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                     const result = await response.json();
                     console.log('Reset result:', result);
                     console.log('Reset observation:', result.observation);
+                    
+                    // Mark environment as initialized
+                    this.isInitialized = true;
+                    this.updateActionButtonState();
                     
                     // Render grid immediately after reset and update stats
                     if (result.observation && result.observation.grid) {{
