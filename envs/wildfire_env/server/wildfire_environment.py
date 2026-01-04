@@ -414,7 +414,8 @@ class WildfireEnvironment(Environment):
         """Return the current environment state."""
         if self._state is None:
             # Initialize with minimal defaults if accessed before reset()
-            self._state = WildfireState(
+            # Use model_construct to bypass Pydantic validation for dataclass/Pydantic compatibility
+            self._state = WildfireState.model_construct(
                 episode_id="",
                 step_count=0,
                 total_burned=0,
