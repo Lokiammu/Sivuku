@@ -763,6 +763,13 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                         if (obs.step !== undefined) {{
                             document.getElementById('step-count').textContent = obs.step;
                         }}
+                        // Update wind direction and humidity if available
+                        if (obs.wind_dir) {{
+                            document.getElementById('wind-dir').textContent = obs.wind_dir;
+                        }}
+                        if (obs.humidity !== undefined) {{
+                            document.getElementById('humidity').textContent = obs.humidity.toFixed(2);
+                        }}
                     }}
                 }} catch (error) {{
                     console.error('Error submitting action:', error);
