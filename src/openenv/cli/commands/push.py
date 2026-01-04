@@ -40,7 +40,7 @@ def _validate_openenv_directory(directory: Path) -> tuple[str, dict]:
     # Load and validate manifest
     manifest_path = directory / "openenv.yaml"
     try:
-        with open(manifest_path, "r") as f:
+        with open(manifest_path, "r", encoding="utf-8") as f:
             manifest = yaml.safe_load(f)
     except Exception as e:
         raise typer.BadParameter(f"Failed to parse openenv.yaml: {e}") from e
@@ -92,7 +92,13 @@ def _ensure_hf_authenticated() -> str:
         )
 
         try:
-            login()
+            # Check for token in environment variable
+            import os
+            token = os.getenv("HF_TOKEN")
+            if token:
+                login(token=token)
+            else:
+                login()
             # Verify login worked
             user_info = whoami()
             # Handle both dict and object return types
@@ -168,7 +174,7 @@ def _prepare_staging_directory(
 
     # Modify Dockerfile to optionally enable web interface and update base image
     if dockerfile_path and dockerfile_path.exists():
-        dockerfile_content = dockerfile_path.read_text()
+        dockerfile_content = dockerfile_path.read_text(encoding="utf-8")
         lines = dockerfile_content.split("\n")
         new_lines = []
         cmd_found = False
@@ -211,7 +217,7 @@ def _prepare_staging_directory(
         if base_image and not base_image_updated:
             new_lines.insert(0, f"FROM {base_image}")
 
-        dockerfile_path.write_text("\n".join(new_lines))
+        dockerfile_path.write_text("\n".join(new_lines), encoding="utf-8")
 
         changes = []
         if base_image and base_image_updated:
@@ -231,7 +237,7 @@ def _prepare_staging_directory(
     if enable_interface:
         readme_path = staging_dir / "README.md"
         if readme_path.exists():
-            readme_content = readme_path.read_text()
+            readme_content = readme_path.read_text(encoding="utf-8")
             if "base_path: /web" not in readme_content:
                 # Check if frontmatter exists
                 if readme_content.startswith("---"):
@@ -246,7 +252,7 @@ def _prepare_staging_directory(
                             if "base_path:" not in "\n".join(new_lines):
                                 new_lines.insert(-1, "base_path: /web")
                             _in_frontmatter = False
-                    readme_path.write_text("\n".join(new_lines))
+                    readme_path.write_text("\n".join(new_lines), encoding="utf-8")
                 else:
                     # No frontmatter, add it
                     frontmatter = f"""---
@@ -263,7 +269,7 @@ tags:
 ---
 
 """
-                    readme_path.write_text(frontmatter + readme_content)
+                    readme_path.write_text(frontmatter + readme_content, encoding="utf-8")
                 console.print(
                     "[bold green]Γ£ô[/bold green] Updated README with HF Space frontmatter"
                 )
