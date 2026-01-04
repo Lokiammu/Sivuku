@@ -87,7 +87,22 @@ class WildfireEnvironment(Environment):
         # burn lifetime in ticks (balanced model)
         self.burn_lifetime = 3
 
-        self._state = WildfireState()
+        # Initialize state with minimal defaults (will be properly set in reset())
+        self._state = WildfireState(
+            episode_id="",
+            step_count=0,
+            total_burned=0,
+            total_extinguished=0,
+            last_action="reset",
+            width=0,
+            height=0,
+            wind_dir="CALM",
+            humidity=0.25,
+            remaining_water=self.init_water,
+            remaining_breaks=self.init_breaks,
+            grid=[],
+            burn_timers=[],
+        )
 
     # --- Core API ---
 
