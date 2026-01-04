@@ -10,8 +10,15 @@ try:
     from openenv_core.http_env_client import HTTPEnvClient
 except ImportError:
     # Fallback: create HTTPEnvClient from EnvClient
-    from openenv_core.env_client import EnvClient
-    from openenv_core.env_server.types import State
+    # Try openenv.core first (correct package structure)
+    try:
+        from openenv.core.env_client import EnvClient
+        from openenv.core.env_server.types import State
+    except ImportError:
+        # Fallback to openenv_core (legacy compatibility)
+        from openenv_core.env_client import EnvClient
+        from openenv_core.env_server.types import State
+    
     from typing import Generic, TypeVar
 
     ActT = TypeVar("ActT")
