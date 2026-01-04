@@ -920,15 +920,16 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                 
                 // Update action logs
                 const logsDiv = document.getElementById('action-logs');
-                if (episodeState.action_logs.length === 0) {{
+                if (!episodeState.action_logs || episodeState.action_logs.length === 0) {{
                     logsDiv.innerHTML = 'No actions taken yet';
                 }} else {{
+                    console.log('Updating action logs:', episodeState.action_logs.length, 'logs');
                     logsDiv.innerHTML = episodeState.action_logs.map(log => `
                         <div class="log-entry">
                             <div class="log-timestamp">${{log.timestamp}} (Step ${{log.step_count}})</div>
                             <div class="log-action">Action: ${{JSON.stringify(log.action, null, 2)}}</div>
                             <div>
-                                <span class="log-reward">Reward: ${{log.reward !== null ? log.reward.toFixed(2) : 'None'}}</span>
+                                <span class="log-reward">Reward: ${{log.reward !== null && log.reward !== undefined ? log.reward.toFixed(2) : 'None'}}</span>
                                 ${{log.done ? '<span class="log-done">DONE</span>' : ''}}
                             </div>
                         </div>
