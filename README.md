@@ -2,7 +2,7 @@
 
 An e2e framework for creating, deploying and using isolated execution environments for agentic RL training, built using Gymnasium style simple APIs.
 
-[![PyPI](https://img.shields.io/pypi/v/openenv-core?color=blue)](https://pypi.org/project/openenv-core/)
+[![PyPI](https://img.shields.io/pypi/v/openenv?color=blue)](https://pypi.org/project/openenv/)
 [![Discord](https://img.shields.io/badge/Discord-OpenEnv-7289da?style=flat&logo=discord&logoColor=white)](https://discord.gg/YsTYBh6PD9)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meta-pytorch/OpenEnv/blob/main/examples/OpenEnv_Tutorial.ipynb)
 [![Docs](https://img.shields.io/badge/Docs-Explore-blue?logo=readthedocs&logoColor=white)](https://meta-pytorch.org/OpenEnv/)
@@ -10,6 +10,37 @@ An e2e framework for creating, deploying and using isolated execution environmen
 ---
 
 **🚀 Featured Example:** Train LLMs to play BlackJack using [torchforge](https://github.com/meta-pytorch/torchforge) (PyTorch's agentic RL framework): [`examples/grpo_blackjack/`](examples/grpo_blackjack/)
+
+## Quick Start
+
+Install OpenEnv with pip from this repo like so: 
+
+```sh
+pip install https://github.com/meta-pytorch/OpenEnv.git
+```
+
+You can then use an OpenEnv from the Hugging Face hub like so:
+
+```python
+from envs.echo_env import EchoAction, EchoEnv
+
+# Automatically start container and connect
+client = EchoEnv.from_hub("openenv/echo-env")
+
+# Reset the environment
+result = client.reset()
+print(result.observation.echoed_message)  # "Echo environment ready!"
+
+# Send messages
+result = client.step(EchoAction(message="Hello, World!"))
+print(result.observation.echoed_message)  # "Hello, World!"
+print(result.reward)  # 1.3 (based on message length)
+
+# Cleanup
+client.close()  # Stops and removes container
+```
+
+For a detailed quick start, check out the [docs page](https://meta-pytorch.org/OpenEnv/quickstart/).
 
 ## OpenEnv on partner platforms:
 
@@ -83,7 +114,7 @@ The web interface is **conditionally enabled** based on environment variables:
 To use the web interface:
 
 ```python
-from core.env_server import create_web_interface_app
+from openenv.core.env_server import create_web_interface_app
 from your_env.models import YourAction, YourObservation
 from your_env.server.your_environment import YourEnvironment
 
@@ -176,7 +207,7 @@ uv run server --host 0.0.0.0 --port 8000
 - ✅ **Flexible workflows**: Use pip, uv, or Docker for different scenarios
 - ✅ **CI/CD ready**: Automated dependency generation and validation
 
-See [`src/envs/README.md`](src/envs/README.md) for a complete guide on building environments.
+See [`envs/README.md`](envs/README.md) for a complete guide on building environments.
 
 ### For Environment Users
 
@@ -276,7 +307,7 @@ A simple environment that echoes back messages with metadata. Perfect for:
 - Learning the framework basics
 - Verifying container deployment
 
-See: [`src/envs/echo_env/README.md`](src/envs/echo_env/README.md)
+See: [`envs/echo_env/README.md`](envs/echo_env/README.md)
 
 ### Coding Environment
 Executes arbitrary Python code in a sandboxed environment. Features:
@@ -285,12 +316,12 @@ Executes arbitrary Python code in a sandboxed environment. Features:
 - Persistent execution context within episodes
 - Error handling with detailed messages
 
-See: [`src/envs/coding_env/README.md`](src/envs/coding_env/README.md)
+See: [`envs/coding_env/README.md`](envs/coding_env/README.md)
 
 ## Community Support & Acknowledgments
 This is an open and community-centric project. If you would like to add your name here, please put up a pull request and tag @jspisak for review. Ty!!
 
-Supporters include: Meta-PyTorch, Hugging Face, [Patronus AI](https://patronus.ai), [Surge AI](https://surgehq.ai), [LastMile AI](https://www.lastmileai.dev), Unsloth AI, Reflection AI, vLLM, SkyRL (UC-Berkeley), LightningAI, Axolotl AI, Stanford Scaling Intelligence Lab, Mithril, [OpenMined](https://openmined.org/), [Fleet AI](https://fleetai.com), [Halluminate](https://halluminate.ai/) ..
+Supporters include: Meta-PyTorch, Hugging Face, [Patronus AI](https://patronus.ai), [Surge AI](https://surgehq.ai), [LastMile AI](https://www.lastmileai.dev), Unsloth AI, Reflection AI, vLLM, SkyRL (UC-Berkeley), LightningAI, Axolotl AI, Stanford Scaling Intelligence Lab, Mithril, [OpenMined](https://openmined.org/), [Fleet AI](https://fleetai.com), [Halluminate](https://halluminate.ai/), [Turing](https://www.turing.com/), [Scale AI](https://scale.com/) ..
 
 And we'd also like to acknowledge the team at Farama Foundation as the OpenEnv API was heavily inspired by the work you all have done on Gymnasium. Cheers!
 
