@@ -567,6 +567,7 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                 this.currentGrid = null;
                 this.gridWidth = 0;
                 this.gridHeight = 0;
+                this.isInitialized = false; // Track if environment has been reset
                 this.init();
             }}
             
@@ -636,6 +637,19 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                 }}
             }}
             
+            updateActionButtonState() {{
+                const stepBtn = document.getElementById('step-btn');
+                if (stepBtn) {{
+                    if (this.isInitialized) {{
+                        stepBtn.disabled = false;
+                        stepBtn.textContent = 'Execute Action';
+                    }} else {{
+                        stepBtn.disabled = true;
+                        stepBtn.textContent = 'Reset Environment First';
+                    }}
+                }}
+            }}
+            
             setupEventListeners() {{
                 // Instructions toggle
                 const instructionsToggle = document.getElementById('instructions-toggle');
@@ -647,6 +661,9 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                             ? 'Hide Instructions' : 'Show Instructions';
                     }});
                 }}
+                
+                // Initialize action button state
+                this.updateActionButtonState();
                 
                 // Render README markdown into instructions (client-side, with proper markdown support)
                 const readmeMarkdown = window.__WILDFIRE_README__;
