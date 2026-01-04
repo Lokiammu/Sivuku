@@ -119,6 +119,9 @@ class WildfireEnvironment(Environment):
             if 0 <= i < len(grid):
                 grid[i] = 2
 
+        # Initialize burn timers before creating state
+        burn_timers = [0] * (w * h)
+        
         self._state = WildfireState(
             episode_id=str(uuid.uuid4()),
             step_count=0,
@@ -132,10 +135,8 @@ class WildfireEnvironment(Environment):
             remaining_water=self.init_water,
             remaining_breaks=self.init_breaks,
             grid=grid,
+            burn_timers=burn_timers,
         )
-
-        # per-cell burn timers (persist across steps)
-        self._state.burn_timers = [0] * (w * h)
 
         obs = self._make_observation(reward_hint=0.0)
         return obs
