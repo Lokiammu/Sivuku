@@ -763,13 +763,7 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                         if (obs.step !== undefined) {{
                             document.getElementById('step-count').textContent = obs.step;
                         }}
-                        // Update wind direction and humidity if available
-                        if (obs.wind_dir) {{
-                            document.getElementById('wind-dir').textContent = obs.wind_dir;
-                        }}
-                        if (obs.humidity !== undefined) {{
-                            document.getElementById('humidity').textContent = obs.humidity.toFixed(2);
-                        }}
+                        // Status and Episode ID are updated via WebSocket state_update
                     }}
                 }} catch (error) {{
                     console.error('Error submitting action:', error);
@@ -792,7 +786,7 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                     console.log('Reset result:', result);
                     console.log('Reset observation:', result.observation);
                     
-                    // Render grid immediately after reset
+                    // Render grid immediately after reset and update stats
                     if (result.observation && result.observation.grid) {{
                         const obs = result.observation;
                         console.log('Grid data:', obs.grid);
@@ -807,9 +801,31 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                                 height: obs.height
                             }});
                         }}
+                        // Update stats from observation
+                        if (obs.wind_dir) {{
+                            document.getElementById('wind-dir').textContent = obs.wind_dir;
+                        }}
+                        if (obs.humidity !== undefined) {{
+                            document.getElementById('humidity').textContent = obs.humidity.toFixed(2);
+                        }}
+                        if (obs.step !== undefined) {{
+                            document.getElementById('step-count').textContent = obs.step;
+                        }}
+                        if (obs.remaining_water !== undefined) {{
+                            document.getElementById('water-remaining').textContent = obs.remaining_water;
+                        }}
+                        if (obs.remaining_breaks !== undefined) {{
+                            document.getElementById('breaks-remaining').textContent = obs.remaining_breaks;
+                        }}
+                        if (obs.burning_count !== undefined) {{
+                            document.getElementById('burning-count').textContent = obs.burning_count;
+                        }}
                     }} else {{
                         console.warn('No grid data in reset result:', result);
                     }}
+                    // Status and Episode ID will be updated via WebSocket state_update
+                    // But set status immediately to show it's reset
+                    document.getElementById('env-status').textContent = 'Reset';
                 }} catch (error) {{
                     console.error('Error resetting environment:', error);
                     alert('Error resetting environment: ' + error.message);
