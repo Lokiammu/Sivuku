@@ -24,10 +24,11 @@ except ImportError:
 
 W = int(os.getenv("WILDFIRE_WIDTH", "16"))
 H = int(os.getenv("WILDFIRE_HEIGHT", "16"))
-env = WildfireEnvironment(width=W, height=H)
 
-# Create base app without web interface
-app = create_fastapi_app(env, WildfireAction, WildfireObservation)
+# Factory function to create WildfireEnvironment instances
+def create_wildfire_environment():
+    """Factory function that creates WildfireEnvironment with config."""
+    return WildfireEnvironment(width=W, height=H)
 
 # Check if web interface should be enabled
 # This can be controlled via environment variable
@@ -36,11 +37,17 @@ enable_web = (
 )
 
 if enable_web:
-    # Load environment metadata
-    metadata = load_environment_metadata(env, 'wildfire_env')
+    # Create an instance for metadata loading (load_environment_metadata needs an instance)
+    env_instance = create_wildfire_environment()
+    metadata = load_environment_metadata(env_instance, 'wildfire_env')
+
+    # Create base app without web interface first
+    # Pass the factory function instead of an instance for WebSocket session support
+    app = create_fastapi_app(create_wildfire_environment, WildfireAction, WildfireObservation)
 
     # Create web interface manager (needed for /web/reset, /web/step, /ws endpoints)
-    web_manager = WebInterfaceManager(env, WildfireAction, WildfireObservation, metadata)
+    # WebInterfaceManager expects an Environment instance, not a callable
+    web_manager = WebInterfaceManager(env_instance, WildfireAction, WildfireObservation, metadata)
 
     # Add our custom wildfire interface route
     @app.get("/web", response_class=HTMLResponse)
