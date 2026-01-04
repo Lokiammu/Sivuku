@@ -590,9 +590,15 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                 }};
                 
                 this.ws.onmessage = (event) => {{
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'state_update') {{
-                        this.updateUI(data.episode_state);
+                    try {{
+                        const data = JSON.parse(event.data);
+                        console.log('WebSocket message received:', data.type, data);
+                        if (data.type === 'state_update') {{
+                            console.log('Updating UI from WebSocket state_update:', data.episode_state);
+                            this.updateUI(data.episode_state);
+                        }}
+                    }} catch (error) {{
+                        console.error('Error parsing WebSocket message:', error, event.data);
                     }}
                 }};
                 
@@ -854,13 +860,21 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
             }}
             
             updateUI(episodeState) {{
+                console.log('updateUI called with episodeState:', episodeState);
                 // Update state display
-                document.getElementById('env-status').textContent = 
-                    episodeState.is_reset ? 'Reset' : 'Running';
-                document.getElementById('episode-id').textContent = 
-                    episodeState.episode_id || '-';
-                document.getElementById('step-count').textContent = 
-                    episodeState.step_count.toString();
+                const statusEl = document.getElementById('env-status');
+                const episodeIdEl = document.getElementById('episode-id');
+                const stepCountEl = document.getElementById('step-count');
+                
+                if (statusEl) {{
+                    statusEl.textContent = episodeState.is_reset ? 'Reset' : 'Running';
+                }}
+                if (episodeIdEl) {{
+                    episodeIdEl.textContent = episodeState.episode_id || '-';
+                }}
+                if (stepCountEl) {{
+                    stepCountEl.textContent = episodeState.step_count.toString();
+                }}
                 
                 // Update observation if available
                 if (episodeState.current_observation) {{
