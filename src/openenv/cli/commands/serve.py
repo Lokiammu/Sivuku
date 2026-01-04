@@ -17,6 +17,7 @@ from .._cli_utils import console
 
 # Commands are registered in __main__.py
 
+
 def serve(
     env_path: Annotated[
         Optional[str],

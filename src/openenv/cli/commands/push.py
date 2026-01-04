@@ -1,4 +1,4 @@
-﻿# Copyright (c) Meta Platforms, Inc. and affiliates.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under the BSD-style license found in the
@@ -94,6 +94,7 @@ def _ensure_hf_authenticated() -> str:
         try:
             # Check for token in environment variable
             import os
+
             token = os.getenv("HF_TOKEN")
             if token:
                 login(token=token)
@@ -269,7 +270,9 @@ tags:
 ---
 
 """
-                    readme_path.write_text(frontmatter + readme_content, encoding="utf-8")
+                    readme_path.write_text(
+                        frontmatter + readme_content, encoding="utf-8"
+                    )
                 console.print(
                     "[bold green]Γ£ô[/bold green] Updated README with HF Space frontmatter"
                 )
