@@ -720,6 +720,35 @@ def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = No
                     
                     const result = await response.json();
                     console.log('Step result:', result);
+                    
+                    // Update UI immediately from the response (don't wait for WebSocket)
+                    if (result.observation) {{
+                        const obs = result.observation;
+                        // Update grid if available
+                        if (obs.grid && Array.isArray(obs.grid) && obs.width && obs.height) {{
+                            console.log('Updating grid from step response:', obs.width, 'x', obs.height);
+                            this.renderGrid(obs.grid, obs.width, obs.height);
+                        }}
+                        // Update stats
+                        if (obs.remaining_water !== undefined) {{
+                            document.getElementById('water-remaining').textContent = obs.remaining_water;
+                        }}
+                        if (obs.remaining_breaks !== undefined) {{
+                            document.getElementById('breaks-remaining').textContent = obs.remaining_breaks;
+                        }}
+                        if (obs.burning_count !== undefined) {{
+                            document.getElementById('burning-count').textContent = obs.burning_count;
+                        }}
+                        if (obs.wind_dir) {{
+                            document.getElementById('wind-dir').textContent = obs.wind_dir;
+                        }}
+                        if (obs.humidity !== undefined) {{
+                            document.getElementById('humidity').textContent = obs.humidity.toFixed(2);
+                        }}
+                        if (obs.step !== undefined) {{
+                            document.getElementById('step-count').textContent = obs.step;
+                        }}
+                    }}
                 }} catch (error) {{
                     console.error('Error submitting action:', error);
                     alert('Error submitting action: ' + error.message);
