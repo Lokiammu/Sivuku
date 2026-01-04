@@ -88,21 +88,9 @@ class WildfireEnvironment(Environment):
         self.burn_lifetime = 3
 
         # Initialize state with minimal defaults (will be properly set in reset())
-        self._state = WildfireState(
-            episode_id="",
-            step_count=0,
-            total_burned=0,
-            total_extinguished=0,
-            last_action="reset",
-            width=0,
-            height=0,
-            wind_dir="CALM",
-            humidity=0.25,
-            remaining_water=self.init_water,
-            remaining_breaks=self.init_breaks,
-            grid=[],
-            burn_timers=[],
-        )
+        # We can't use WildfireState() directly due to Pydantic/dataclass conflicts,
+        # so we'll initialize it in reset() and handle None case in state property
+        self._state: WildfireState | None = None
 
     # --- Core API ---
 
@@ -424,5 +412,22 @@ class WildfireEnvironment(Environment):
     @property
     def state(self) -> WildfireState:
         """Return the current environment state."""
+        if self._state is None:
+            # Initialize with minimal defaults if accessed before reset()
+            self._state = WildfireState(
+                episode_id="",
+                step_count=0,
+                total_burned=0,
+                total_extinguished=0,
+                last_action="reset",
+                width=0,
+                height=0,
+                wind_dir="CALM",
+                humidity=0.25,
+                remaining_water=self.init_water,
+                remaining_breaks=self.init_breaks,
+                grid=[],
+                burn_timers=[],
+            )
         return self._state
 
