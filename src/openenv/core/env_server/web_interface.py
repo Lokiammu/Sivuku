@@ -167,7 +167,13 @@ class WebInterfaceManager:
         observation_cls: Type[Observation],
         metadata: Optional[EnvironmentMetadata] = None,
     ):
-        self.env = env
+        import inspect
+
+        # If env is a class or factory function, instantiate it
+        if inspect.isclass(env) or inspect.isfunction(env):
+            self.env = env()
+        else:
+            self.env = env
         self.action_cls = action_cls
         self.observation_cls = observation_cls
         self.metadata = metadata or EnvironmentMetadata(
