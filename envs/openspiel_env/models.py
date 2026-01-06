@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional
 from openenv.core.env_server import Action, Observation, State
 
 
-@dataclass
 class OpenSpielAction(Action):
     """
     Action for OpenSpiel environments.
@@ -33,7 +32,6 @@ class OpenSpielAction(Action):
     game_params: Dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
 class OpenSpielObservation(Observation):
     """
     Observation from OpenSpiel environment.
@@ -57,7 +55,6 @@ class OpenSpielObservation(Observation):
     opponent_last_action: Optional[int] = None
 
 
-@dataclass
 class OpenSpielState(State):
     """
     State for OpenSpiel environment.
