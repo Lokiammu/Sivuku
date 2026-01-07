@@ -156,9 +156,7 @@ class TextArenaEnvironment(Environment):
         observation.reward = reward
         self._state.last_reward = reward
 
-        reward_signals = self._compute_reward_signals(
-            action=action, observation=observation
-        )
+        reward_signals = self._compute_reward_signals(action=action, observation=observation)
         if reward_signals:
             observation.info.setdefault("reward_signals", {}).update(reward_signals)
             observation.metadata.setdefault("reward_signals", {}).update(reward_signals)
@@ -229,9 +227,7 @@ class TextArenaEnvironment(Environment):
 
     def _legal_players(self) -> List[int]:
         role_mapping = getattr(self._ta_env.state, "role_mapping", {}) or {}
-        players = [
-            pid for pid in role_mapping.keys() if isinstance(pid, int) and pid >= 0
-        ]
+        players = [pid for pid in role_mapping.keys() if isinstance(pid, int) and pid >= 0]
         return sorted(players)
 
     def _convert_messages(self, messages: Iterable[Any]) -> List[TextArenaMessage]:
@@ -268,11 +264,7 @@ class TextArenaEnvironment(Environment):
             sender_id = int(sender) if isinstance(sender, (int, float)) else -1
             text = str(content)
 
-            if (
-                buffered_content
-                and buffered_category == category_name
-                and buffered_sender == sender_id
-            ):
+            if buffered_content and buffered_category == category_name and buffered_sender == sender_id:
                 buffered_content.append(text)
             else:
                 flush_buffer()
