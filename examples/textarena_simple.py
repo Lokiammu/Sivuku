@@ -5,30 +5,10 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-"""Quickstart example for the generic TextArena environment.
-
-Usage:
-    1. Start the server:
-       cd envs/textarena_env && source .venv/bin/activate
-       python -m uvicorn server.app:app --reload
-
-    2. Run this example:
-       python examples/textarena_simple.py
-"""
-
+"""Quickstart example for the generic TextArena environment."""
 from __future__ import annotations
 
 from textarena_env import TextArenaEnv, TextArenaAction
-
-
-# try:
-# except ImportError:
-#     # Fallback for running from repo without installing
-#     import sys
-#     from pathlib import Path
-
-#     sys.path.insert(0, str(Path(__file__).parent.parent / "envs"))
-#     from textarena_env import TextArenaEnv, TextArenaAction
 
 
 def main() -> None:
@@ -36,7 +16,7 @@ def main() -> None:
     print("💬 TextArena Hello World - Wordle-v0")
     print("=" * 60)
 
-    # Connect to running server (start with: python -m uvicorn server.app:app)
+    # TODO: move to openenv org
     env = TextArenaEnv(base_url="https://burtenshaw-wordle.hf.space")
 
     try:
