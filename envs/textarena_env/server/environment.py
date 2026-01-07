@@ -16,13 +16,24 @@ import nltk
 
 from openenv.core.env_server.interfaces import Environment
 
-from ..models import (
-    TextArenaAction,
-    TextArenaMessage,
-    TextArenaObservation,
-    TextArenaState,
-)
-from ..rewards import RewardProvider, build_reward_providers
+try:
+    # When running as installed package
+    from textarena_env.models import (
+        TextArenaAction,
+        TextArenaMessage,
+        TextArenaObservation,
+        TextArenaState,
+    )
+    from textarena_env.rewards import RewardProvider, build_reward_providers
+except ImportError:
+    # When running uvicorn directly from textarena_env/
+    from models import (
+        TextArenaAction,
+        TextArenaMessage,
+        TextArenaObservation,
+        TextArenaState,
+    )
+    from rewards import RewardProvider, build_reward_providers
 
 
 _TEXTARENA_MODULE: Any | None = None
