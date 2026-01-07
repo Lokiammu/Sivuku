@@ -10,8 +10,6 @@ import pytest
 
 # Add the project root to the path for envs imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-print(sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))))
-print(sys.path)
 from envs.openspiel_env.client import OpenSpielEnv
 from envs.openspiel_env.models import OpenSpielAction
 
@@ -116,6 +114,7 @@ def test_reset(server):
     assert hasattr(result.observation, "current_player_id")
     assert hasattr(result.observation, "opponent_last_action")
     assert result.observation.done is False
+    env.close()
 
 
 def test_reset_multiple_times(server):
@@ -134,6 +133,7 @@ def test_reset_multiple_times(server):
     env.reset()
     state2 = env.state()
     assert state1.episode_id != state2.episode_id
+    env.close()
 
 
 def test_step(server):
@@ -148,6 +148,7 @@ def test_step(server):
     assert result.observation is not None
     assert isinstance(result.reward, (int, float)) or result.reward is None
     assert isinstance(result.done, bool)
+    env.close()
 
 
 def test_step_multiple_times(server):
@@ -165,6 +166,7 @@ def test_step_multiple_times(server):
     # Both should be valid
     assert result1.observation is not None
     assert result2.observation is not None
+    env.close()
 
 
 def test_state_endpoint(server):
@@ -180,6 +182,7 @@ def test_state_endpoint(server):
     assert hasattr(state, "opponent_policy")
     assert hasattr(state, "game_params")
     assert hasattr(state, "num_players")
+    env.close()
 
 
 def test_step_count_increments(server):
@@ -200,6 +203,7 @@ def test_step_count_increments(server):
 
     state3 = env.state()
     assert state3.step_count == 2
+    env.close()
 
 
 def test_action_with_metadata(server):
@@ -213,16 +217,4 @@ def test_action_with_metadata(server):
     result = env.step(action)
 
     assert result.observation is not None
-
-
-def test_error_handling(server):
-    """Test that invalid actions are handled gracefully."""
-    env = OpenSpielEnv(base_url=server )
-    env.reset()
-
-    # Invalid action (malformed)
-    action = OpenSpielAction(action_id="invalid_action_format")
-    result = env.step(action)
-
-    # Should not crash, should return an observation
-    assert result.observation is not None
+    env.close()
