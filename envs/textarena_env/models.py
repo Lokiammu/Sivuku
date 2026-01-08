@@ -47,6 +47,8 @@ class TextArenaObservation(Observation):
 class TextArenaState(State):
     """Structured state snapshot for the server."""
 
+    episode_id: Optional[str] = None
+    step_count: int = 0
     env_id: str
     num_players: int
     max_turns: Optional[int] = None
