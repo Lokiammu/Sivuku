@@ -104,6 +104,11 @@ class TextArenaEnvironment(Environment):
         self._reward_providers: List[RewardProvider] = build_reward_providers(env_id)
         self._last_reward_signals: Dict[str, float] = {}
 
+        # Initialize environment state - TextArena envs require reset() to be called
+        # before step() can be used, as the internal state object isn't created until reset.
+        # This ensures the environment is always in a valid state after construction.
+        self._ta_env.reset(num_players=self.num_players)
+
     # ------------------------------------------------------------------
     # Environment interface
     # ------------------------------------------------------------------
