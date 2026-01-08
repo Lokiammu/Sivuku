@@ -1,4 +1,4 @@
-"""Unit tests for BrowserGym environment server."""
+"""Unit tests for OpenSpiel environment server."""
 
 import os
 import shutil
