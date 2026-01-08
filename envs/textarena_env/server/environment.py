@@ -122,7 +122,12 @@ class TextArenaEnvironment(Environment):
     # ------------------------------------------------------------------
     # Environment interface
     # ------------------------------------------------------------------
-    def reset(self) -> TextArenaObservation:
+    def reset(
+        self,
+        seed: Optional[int] = None,
+        episode_id: Optional[str] = None,
+        **kwargs: Any,
+    ) -> TextArenaObservation:
         # TextArena observation wrappers (LLMObservationWrapper, etc.) accumulate
         # observations in self.full_observations across resets. Since we can't modify TextArena,
         # we need to manually clear this state to prevent history accumulation.
@@ -140,7 +145,7 @@ class TextArenaEnvironment(Environment):
         for provider in self._reward_providers:
             provider.reset()
 
-        self._state.episode_id = str(uuid4())
+        self._state.episode_id = episode_id if episode_id is not None else str(uuid4())
         self._state.step_count = 0
         self._state.turn = 0
         self._state.last_reward = 0.0
