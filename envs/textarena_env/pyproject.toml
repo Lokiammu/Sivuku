@@ -40,8 +40,8 @@ dev = [
 
 [project.scripts]
 # Server entry point - enables running via: uv run --project . server
-# or: python -m textarena.server.app
-server = "textarena.server.app:main"
+# or: python -m textarena_env.server.app
+server = "textarena_env.server.app:main"
 
 [tool.setuptools]
 # Explicitly list packages - "textarena_env" maps to current dir
