@@ -15,6 +15,9 @@ tags:
 
 A simple test environment that echoes back messages. Perfect for testing the env APIs as well as demonstrating environment usage patterns.
 
+> [!NOTE]
+> Generic wrapper for any [TextArena](https://www.textarena.ai/docs/overview) game inside OpenEnv. This module exposes the TextArena `Env` interface through the standard HTTP server/client APIs used by other OpenEnv environments, enabling quick experimentation with the full suite of word, reasoning, and multi-agent games.
+
 ## Quick Start
 
 The simplest way to use the TextArena environment is through the `TextArenaEnv` class:
