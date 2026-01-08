@@ -17,7 +17,9 @@ class RewardProvider(Protocol):
     def reset(self) -> None:
         """Clear any internal state before a new episode."""
 
-    def compute(self, *, action: TextArenaAction, observation: TextArenaObservation) -> Dict[str, float]:
+    def compute(
+        self, *, action: TextArenaAction, observation: TextArenaObservation
+    ) -> Dict[str, float]:
         """Return a mapping of reward names to float values for the step."""
 
 
@@ -92,12 +94,16 @@ class _WordleRewardProvider:
     def reset(self) -> None:
         self._guess_history.clear()
 
-    def compute(self, *, action: TextArenaAction, observation: TextArenaObservation) -> Dict[str, float]:
+    def compute(
+        self, *, action: TextArenaAction, observation: TextArenaObservation
+    ) -> Dict[str, float]:
         guess = extract_guess(action.message)
         feedback = extract_wordle_feedback(observation)
 
         normalized_guess = guess if guess and guess != "[dunno]" else ""
-        previous_occurrences = self._guess_history.get(normalized_guess, 0) if normalized_guess else 0
+        previous_occurrences = (
+            self._guess_history.get(normalized_guess, 0) if normalized_guess else 0
+        )
 
         green_score = 0.0
         yellow_score = 0.0
