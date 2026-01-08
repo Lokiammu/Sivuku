@@ -170,7 +170,7 @@ If you already have a TextArena environment server running, you can connect dire
 from textarena_env import TextArenaEnv, TextArenaAction
 
 # Connect to existing server
-env = TextArenaEnv(base_url="http://localhost:8000")
+env = TextArenaEnv(base_url="<ENV_HTTP_URL_HERE>")
 
 # Use as normal
 result = env.reset()
