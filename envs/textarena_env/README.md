@@ -148,6 +148,8 @@ Each message in the conversation has:
 
 ### State
 **TextArenaState**: Server-side state snapshot
+- `episode_id` (str) - Unique identifier for the current episode
+- `step_count` (int) - Number of steps taken in the current episode
 - `env_id` (str) - The TextArena environment ID (e.g., "Wordle-v0")
 - `num_players` (int) - Number of players in the game
 - `max_turns` (Optional[int]) - Maximum turns allowed
