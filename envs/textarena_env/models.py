@@ -7,7 +7,8 @@
 """
 Data models for the TextArena Environment.
 
-The textarena environment is a simple test environment that echoes back messages.
+This module defines the action, observation, and state models for interacting
+with TextArena game environments (e.g., Wordle-v0).
 """
 
 from __future__ import annotations
