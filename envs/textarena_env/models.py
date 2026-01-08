@@ -12,15 +12,14 @@ The textarena environment is a simple test environment that echoes back messages
 
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
 
 from openenv.core.env_server.types import Action, Observation, State
 
 
-class TextArenaMessage:
+class TextArenaMessage(BaseModel):
     """Single message observed by a player."""
 
     sender_id: int
@@ -43,7 +42,7 @@ class TextArenaObservation(Observation):
     legal_players: List[int] = Field(default_factory=list)
     info: Dict[str, Any] = Field(default_factory=dict)
 
-    
+
 class TextArenaState(State):
     """Structured state snapshot for the server."""
 
@@ -54,4 +53,3 @@ class TextArenaState(State):
     last_reward: float = 0.0
     last_info: Dict[str, Any] = Field(default_factory=dict)
     raw_state: Dict[str, Any] = Field(default_factory=dict)
-
