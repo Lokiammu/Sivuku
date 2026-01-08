@@ -104,7 +104,7 @@ def test_health_endpoint(server):
 
 def test_reset(server):
     """Test that reset() returns a valid observation."""
-    env = OpenSpielEnv(base_url=server )
+    env = OpenSpielEnv(base_url=server)
     result = env.reset()
 
     assert result.observation is not None
@@ -119,7 +119,7 @@ def test_reset(server):
 
 def test_reset_multiple_times(server):
     """Test that reset() can be called multiple times."""
-    env = OpenSpielEnv(base_url=server )
+    env = OpenSpielEnv(base_url=server)
 
     result1 = env.reset()
     result2 = env.reset()
@@ -138,7 +138,7 @@ def test_reset_multiple_times(server):
 
 def test_step(server):
     """Test that step() returns a valid result."""
-    env = OpenSpielEnv(base_url=server )
+    env = OpenSpielEnv(base_url=server)
     env.reset()
 
     # Take a simple action
@@ -153,7 +153,7 @@ def test_step(server):
 
 def test_step_multiple_times(server):
     """Test that step() can be called multiple times."""
-    env = OpenSpielEnv(base_url=server )
+    env = OpenSpielEnv(base_url=server)
     env.reset()
 
     # Take multiple actions
@@ -171,7 +171,7 @@ def test_step_multiple_times(server):
 
 def test_state_endpoint(server):
     """Test that the state endpoint returns valid state."""
-    env = OpenSpielEnv(base_url=server )
+    env = OpenSpielEnv(base_url=server)
     env.reset()
 
     state = env.state()
@@ -187,7 +187,7 @@ def test_state_endpoint(server):
 
 def test_step_count_increments(server):
     """Test that step count increments correctly."""
-    env = OpenSpielEnv(base_url=server )
+    env = OpenSpielEnv(base_url=server)
     env.reset()
 
     state1 = env.state()
@@ -208,12 +208,10 @@ def test_step_count_increments(server):
 
 def test_action_with_metadata(server):
     """Test that actions with metadata work."""
-    env = OpenSpielEnv(base_url=server )
+    env = OpenSpielEnv(base_url=server)
     env.reset()
 
-    action = OpenSpielAction(
-        action_id="0", metadata={"test": "value", "number": 42}
-    )
+    action = OpenSpielAction(action_id="0", metadata={"test": "value", "number": 42})
     result = env.step(action)
 
     assert result.observation is not None
