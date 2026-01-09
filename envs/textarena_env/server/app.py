@@ -71,7 +71,7 @@ def main(host: str = "0.0.0.0", port: int = 8000):
     This function enables running the server without Docker:
         uv run --project . server
         uv run --project . server --port 8001
-        python -m textarena.server.app
+        python -m textarena_env.server.app
 
     Args:
         host: Host address to bind to (default: "0.0.0.0")
@@ -79,7 +79,7 @@ def main(host: str = "0.0.0.0", port: int = 8000):
 
     For production deployments, consider using uvicorn directly with
     multiple workers:
-        uvicorn textarena.server.app:app --workers 4
+        uvicorn textarena_env.server.app:app --workers 4
     """
     import uvicorn
 

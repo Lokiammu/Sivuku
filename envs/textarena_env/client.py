@@ -35,13 +35,13 @@ class TextArenaEnv(EnvClient[TextArenaAction, TextArenaObservation, TextArenaSta
 
     Example:
         >>> # Connect to a running server
-        >>> client = TextArenaEnv(base_url="http://localhost:8000")
+        >>> client = TextArenaEnv(base_url="<ENV_HTTP_URL_HERE>")
         >>> result = client.reset()
-        >>> print(result.observation.echoed_message)
+        >>> print(result.observation.prompt)
         >>>
-        >>> # Send a message
-        >>> result = client.step(TextArenaAction(message="Hello!"))
-        >>> print(result.observation.echoed_message)
+        >>> # Send an action
+        >>> result = client.step(TextArenaAction(message="[crane]"))
+        >>> print(result.observation.messages)
         >>> print(result.reward)
 
     Example with Docker:

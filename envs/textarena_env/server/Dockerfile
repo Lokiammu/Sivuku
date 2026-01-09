@@ -17,7 +17,6 @@ WORKDIR /app
 
 # Build argument to control whether we're building standalone or in-repo
 ARG BUILD_MODE=in-repo
-ARG ENV_NAME=textarena
 
 # Copy environment code (always at root of build context)
 COPY . /app/env
@@ -33,16 +32,14 @@ RUN if ! command -v uv >/dev/null 2>&1; then \
         mv /root/.local/bin/uvx /usr/local/bin/uvx; \
     fi
 
-# Install system libraries required by TextArena (cv2 needs libGL, glib)
-# Also install git for building from git repos
+# Install git for building from git repos (build-time only)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
     git \
     && rm -rf /var/lib/apt/lists/*
-    
+
 # Install dependencies using uv sync
-# If uv.lock exists, use it; otherwise resolve on the fly
+# First pass: install dependencies without the project (for better caching)
+# Second pass: install the project itself
 RUN --mount=type=cache,target=/root/.cache/uv \
     if [ -f uv.lock ]; then \
         uv sync --frozen --no-install-project --no-editable; \
@@ -62,6 +59,12 @@ FROM ${BASE_IMAGE}
 
 WORKDIR /app
 
+# Install runtime system libraries required by TextArena (cv2 needs libGL, glib)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy the virtual environment from builder
 COPY --from=builder /app/env/.venv /app/.venv
 
@@ -74,9 +77,9 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Set PYTHONPATH so imports work correctly
 ENV PYTHONPATH="/app/env:$PYTHONPATH"
 
-# Health check
+# Health check using Python (more portable than curl/wget)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # Run the FastAPI server
 # The module path is constructed to work with the /app/env structure
