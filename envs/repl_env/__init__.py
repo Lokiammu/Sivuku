@@ -42,11 +42,31 @@ References:
 
 from .models import REPLAction, REPLObservation, REPLState, CodeBlockResult
 from .client import REPLEnv
+from .prompts import (
+    RLM_SYSTEM_PROMPT,
+    RLM_SYSTEM_PROMPT_COMPACT,
+    build_initial_prompt,
+    build_continuation_prompt,
+    build_messages,
+    extract_code_blocks,
+    format_observation,
+)
 
 __all__ = [
+    # Models
     "REPLAction",
     "REPLObservation",
     "REPLState",
     "CodeBlockResult",
+    # Client
     "REPLEnv",
+    # Prompts
+    "RLM_SYSTEM_PROMPT",
+    "RLM_SYSTEM_PROMPT_COMPACT",
+    "build_initial_prompt",
+    "build_continuation_prompt",
+    "build_messages",
+    # Parsing utilities
+    "extract_code_blocks",
+    "format_observation",
 ]

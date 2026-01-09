@@ -26,58 +26,14 @@ Usage:
 """
 from __future__ import annotations
 
-import re
-
 from repl_env.server.repl_environment import REPLEnvironment
 from repl_env.models import REPLAction
-
-# System prompt for the RLM
-RLM_SYSTEM_PROMPT = """You are an AI assistant with access to a Python REPL.
-
-IMPORTANT RULES:
-1. The variable 'context' already contains the data - DO NOT redefine it
-2. Write Python code in ```python``` blocks
-3. To submit your final answer, use: print(f'FINAL(your_answer_here)')
-
-Example:
-```python
-# context is already defined, just use it
-word_count = len(context.split())
-print(f'FINAL({word_count})')
-```
-
-Available: context (the data), answer (dict), standard library modules.
-"""
-
-
-def extract_code_blocks(text: str) -> list[str]:
-    """Extract Python code blocks from LLM response."""
-    pattern = r"```python\s*(.*?)```"
-    matches = re.findall(pattern, text, re.DOTALL)
-    return [m.strip() for m in matches if m.strip()]
-
-
-def format_observation(obs, iteration: int) -> str:
-    """Format observation for the LLM."""
-    parts = []
-
-    if obs.result.success:
-        if obs.result.stdout:
-            parts.append(f"Output: {obs.result.stdout.strip()}")
-        parts.append("Code executed successfully.")
-    else:
-        # Show error clearly
-        error = obs.result.stderr or obs.result.exception or "Unknown error"
-        # Truncate long errors
-        if len(error) > 300:
-            error = error[:300] + "..."
-        parts.append(f"ERROR: {error}")
-        parts.append("Fix the error and try again. Remember: 'context' is already defined.")
-
-    parts.append(f"Variables available: {obs.available_variables}")
-    parts.append("Submit answer with: print(f'FINAL(answer)')")
-
-    return "\n".join(parts)
+from repl_env.prompts import (
+    RLM_SYSTEM_PROMPT_COMPACT,
+    build_initial_prompt,
+    extract_code_blocks,
+    format_observation,
+)
 
 
 def create_qwen_llm():
@@ -151,20 +107,17 @@ def run_rlm_loop(
     try:
         obs = env.reset()
 
-        # Build initial messages
+        # Build initial messages using prompts from repl_env
+        initial_user_prompt = build_initial_prompt(
+            task_prompt=task_prompt,
+            context_length=obs.context_length,
+            context_preview=obs.context_preview,
+            variables=obs.available_variables,
+        )
+
         messages = [
-            {"role": "system", "content": RLM_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"""Task: {task_prompt}
-
-Context ({obs.context_length} chars):
-{obs.context_preview}{'...' if obs.context_length > 500 else ''}
-
-Available variables: {obs.available_variables}
-
-Generate Python code to solve this task. End with FINAL(answer) when done.""",
-            },
+            {"role": "system", "content": RLM_SYSTEM_PROMPT_COMPACT},
+            {"role": "user", "content": initial_user_prompt},
         ]
 
         for iteration in range(1, max_iterations + 1):
@@ -210,7 +163,7 @@ Generate Python code to solve this task. End with FINAL(answer) when done.""",
                     return final_answer
 
             # Format observation for next iteration
-            obs_text = format_observation(obs, iteration)
+            obs_text = format_observation(obs)
             messages.append({"role": "assistant", "content": response})
             messages.append({"role": "user", "content": obs_text})
 
