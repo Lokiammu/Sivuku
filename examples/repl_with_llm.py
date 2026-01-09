@@ -40,7 +40,7 @@ def create_qwen_llm():
     """Create an LLM function using the smallest Qwen instruct model."""
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    model_name = "Qwen/Qwen2.5-1.5B-Instruct"
+    model_name = "Qwen/Qwen3-1.7B"
     print(f"Loading model: {model_name}")
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -50,12 +50,16 @@ def create_qwen_llm():
         device_map="auto",
     )
 
+    # Disable thinking mode for Qwen3
+    enable_thinking = False
+
     def llm_fn(messages: list[dict]) -> str:
         """Generate response using Qwen model."""
         text = tokenizer.apply_chat_template(
             messages,
             tokenize=False,
             add_generation_prompt=True,
+            enable_thinking=enable_thinking,
         )
         model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
