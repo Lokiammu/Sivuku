@@ -173,6 +173,14 @@ class REPLEnvironment(Environment):
         if self.llm_batch_fn:
             self._executor.inject_function("llm_batch", self.llm_batch_fn)
 
+        # Inject FINAL helper function so both FINAL(x) and print(f'FINAL({x})') work
+        # Returns the FINAL pattern as a string so it appears in stdout for detection
+        def final_helper(value):
+            """Helper that returns FINAL(value) string for detection."""
+            return f"FINAL({value})"
+
+        self._executor.inject_function("FINAL", final_helper)
+
         # Update namespace keys
         self._state.namespace_keys = self._executor.list_variables()
 

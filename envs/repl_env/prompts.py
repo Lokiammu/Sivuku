@@ -51,9 +51,9 @@ RLM_SYSTEM_PROMPT = textwrap.dedent("""
     - DO NOT redefine the `context` variable - it's already set!
 
     When you have the final answer, use ONE of these patterns:
-    1. print(f'FINAL({your_answer})') - provide answer directly
-    2. print('FINAL_VAR(variable_name)') - return a variable's value
-    3. answer['content'] = result; answer['ready'] = True - dict pattern
+    1. FINAL(your_answer) - call the FINAL function with your answer
+    2. print(f'FINAL({your_answer})') - print the final answer
+    3. answer['content'] = result; answer['ready'] = True - use the answer dict
 
     Think step by step. Explore first, then analyze, then provide your final answer.
 """).strip()
@@ -67,9 +67,11 @@ RLM_SYSTEM_PROMPT_COMPACT = textwrap.dedent("""
     - context: the data (DO NOT redefine it)
     - llm_query(prompt): query a sub-LLM
     - llm_batch(prompts): concurrent sub-LLM queries
+    - FINAL(answer): call this to submit your final answer
     - Standard library (re, json, math, collections, etc.)
 
-    Write Python in ```python``` blocks. When done, use: print(f'FINAL({answer})')
+    Write Python in ```python``` blocks.
+    When done, call: FINAL(your_answer)
 """).strip()
 
 

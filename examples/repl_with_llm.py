@@ -29,7 +29,7 @@ from __future__ import annotations
 from repl_env.server.repl_environment import REPLEnvironment
 from repl_env.models import REPLAction
 from repl_env.prompts import (
-    RLM_SYSTEM_PROMPT_COMPACT,
+    RLM_SYSTEM_PROMPT,
     build_initial_prompt,
     extract_code_blocks,
     format_observation,
@@ -40,13 +40,13 @@ def create_qwen_llm():
     """Create an LLM function using the smallest Qwen instruct model."""
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+    model_name = "Qwen/Qwen2.5-1.5B-Instruct"
     print(f"Loading model: {model_name}")
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype="auto",
+        dtype="auto",
         device_map="auto",
     )
 
@@ -116,7 +116,7 @@ def run_rlm_loop(
         )
 
         messages = [
-            {"role": "system", "content": RLM_SYSTEM_PROMPT_COMPACT},
+            {"role": "system", "content": RLM_SYSTEM_PROMPT},
             {"role": "user", "content": initial_user_prompt},
         ]
 
