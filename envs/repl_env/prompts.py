@@ -7,7 +7,7 @@
 """
 RLM System Prompts and Parsing Utilities for the REPL Environment.
 
-Based on the official RLM prompts from https://github.com/MIT-OASYS-Lab/rlm
+Based on the official RLM prompts from https://github.com/alexzhang13/rlm
 with adaptations for OpenEnv's repl_env.
 
 These prompts guide LLMs to use the REPL environment effectively:
