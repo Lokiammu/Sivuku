@@ -335,6 +335,6 @@ pytest tests/
 ## References
 
 - [RLM Paper (arXiv:2512.24601)](https://arxiv.org/abs/2512.24601)
-- [MIT RLM Implementation](https://github.com/MIT-OASYS-Lab/rlm)
+- [RLM Implementation](https://github.com/alexzhang13/rlm)
 - [Alex Zhang's RLM Blog](https://alexzhang13.github.io/blog/2025/rlm/)
 - [Prime Intellect RLM Blog](https://www.primeintellect.ai/blog/rlm)
