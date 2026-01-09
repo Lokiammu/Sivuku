@@ -259,7 +259,7 @@ def collect_trajectory(env, policy, context, task):
     total_reward = 0
 
     while not obs.done:
-        # Policy generates code
+        # Policy generates code (pseudo-code: replace with your LLM inference)
         code = policy.generate(obs)
 
         # Step environment
@@ -291,11 +291,12 @@ for epoch in range(num_epochs):
         trajectory, reward = collect_trajectory(env, policy, context, task)
 
         # Verify answer correctness (optional external reward)
+        # Note: assumes trajectory is non-empty; add check in production code
         final_answer = trajectory[-1]["next_observation"].metadata.get("final_answer")
         if final_answer == ground_truth:
             reward += verification_bonus
 
-        # Update policy (PPO, GRPO, DPO, etc.)
+        # Update policy (pseudo-code: use your RL framework - PPO, GRPO, DPO, etc.)
         policy.update(trajectory, reward)
 ```
 
