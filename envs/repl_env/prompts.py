@@ -12,7 +12,7 @@ with adaptations for OpenEnv's repl_env.
 
 These prompts guide LLMs to use the REPL environment effectively:
 - Explore context programmatically
-- Use llm_query/llm_query_batched for recursive calls
+- Use llm_query/llm_batch for recursive calls
 - Provide final answers via FINAL() or FINAL_VAR() patterns
 
 Parsing utilities help extract code blocks and format observations.
@@ -32,7 +32,7 @@ RLM_SYSTEM_PROMPT = textwrap.dedent("""
     The REPL environment is initialized with:
     1. A `context` variable containing the data you need to analyze.
     2. A `llm_query(prompt)` function to query a sub-LLM for semantic analysis.
-    3. A `llm_query_batched(prompts)` function for concurrent LLM queries.
+    3. A `llm_batch(prompts)` function for concurrent LLM queries.
     4. An `answer` dict for storing your final answer.
     5. Standard library modules (re, json, math, collections, itertools, etc.)
 
@@ -46,7 +46,7 @@ RLM_SYSTEM_PROMPT = textwrap.dedent("""
 
     Key strategies:
     - First explore the context to understand its structure
-    - For long contexts, chunk and analyze with llm_query_batched
+    - For long contexts, chunk and analyze with llm_batch
     - Use variables as buffers to build up your answer
     - DO NOT redefine the `context` variable - it's already set!
 
@@ -66,7 +66,7 @@ RLM_SYSTEM_PROMPT_COMPACT = textwrap.dedent("""
     Available:
     - context: the data (DO NOT redefine it)
     - llm_query(prompt): query a sub-LLM
-    - llm_query_batched(prompts): concurrent sub-LLM queries
+    - llm_batch(prompts): concurrent sub-LLM queries
     - Standard library (re, json, math, collections, etc.)
 
     Write Python in ```python``` blocks. When done, use: print(f'FINAL({answer})')
