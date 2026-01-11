@@ -15,9 +15,9 @@ import re
 import uuid
 
 from openenv.core.env_server.interfaces import Action, Environment, Observation
-from openenv.core.tools import JuliaExecutor
 
 from ..models import JuliaAction, JuliaObservation, JuliaState
+from .julia_executor import JuliaExecutor
 from .julia_transforms import create_safe_julia_transform
 
 
@@ -85,16 +85,24 @@ class JuliaCodeActEnv(Environment):
         - Runs core_code + test_code together
         - Infers compilation status from combined execution
         - 2x faster than double execution
+
+        Args:
+            action: JuliaAction with core_code and optional test_code
+            **kwargs: Optional parameters including:
+                - timeout: Execution timeout in seconds (default: 120)
         """
         if not isinstance(action, JuliaAction):
             raise ValueError(f"Expected JuliaAction, got {type(action)}")
+
+        # Get timeout from kwargs (default handled by executor)
+        timeout = kwargs.get("timeout")
 
         # Single execution: Run core_code + test_code together (if test_code provided)
         if action.test_code:
             combined_code = action.core_code + "\n\n" + action.test_code
         else:
             combined_code = action.core_code
-        full_result = self._executor.run(combined_code)
+        full_result = self._executor.run(combined_code, timeout=timeout)
 
         # Parse test results from execution output
         tests_passed, tests_failed = self._parse_test_results(
