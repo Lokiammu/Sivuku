@@ -1,6 +1,5 @@
-spec_version: 1
 name: julia_env
-type: space
-runtime: fastapi
-app: server.app:app
-port: 8000
+version: "0.1.0"
+description: "Julia code execution environment for OpenEnv with test tracking and reward calculation"
+action: JuliaAction
+observation: JuliaObservation

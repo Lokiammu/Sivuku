@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 """
 envs/julia_env/julia_transforms.py
 --------------------------------
@@ -5,8 +11,8 @@ Safety and quality transforms for Julia code.
 """
 
 import re
-from core.env_server.base_transforms import CompositeTransform
-from core.env_server.interfaces import Transform
+from openenv.core.env_server import CompositeTransform
+from openenv.core.env_server.interfaces import Transform
 from ..models import JuliaObservation
 
 

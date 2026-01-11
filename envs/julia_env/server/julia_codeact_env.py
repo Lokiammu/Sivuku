@@ -1,16 +1,22 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 """
 Julia Code Action Environment.
 
-This environment mirrors the PythonCodeActEnv but runs Julia code instead.
-It executes Julia code using JuliaExecutor, captures output,
-tracks the last exit code, and returns a JuliaObservation.
+This module provides a server-side environment implementation for executing
+Julia code actions using JuliaExecutor.
 """
 
 import re
 import uuid
 
-from core.env_server import Environment
-from core.tools import JuliaExecutor
+from openenv.core.env_server.interfaces import Action, Environment, Observation
+from openenv.core.tools import JuliaExecutor
+
 from ..models import JuliaAction, JuliaObservation, JuliaState
 from .julia_transforms import create_safe_julia_transform
 
@@ -28,7 +34,7 @@ class JuliaCodeActEnv(Environment):
         >>> obs = env.reset()
         >>> action = JuliaAction(core_code='println("Hello, Julia!")', test_code='')
         >>> obs = env.step(action)
-        >>> print(obs.stdout)  # "Hello, Julia!\n"
+        >>> print(obs.stdout)  # "Hello, Julia!\\n"
         >>> print(obs.exit_code)  # 0
         >>> print(env.state.last_exit_code)  # 0
     """
@@ -45,7 +51,7 @@ class JuliaCodeActEnv(Environment):
         self._state = JuliaState()
         self.transform = create_safe_julia_transform()
 
-    def reset(self) -> JuliaObservation:
+    def reset(self, **kwargs) -> Observation:
         """
         Reset environment for a fresh Julia execution session.
         Returns an empty JuliaObservation with exit_code=0.
@@ -71,7 +77,7 @@ class JuliaCodeActEnv(Environment):
         observation = self._apply_transform(observation)
         return observation
 
-    def step(self, action: JuliaAction) -> JuliaObservation:
+    def step(self, action: Action, **kwargs) -> Observation:
         """
         Execute Julia code and return the result as JuliaObservation.
 

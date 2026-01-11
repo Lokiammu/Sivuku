@@ -64,16 +64,12 @@ That's it! The `JuliaEnv.from_docker_image()` method handles:
 
 ## Building the Docker Image
 
-Before using the environment, you need to build the Docker images:
+Before using the environment, you need to build the Docker image:
 
 ```bash
-# From project root
-
-# 1. First, build the base image (if not already built)
-docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
-
-# 2. Then build the Julia environment image
-docker build -t julia-env:latest -f src/envs/julia_env/server/Dockerfile .
+# From the julia_env directory
+cd envs/julia_env
+docker build -t julia-env:latest -f server/Dockerfile .
 ```
 
 ## Environment Details
@@ -119,8 +115,6 @@ See `server/julia_transforms.py` for detailed reward logic.
 - ✅ Parse Julia `Test` module output (tests passed/failed)
 - ✅ Calculate rewards based on execution results and test outcomes
 - ✅ Safety transforms for output truncation (prevents excessive output)
-- ✅ Process pooling for concurrent execution (configurable)
-- ✅ Request queuing with backpressure management
 - ✅ Docker support for reproducible execution
 - ✅ Compatible with GRPO and other RL training frameworks
 
@@ -131,7 +125,7 @@ See `server/julia_transforms.py` for detailed reward logic.
 If you already have a Julia environment server running, you can connect directly:
 
 ```python
-from envs.julia_env import JuliaEnv
+from envs.julia_env import JuliaEnv, JuliaAction
 
 # Connect to existing server
 julia_env = JuliaEnv(base_url="http://localhost:8000")
@@ -152,21 +146,14 @@ The Julia environment uses a longer timeout (180s) by default to accommodate Jul
 
 ```python
 # Custom timeout (in seconds)
-julia_env = JuliaEnv(base_url="http://localhost:8000", request_timeout_s=300.0)
+julia_env = JuliaEnv(base_url="http://localhost:8000", message_timeout_s=300.0)
 ```
 
 ### Running with Docker Directly
 
 ```bash
-# Run with default settings (port 8000, 4 workers)
+# Run with default settings (port 8000)
 docker run -d -p 8000:8000 --name julia-env julia-env:latest
-
-# Run with custom configuration
-docker run -d -p 9000:9000 \
-  -e PORT=9000 \
-  -e NUM_WORKER=8 \
-  -e JULIA_MAX_WORKERS=32 \
-  --name julia-env julia-env:latest
 
 # Check health
 curl http://localhost:8000/health
@@ -188,7 +175,7 @@ try:
     # Reset the environment
     julia_env.reset()
 
-    # Step 1: Define a function with bugs
+    # Step 1: Define a function with tests
     action = JuliaAction(
         core_code="""
         function fibonacci(n)
@@ -220,29 +207,6 @@ finally:
     julia_env.close()
 ```
 
-## Environment Variables
-
-The server supports several environment variables for configuration:
-
-- `PORT` - Server port (default: 8000)
-- `NUM_WORKER` - Number of uvicorn workers (default: 4)
-- `JULIA_MAX_WORKERS` - Maximum Julia process pool workers (default: 64)
-- `JULIA_MAX_QUEUE_SIZE` - Request queue size (default: 100)
-- `JULIA_EXECUTION_TIMEOUT` - Execution timeout in seconds (default: 120)
-- `JULIA_USE_PROCESS_POOL` - Enable process pooling (default: 1)
-- `ENABLE_WEB_INTERFACE` - Enable web UI (default: false)
-
-## Web Interface
-
-When `ENABLE_WEB_INTERFACE=true`, you can access an interactive web UI at `http://localhost:8000/web` to manually test Julia code execution.
-
-## Performance Notes
-
-- The Julia environment uses process pooling for better performance under concurrent load
-- First execution may be slower due to Julia compilation; subsequent executions are faster
-- Request queuing prevents overload and provides backpressure when the system is busy
-- The default timeout (180s) accommodates Julia's compilation time plus execution
-
 ## Compatibility
 
 This environment is compatible with:
@@ -258,11 +222,11 @@ For local development without Docker:
 # Install Julia 1.10+ from https://julialang.org/downloads/
 
 # Install Python dependencies
-cd src/envs/julia_env
+cd envs/julia_env
 pip install -e .
 
 # Run the server locally
-uvicorn server.app:app --host 0.0.0.0 --port 8000
+uvicorn julia_env.server.app:app --host 0.0.0.0 --port 8000
 ```
 
 ## License

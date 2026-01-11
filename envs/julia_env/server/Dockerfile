@@ -1,19 +1,18 @@
-# Copyright (c) Yogesh Singla, Inc. and affiliates.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-# Use the standard openenv base image
-# Built from: docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
-# In GitHub Actions, this is overridden to use the GHCR base image
+# Base image
+FROM python:3.11-slim
 
-# Use the standard openenv base image
-ARG BASE_IMAGE=openenv-base:latest
-FROM ${BASE_IMAGE}
+# Set working directory
+WORKDIR /app/env
 
-# Install Julia using juliaup (official installer - more reliable in Docker)
+# Install system dependencies (including curl for Julia installation)
 RUN apt-get update && apt-get install -y \
+    git \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -30,26 +29,22 @@ RUN julia --version
 # Precompile commonly used Julia packages (Test is built-in, but precompile it)
 RUN julia -e 'using Test; println("Julia Test module ready")'
 
+# Copy environment files
+COPY . .
+
 # Install Python dependencies
-COPY src/envs/julia_env/server/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
+RUN pip install --no-cache-dir -e .
 
-# Environment variable to enable Julia process pool (optional - can be set at runtime)
-# Set to "1" to enable process pool, "0" to use standard execution
-ENV JULIA_USE_PROCESS_POOL=1
-ENV JULIA_POOL_SIZE=64
-ENV JULIA_MAX_WORKERS=64
-# Copy only what's needed for the Julia environment
-COPY src/core/ /app/src/core/
-COPY src/envs/julia_env/ /app/src/envs/julia_env/
+# Expose port
+EXPOSE 8000
 
-# Environment variables for port and workers with defaults
-ENV PORT=8000
-ENV NUM_WORKER=4
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV ENABLE_WEB_INTERFACE=true
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/health || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the FastAPI server
-CMD ["sh", "-c", "python -m uvicorn envs.julia_env.server.app:app --host 0.0.0.0 --port ${PORT} --workers ${NUM_WORKER}"]
+# Run the server
+CMD ["python", "-m", "uvicorn", "julia_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]

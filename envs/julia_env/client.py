@@ -1,32 +1,38 @@
-# Copyright (c) Yogesh Singla and affiliates.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
 """
-Julia Environment HTTP Client.
+JuliaEnv
+--------
+Client-side wrapper for the Julia environment server.
 
-This module provides the client for connecting to a Julia Environment server
-over HTTP.
+This client maintains a persistent WebSocket connection to the environment
+server, enabling efficient multi-step interactions with lower latency.
+
+- Users instantiate JuliaEnv with a base_url provided by the higher-level
+  vector/orchestration layer.
+- Environment authors ship the Docker image that serves the API.
 """
 
-from typing import Dict
+from __future__ import annotations
 
-from core.client_types import StepResult
-from core.http_env_client import HTTPEnvClient
+from openenv.core.client_types import StepResult
+from openenv.core.env_client import EnvClient
 
 from .models import JuliaAction, JuliaObservation, JuliaState
 
 
-class JuliaEnv(HTTPEnvClient[JuliaAction, JuliaObservation]):
+class JuliaEnv(EnvClient[JuliaAction, JuliaObservation, JuliaState]):
     """
-    HTTP client for the Julia Environment.
+    WebSocket client for the Julia Environment.
 
-    This client connects to a JuliaEnvironment HTTP server and provides
+    This client connects to a JuliaEnvironment server and provides
     methods to interact with it: reset(), step(), and state access.
 
-    The default timeout is set to 180 seconds to accommodate:
+    The default message timeout is set to 180 seconds to accommodate:
     - Server execution timeout: 120s
     - Process pool worker wait: 30s
     - Network overhead: 30s buffer
@@ -58,48 +64,62 @@ class JuliaEnv(HTTPEnvClient[JuliaAction, JuliaObservation]):
         >>> client = JuliaEnv.from_docker_image("julia-env:latest")
         >>> result = client.reset()
         >>> result = client.step(JuliaAction(core_code="println(2 + 2)", test_code=""))
-        >>> print(result.observation.stdout)  # "4\n"
+        >>> print(result.observation.stdout)  # "4\\n"
         >>> client.close()
     """
 
     # Override default timeout to accommodate Julia execution + worker wait
-    DEFAULT_TIMEOUT = 180.0  # 120s execution + 30s worker wait + 30s buffer
+    DEFAULT_MESSAGE_TIMEOUT = 180.0  # 120s execution + 30s worker wait + 30s buffer
 
-    def __init__(self, base_url: str, request_timeout_s: float = None, **kwargs):
+    def __init__(
+        self,
+        base_url: str,
+        connect_timeout_s: float = 10.0,
+        message_timeout_s: float | None = None,
+        **kwargs,
+    ):
         """
         Initialize JuliaEnv client with appropriate timeout.
 
         Args:
             base_url: Base URL of the Julia environment server
-            request_timeout_s: HTTP request timeout in seconds (default: 180.0)
-            **kwargs: Additional arguments passed to HTTPEnvClient
+            connect_timeout_s: Timeout for establishing WebSocket connection
+            message_timeout_s: Timeout for receiving responses (default: 180.0)
+            **kwargs: Additional arguments passed to EnvClient
         """
-        if request_timeout_s is None:
-            request_timeout_s = self.DEFAULT_TIMEOUT
-        super().__init__(base_url, request_timeout_s=request_timeout_s, **kwargs)
+        if message_timeout_s is None:
+            message_timeout_s = self.DEFAULT_MESSAGE_TIMEOUT
+        super().__init__(
+            base_url,
+            connect_timeout_s=connect_timeout_s,
+            message_timeout_s=message_timeout_s,
+            **kwargs,
+        )
 
-    def _step_payload(self, action: JuliaAction) -> Dict:
+    # --- EnvClient abstract hooks ---
+
+    def _step_payload(self, action: JuliaAction) -> dict:
         """
         Convert JuliaAction to JSON payload for step request.
-        
+
         Args:
             action: JuliaAction instance
-            
+
         Returns:
             Dictionary representation suitable for JSON encoding
         """
         return {
             "core_code": action.core_code,
-            "test_code": action.test_code
+            "test_code": action.test_code,
         }
 
-    def _parse_result(self, payload: Dict) -> StepResult[JuliaObservation]:
+    def _parse_result(self, payload: dict) -> StepResult[JuliaObservation]:
         """
         Parse server response into StepResult[JuliaObservation].
-        
+
         Args:
             payload: JSON response from server
-            
+
         Returns:
             StepResult with JuliaObservation
         """
@@ -111,22 +131,23 @@ class JuliaEnv(HTTPEnvClient[JuliaAction, JuliaObservation]):
             tests_passed=obs_data.get("tests_passed", 0),
             tests_failed=obs_data.get("tests_failed", 0),
             code_compiles=obs_data.get("code_compiles", True),
-            metadata=obs_data.get("metadata", {}),
+            done=payload.get("done", False),
+            reward=payload.get("reward"),
         )
-        
+
         return StepResult[JuliaObservation](
             observation=observation,
             reward=payload.get("reward"),
             done=payload.get("done", False),
         )
 
-    def _parse_state(self, payload: Dict) -> JuliaState:
+    def _parse_state(self, payload: dict) -> JuliaState:
         """
         Parse server response into JuliaState object.
-        
+
         Args:
             payload: JSON response from /state endpoint
-            
+
         Returns:
             JuliaState object with episode metadata
         """
@@ -138,4 +159,3 @@ class JuliaEnv(HTTPEnvClient[JuliaAction, JuliaObservation]):
             total_tests_passed=payload.get("total_tests_passed", 0),
             total_tests_failed=payload.get("total_tests_failed", 0),
         )
-

@@ -1,4 +1,4 @@
-# Copyright (c) Yogesh Singla and affiliates.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under the BSD-style license found in the
@@ -6,7 +6,7 @@
 
 """Julia Environment - Code execution environment for RL training."""
 
-from .julia_env_client import JuliaEnv
+from .client import JuliaEnv
 from .models import JuliaAction, JuliaObservation, JuliaState
 
 __all__ = ["JuliaAction", "JuliaObservation", "JuliaState", "JuliaEnv"]
