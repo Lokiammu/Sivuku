@@ -95,8 +95,8 @@ class TestJuliaExecutorImport:
     """Test that JuliaExecutor can be imported correctly."""
 
     def test_import_julia_executor(self):
-        """Test that JuliaExecutor can be imported from core.tools."""
-        from openenv.core.tools import JuliaExecutor
+        """Test that JuliaExecutor can be imported from julia_env.server."""
+        from julia_env.server.julia_executor import JuliaExecutor
 
         executor = JuliaExecutor(use_process_pool=False)
         assert hasattr(executor, "run")
@@ -172,8 +172,10 @@ class TestJuliaCodeActEnv:
             """,
             test_code="""
             using Test
-            @test add(1, 2) == 3
-            @test add(0, 0) == 0
+            @testset "add function tests" begin
+                @test add(1, 2) == 3
+                @test add(0, 0) == 0
+            end
             """,
         )
         obs = env.step(action)
@@ -199,7 +201,9 @@ class TestJuliaCodeActEnv:
             """,
             test_code="""
             using Test
-            @test add(1, 2) == 3  # This will fail
+            @testset "add function tests" begin
+                @test add(1, 2) == 3  # This will fail
+            end
             """,
         )
         obs = env.step(action)
@@ -241,7 +245,7 @@ class TestJuliaExecutor:
 
     def test_run_simple(self):
         """Test running simple Julia code."""
-        from openenv.core.tools import JuliaExecutor
+        from julia_env.server.julia_executor import JuliaExecutor
 
         executor = JuliaExecutor(use_process_pool=False)
         result = executor.run('println("Hello")')
@@ -251,7 +255,7 @@ class TestJuliaExecutor:
 
     def test_run_math(self):
         """Test running Julia math code."""
-        from openenv.core.tools import JuliaExecutor
+        from julia_env.server.julia_executor import JuliaExecutor
 
         executor = JuliaExecutor(use_process_pool=False)
         result = executor.run("println(2 + 2)")
@@ -261,7 +265,7 @@ class TestJuliaExecutor:
 
     def test_run_syntax_error(self):
         """Test running Julia code with syntax error."""
-        from openenv.core.tools import JuliaExecutor
+        from julia_env.server.julia_executor import JuliaExecutor
 
         executor = JuliaExecutor(use_process_pool=False)
         result = executor.run('println("unclosed string)')
