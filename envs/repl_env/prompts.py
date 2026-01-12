@@ -278,10 +278,13 @@ def build_user_prompt(
             else USER_PROMPT
         )
     else:
-        prompt = "The history before is your previous interactions with the REPL environment. " + (
-            USER_PROMPT_WITH_ROOT.format(root_prompt=root_prompt)
-            if root_prompt
-            else USER_PROMPT
+        prompt = (
+            "The history before is your previous interactions with the REPL environment. "
+            + (
+                USER_PROMPT_WITH_ROOT.format(root_prompt=root_prompt)
+                if root_prompt
+                else USER_PROMPT
+            )
         )
 
     # Inform model about multiple contexts if present

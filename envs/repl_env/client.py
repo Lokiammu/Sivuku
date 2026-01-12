@@ -265,7 +265,9 @@ class REPLEnv:
         Returns:
             StepResult with done=True.
         """
-        return self.step(REPLAction(code="", is_final=True, final_answer=answer))
+        return self.step(
+            REPLAction(code="", is_final=True, final_answer=answer)
+        )
 
     def get_variable(self, name: str) -> StepResult[REPLObservation]:
         """
@@ -313,7 +315,9 @@ class REPLEnv:
             self._remote_client.close()
             self._remote_client = None
 
-    def _wrap_observation(self, obs: REPLObservation) -> StepResult[REPLObservation]:
+    def _wrap_observation(
+        self, obs: REPLObservation
+    ) -> StepResult[REPLObservation]:
         """Wrap a local REPLObservation in a StepResult."""
         return StepResult(
             observation=obs,

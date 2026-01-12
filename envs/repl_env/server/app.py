@@ -34,6 +34,7 @@ Environment Variables:
     HF_TOKEN: Fallback HuggingFace API token (client token takes priority)
     LLM_MODEL: Model to use for llm_query/llm_query_batched (default: Qwen/Qwen3-Coder-480B-A35B-Instruct)
 """
+
 import os
 
 # Support both in-repo and standalone imports
@@ -60,7 +61,9 @@ if HF_TOKEN:
     print(f"[REPL Server] Default model: {LLM_MODEL}")
 else:
     print("[REPL Server] No server HF_TOKEN configured")
-    print("[REPL Server] LLM functions will be enabled if client passes hf_token in reset()")
+    print(
+        "[REPL Server] LLM functions will be enabled if client passes hf_token in reset()"
+    )
 
 # Simple factory - LLM functions are created dynamically in reset() based on token
 env_factory = REPLEnvironment

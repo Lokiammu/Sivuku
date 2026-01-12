@@ -42,18 +42,19 @@ class PythonExecutor:
     def __init__(
         self,
         max_output_length: int = 8192,
-        timeout: float = 30.0,
         allowed_imports: Optional[List[str]] = None,
     ):
         """Initialize the executor.
 
         Args:
             max_output_length: Maximum characters for stdout/stderr (default 8192)
-            timeout: Execution timeout in seconds (passed to LocalPythonExecutor)
             allowed_imports: List of allowed module names for import
+
+        Note:
+            smolagents.LocalPythonExecutor does NOT support wall-clock timeouts.
+            Instead, it limits operations (10M ops) and while iterations (1M).
         """
         self.max_output_length = max_output_length
-        self.timeout = timeout
 
         # Default allowed imports for RLM tasks
         default_imports = [
@@ -107,7 +108,9 @@ class PythonExecutor:
         """Register helper functions with the executor."""
         helpers = {
             "format_exc": traceback.format_exc,
-            "safe_json_dumps": lambda obj: json.dumps(obj, default=lambda o: repr(o)),
+            "safe_json_dumps": lambda obj: json.dumps(
+                obj, default=lambda o: repr(o)
+            ),
         }
         # Register helpers as callable tools
         for name, func in helpers.items():
@@ -120,7 +123,10 @@ class PythonExecutor:
                 # Type ignore: smolagents accepts callables despite Tool type hint
                 self._executor.send_tools(self._callable_tools)  # type: ignore[arg-type]
             except Exception:
-                logger.debug("send_tools failed; continuing without extra tools", exc_info=True)
+                logger.debug(
+                    "send_tools failed; continuing without extra tools",
+                    exc_info=True,
+                )
 
     def set_context(self, context: str, variable_name: str = "context") -> None:
         """Load context into namespace as a variable.
@@ -139,11 +145,13 @@ class PythonExecutor:
             value: Variable value
         """
         # Access the executor's internal state to set variables
-        if hasattr(self._executor, 'state'):
+        if hasattr(self._executor, "state"):
             self._executor.state[name] = value
         else:
             # Fallback: store in injected vars for later retrieval
-            self._executor._injected_vars = getattr(self._executor, '_injected_vars', {})
+            self._executor._injected_vars = getattr(
+                self._executor, "_injected_vars", {}
+            )
             self._executor._injected_vars[name] = value
 
         self._user_variables.add(name)
@@ -158,11 +166,11 @@ class PythonExecutor:
             The variable value or None if not found
         """
         # Try to get from executor's state
-        if hasattr(self._executor, 'state'):
+        if hasattr(self._executor, "state"):
             return self._executor.state.get(name)
 
         # Fallback to injected vars
-        if hasattr(self._executor, '_injected_vars'):
+        if hasattr(self._executor, "_injected_vars"):
             return self._executor._injected_vars.get(name)
 
         return None
@@ -176,9 +184,9 @@ class PythonExecutor:
         variables = set()
 
         # Get from executor's state
-        if hasattr(self._executor, 'state'):
+        if hasattr(self._executor, "state"):
             for key in self._executor.state:
-                if not key.startswith('_'):
+                if not key.startswith("_"):
                     variables.add(key)
 
         # Include tracked user variables
@@ -203,7 +211,7 @@ class PythonExecutor:
 
         # Track state before execution
         pre_state_keys = set()
-        if hasattr(self._executor, 'state'):
+        if hasattr(self._executor, "state"):
             pre_state_keys = set(self._executor.state.keys())
 
         stdout_parts: list[str] = []
@@ -249,29 +257,38 @@ class PythonExecutor:
                     success = False
                     exception_msg = str(ex)
             except Exception:
-                logger.debug("Failed to read exec_result.exception", exc_info=True)
+                logger.debug(
+                    "Failed to read exec_result.exception", exc_info=True
+                )
 
             # Determine success from exit_code if available
             try:
                 if hasattr(exec_result, "exit_code"):
-                    if exec_result.exit_code is not None and exec_result.exit_code != 0:
+                    if (
+                        exec_result.exit_code is not None
+                        and exec_result.exit_code != 0
+                    ):
                         success = False
                 elif hasattr(exec_result, "success"):
                     success = bool(exec_result.success)
             except Exception:
-                logger.debug("Failed to determine exec_result exit code", exc_info=True)
+                logger.debug(
+                    "Failed to determine exec_result exit code", exc_info=True
+                )
 
         except Exception as e:
             success = False
-            exception_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+            exception_msg = (
+                f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+            )
             stderr_parts.append(exception_msg)
 
         execution_time = time.time() - start_time
 
         # Capture new/modified variables
-        if hasattr(self._executor, 'state'):
+        if hasattr(self._executor, "state"):
             for key in self._executor.state:
-                if key not in pre_state_keys and not key.startswith('_'):
+                if key not in pre_state_keys and not key.startswith("_"):
                     try:
                         val = self._executor.state[key]
                         val_repr = repr(val)
@@ -288,10 +305,16 @@ class PythonExecutor:
 
         # Truncate output to max_output_length
         if len(stdout) > self.max_output_length:
-            stdout = stdout[:self.max_output_length] + f"\n... (truncated, total {len(stdout)} chars)"
+            stdout = (
+                stdout[: self.max_output_length]
+                + f"\n... (truncated, total {len(stdout)} chars)"
+            )
 
         if len(stderr) > self.max_output_length:
-            stderr = stderr[:self.max_output_length] + f"\n... (truncated, total {len(stderr)} chars)"
+            stderr = (
+                stderr[: self.max_output_length]
+                + f"\n... (truncated, total {len(stderr)} chars)"
+            )
 
         return {
             "stdout": stdout,
