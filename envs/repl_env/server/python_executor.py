@@ -97,27 +97,30 @@ class PythonExecutor:
         # Track variables we've set (for list_variables)
         self._user_variables: set[str] = set()
 
-        # Track all registered tools (accumulative)
-        self._registered_tools: Dict[str, Callable[..., Any]] = {}
+        # Track callable functions to register with send_tools
+        self._callable_tools: Dict[str, Callable[..., Any]] = {}
 
         # Register helper utilities
         self._register_helpers()
 
     def _register_helpers(self) -> None:
         """Register helper functions with the executor."""
-        tools = {
+        helpers = {
             "format_exc": traceback.format_exc,
             "safe_json_dumps": lambda obj: json.dumps(obj, default=lambda o: repr(o)),
         }
-        self._registered_tools.update(tools)
-        self._sync_tools()
+        # Register helpers as callable tools
+        for name, func in helpers.items():
+            self.inject_function(name, func)
 
-    def _sync_tools(self) -> None:
-        """Sync all registered tools with the executor."""
-        try:
-            self._executor.send_tools(self._registered_tools)
-        except Exception:
-            logger.debug("LocalPythonExecutor.send_tools failed; continuing without extra tools", exc_info=True)
+    def _sync_callable_tools(self) -> None:
+        """Sync callable functions with the executor via send_tools."""
+        if self._callable_tools:
+            try:
+                # Type ignore: smolagents accepts callables despite Tool type hint
+                self._executor.send_tools(self._callable_tools)  # type: ignore[arg-type]
+            except Exception:
+                logger.debug("send_tools failed; continuing without extra tools", exc_info=True)
 
     def set_context(self, context: str, variable_name: str = "context") -> None:
         """Load context into namespace as a variable.
@@ -139,16 +142,9 @@ class PythonExecutor:
         if hasattr(self._executor, 'state'):
             self._executor.state[name] = value
         else:
-            # Fallback: inject via code execution
-            # Store reference for later retrieval
+            # Fallback: store in injected vars for later retrieval
             self._executor._injected_vars = getattr(self._executor, '_injected_vars', {})
             self._executor._injected_vars[name] = value
-
-            # Use send_tools to make it available
-            try:
-                self._executor.send_tools({name: lambda v=value: v})
-            except Exception:
-                pass
 
         self._user_variables.add(name)
 
@@ -313,19 +309,19 @@ class PythonExecutor:
             additional_authorized_imports=self.allowed_imports
         )
         self._user_variables.clear()
-        self._registered_tools.clear()
+        self._callable_tools.clear()
         self._register_helpers()
 
     def inject_function(self, name: str, func: Callable[..., Any]) -> None:
         """Inject a callable function into the namespace.
 
-        Used for adding llm_query, llm_batch, etc.
+        Used for adding llm_query, llm_batch, FINAL, etc.
 
         Args:
             name: Function name in namespace
             func: The callable to inject
         """
-        # Add to registered tools and sync
-        self._registered_tools[name] = func
+        # Add to callable tools and sync with executor
+        self._callable_tools[name] = func
         self._user_variables.add(name)
-        self._sync_tools()
+        self._sync_callable_tools()
