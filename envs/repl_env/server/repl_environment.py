@@ -183,12 +183,19 @@ class REPLEnvironment(Environment):
 
         self._executor.inject_function("FINAL", final_helper)
 
-        # Inject FINAL_VAR helper so FINAL_VAR(var_name) works as described in prompts
-        # Note: var_name should be passed as a STRING, e.g., FINAL_VAR("my_var")
-        # The actual variable lookup happens in _check_finalization via namespace
+        # Inject FINAL_VAR helper that looks up variable and returns FINAL(value)
+        # This matches official RLM behavior - strips quotes from var_name and looks up in namespace
+        executor = self._executor  # Capture for closure
+
         def final_var_helper(var_name: str):
-            """Helper that returns FINAL_VAR(var_name) string for detection."""
-            return f"FINAL_VAR({var_name})"
+            """Look up variable by name and return FINAL(value) for detection."""
+            # Strip quotes if present (handles both FINAL_VAR("x") and FINAL_VAR(x))
+            var_name_clean = str(var_name).strip().strip("\"'")
+            # Look up variable in executor namespace
+            value = executor.get_variable(var_name_clean)
+            if value is not None:
+                return f"FINAL({value})"
+            return f"FINAL_VAR({var_name_clean})"  # Fallback for regex detection
 
         self._executor.inject_function("FINAL_VAR", final_var_helper)
 
