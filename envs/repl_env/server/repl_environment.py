@@ -156,7 +156,7 @@ class REPLEnvironment(Environment):
                     max_tokens=2048,
                     temperature=0.7,
                 )
-                return response.choices[0].message.content
+                return response.choices[0].message.content or ""
             except Exception as e:
                 return f"Error calling LLM: {e}"
 
@@ -166,7 +166,7 @@ class REPLEnvironment(Environment):
                 return []
 
             max_workers = min(len(prompts), 8)
-            results = [None] * len(prompts)
+            results: List[str] = [""] * len(prompts)
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_idx = {
