@@ -11,7 +11,7 @@ Uses smolagents.LocalPythonExecutor as the backend for battle-tested sandboxed
 execution, with RLM-specific features on top:
 - Context loading (set_context)
 - Variable access (get_variable, list_variables)
-- Function injection (inject_function for llm_query, llm_batch)
+- Function injection (inject_function for llm_query, llm_query_batched)
 - Output capped at 8,192 characters per turn (configurable)
 - Persistent namespace across code blocks
 """
@@ -35,7 +35,7 @@ class PythonExecutor:
     Wraps smolagents.LocalPythonExecutor with RLM-specific features:
     - Context loading for RLM tasks
     - Variable tracking for observation
-    - Function injection for llm_query, llm_batch
+    - Function injection for llm_query, llm_query_batched
     - Configurable output length limit (default 8192 chars per Prime Intellect)
     """
 
@@ -315,7 +315,7 @@ class PythonExecutor:
     def inject_function(self, name: str, func: Callable[..., Any]) -> None:
         """Inject a callable function into the namespace.
 
-        Used for adding llm_query, llm_batch, FINAL, etc.
+        Used for adding llm_query, llm_query_batched, FINAL, etc.
 
         Args:
             name: Function name in namespace

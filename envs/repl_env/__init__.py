@@ -14,7 +14,7 @@ This environment allows language models to:
 - Execute Python code in a sandboxed REPL
 - Work with large contexts loaded as variables
 - Finalize answers via FINAL(), FINAL_VAR(), or answer dict pattern
-- Optionally make recursive LLM calls via llm_query() / llm_batch()
+- Optionally make recursive LLM calls via llm_query() / llm_query_batched()
 
 Example:
     >>> from repl_env import REPLEnv, REPLAction

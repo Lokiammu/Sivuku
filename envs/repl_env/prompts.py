@@ -19,7 +19,7 @@ Parsing utilities help extract code blocks and format observations.
 import re
 import textwrap
 from dataclasses import dataclass
-from typing import Any, List, Optional, Union
+from typing import List, Optional
 
 
 # =============================================================================
@@ -43,7 +43,7 @@ class QueryMetadata:
 RLM_SYSTEM_PROMPT = textwrap.dedent(
     """You are tasked with answering a query with associated context. You can access, transform, and analyze this context interactively in a REPL environment that can recursively query sub-LLMs, which you are strongly encouraged to use as much as possible. You will be queried iteratively until you provide a final answer.
 
-The REPL environment is initialized with:
+    The REPL environment is initialized with:
 1. A `context` variable that contains extremely important information about your query. You should check the content of the `context` variable to understand what you are working with. Make sure you look through it sufficiently as you answer your query.
 2. A `llm_query` function that allows you to query an LLM (that can handle around 500K chars) inside your REPL environment.
 3. A `llm_query_batched` function that allows you to query multiple prompts concurrently: `llm_query_batched(prompts: List[str]) -> List[str]`. This is much faster than sequential `llm_query` calls when you have multiple independent queries. Results are returned in the same order as the input prompts.
@@ -435,7 +435,7 @@ def extract_code_blocks(text: str, language: str = "python") -> List[str]:
     return all_matches
 
 
-def format_observation(obs: Any) -> str:
+def format_observation(obs) -> str:
     """Format a REPLObservation into observation text for the LLM.
 
     Args:

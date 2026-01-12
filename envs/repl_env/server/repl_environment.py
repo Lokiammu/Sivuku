@@ -25,10 +25,10 @@ from uuid import uuid4
 # Support both in-repo and standalone imports
 try:
     from openenv.core.env_server.interfaces import Environment
-    from openenv.core.env_server.types import State, EnvironmentMetadata
+    from openenv.core.env_server.types import EnvironmentMetadata
 except ImportError:
     from openenv.core.env_server.interfaces import Environment
-    from openenv.core.env_server.types import State, EnvironmentMetadata
+    from openenv.core.env_server.types import EnvironmentMetadata
 
 try:
     from ..models import REPLAction, REPLObservation, REPLState, CodeBlockResult
@@ -50,7 +50,7 @@ class REPLEnvironment(Environment):
     - Execute Python code in a sandboxed REPL
     - Work with large contexts loaded as variables
     - Finalize answers via FINAL(), FINAL_VAR(), or answer dict pattern
-    - Optionally make recursive LLM calls via llm_query() / llm_batch()
+    - Optionally make recursive LLM calls via llm_query() / llm_query_batched()
 
     Supports two finalization patterns:
     1. RLM-style: print('FINAL(answer)') or print('FINAL_VAR(var_name)')
@@ -99,7 +99,7 @@ class REPLEnvironment(Environment):
             reward_on_failure: Reward when max iterations reached (default -0.1)
             reward_on_error: Reward when code execution fails (default -0.05)
             llm_query_fn: Optional function for llm_query() support
-            llm_batch_fn: Optional function for llm_batch() support
+            llm_batch_fn: Optional function for llm_query_batched() support
         """
         self.initial_context = context or os.environ.get("REPL_CONTEXT", "")
         self.initial_task_prompt = task_prompt or os.environ.get("REPL_TASK_PROMPT", "")
@@ -134,7 +134,6 @@ class REPLEnvironment(Environment):
             hf_token: HuggingFace API token
             llm_model: Model to use (default: Qwen/Qwen3-Coder-480B-A35B-Instruct)
         """
-        import os
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         try:
@@ -214,9 +213,12 @@ class REPLEnvironment(Environment):
         effective_context = context or self.initial_context
         effective_task_prompt = task_prompt or self.initial_task_prompt
         
-        # If client provides hf_token, create LLM functions dynamically
-        if hf_token:
-            self._create_llm_functions(hf_token, llm_model)
+        # Create LLM functions if not already provided at init
+        # Priority: client hf_token > server HF_TOKEN env var
+        if not self.llm_query_fn:
+            effective_token = hf_token or os.environ.get("HF_TOKEN")
+            if effective_token:
+                self._create_llm_functions(effective_token, llm_model)
 
         # Initialize state
         self._state = REPLState(

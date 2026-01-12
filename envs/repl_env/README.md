@@ -19,7 +19,7 @@ A Python REPL environment for training language models on code execution tasks, 
 
 The RLM paradigm allows language models to:
 - Execute Python code in a sandboxed REPL environment
-- Make recursive calls to themselves or other LMs via `llm_query()` / `llm_batch()`
+- Make recursive calls to themselves or other LMs via `llm_query()` / `llm_query_batched()`
 - Handle near-infinite context by programmatically decomposing and exploring data
 - Terminate with explicit `FINAL(answer)` or `answer = {"content": ..., "ready": True}` signals
 
@@ -34,7 +34,7 @@ The RLM paradigm allows language models to:
   - Prime Intellect style: `answer = {"content": "...", "ready": True}`
 - **Iteration Limits**: Configurable maximum steps per episode
 - **Reward Signals**: Customizable reward functions for RL training
-- **Optional LLM Oracle**: Can enable `llm_query()` and `llm_batch()` for recursive calls
+- **Optional LLM Oracle**: Can enable `llm_query()` and `llm_query_batched()` for recursive calls
 
 ## Quick Start
 
@@ -79,14 +79,14 @@ from repl_env import REPLEnv
 def my_llm_query(prompt: str) -> str:
     return your_llm.generate(prompt)
 
-def my_llm_batch(prompts: list[str]) -> list[str]:
+def my_llm_query_batched(prompts: list[str]) -> list[str]:
     return [my_llm_query(p) for p in prompts]
 
 # Pass LLM functions for recursive calls
-with REPLEnv(llm_query_fn=my_llm_query, llm_batch_fn=my_llm_batch) as env:
+with REPLEnv(llm_query_fn=my_llm_query, llm_batch_fn=my_llm_query_batched) as env:
     result = env.reset(context=large_document, task_prompt="Summarize this")
 
-    # Now the executed code can use llm_query() and llm_batch()!
+    # Now the executed code can use llm_query() and llm_query_batched()!
     result = env.execute("summary = llm_query('Summarize: ' + context[:1000])")
 ```
 
@@ -114,9 +114,12 @@ class REPLEnv:
         *,
         # Local-only options
         llm_query_fn: Callable | None = None,    # Function for llm_query()
-        llm_batch_fn: Callable | None = None,    # Function for llm_batch()
+        llm_batch_fn: Callable | None = None,    # Function for llm_query_batched()
         max_output_length: int = 8192,           # Max stdout/stderr chars
+        context_preview_length: int = 500,       # Chars in context preview
         reward_on_success: float = 1.0,          # Reward on FINAL()
+        reward_on_iteration: float = 0.0,        # Reward per step
+        reward_on_failure: float = -0.1,         # Reward on max iterations
         reward_on_error: float = -0.05,          # Reward on execution error
         # Remote-only options
         connect_timeout_s: float = 10.0,
@@ -130,6 +133,9 @@ class REPLEnv:
         task_prompt: str = "",          # Task description
         max_iterations: int = 30,       # Max code execution steps
         seed: int | None = None,        # Random seed
+        episode_id: str | None = None,  # Custom episode ID
+        hf_token: str | None = None,    # HF token for llm_query (remote mode)
+        llm_model: str | None = None,   # Model for llm_query (remote mode)
     ) -> StepResult[REPLObservation]: ...
 
     def execute(self, code: str) -> StepResult[REPLObservation]: ...
@@ -143,23 +149,24 @@ class REPLEnv:
 
 ```python
 class REPLAction:
-    code: str           # Python code to execute
-    is_final: bool      # Whether this signals the final answer
-    final_answer: str   # The final answer (if is_final=True)
+    code: str = ""                    # Python code to execute
+    is_final: bool = False            # Whether this signals the final answer
+    final_answer: str | None = None   # The final answer (if is_final=True)
 ```
 
 ### Observation Space
 
 ```python
 class REPLObservation:
-    result: CodeBlockResult    # Execution result (stdout, stderr, etc.)
-    context_preview: str       # First 500 chars of context
-    context_length: int        # Total context length
-    available_variables: list  # Variables in namespace
-    iteration: int             # Current iteration
-    max_iterations: int        # Max iterations
-    done: bool                 # Episode complete?
-    reward: float              # Step reward
+    result: CodeBlockResult      # Execution result (stdout, stderr, etc.)
+    context_preview: str | None  # First 500 chars of context
+    context_length: int          # Total context length
+    available_variables: list    # Variables in namespace
+    iteration: int               # Current iteration
+    max_iterations: int          # Max iterations
+    done: bool                   # Episode complete?
+    reward: float                # Step reward
+    metadata: dict               # Additional info (final_answer, etc.)
 ```
 
 ## Finalization Patterns
@@ -182,10 +189,11 @@ result = env.execute("print(f'FINAL({answer})')")
 ```python
 result = env.execute("my_result = 'The answer is 42'")
 # Direct call (recommended) - pass variable name as string
+# FINAL_VAR looks up the variable and returns FINAL(value)
 result = env.execute('FINAL_VAR("my_result")')
 # -> done=True, final_answer="The answer is 42"
 
-# Or via print pattern
+# Also works via print (for regex detection)
 result = env.execute("print('FINAL_VAR(my_result)')")
 # -> done=True, final_answer="The answer is 42"
 ```
@@ -212,8 +220,9 @@ from repl_env.prompts import (
     build_rlm_system_prompt,     # Build system messages with metadata
     build_user_prompt,           # Build user prompt for each iteration
 
-    # Legacy prompt building (simpler)
-    build_initial_prompt,        # Build initial user prompt
+    # Convenience functions
+    build_messages,              # Build complete message list (system + user)
+    build_initial_prompt,        # Build initial user prompt string
     build_continuation_prompt,   # Build continuation prompt after execution
 
     # Parsing utilities
@@ -306,12 +315,12 @@ def llm_query(prompt: str) -> str:
     """Single LLM call - model can call this from executed code"""
     return your_llm.generate(prompt)
 
-def llm_batch(prompts: list[str]) -> list[str]:
-    """Batch LLM calls for efficiency"""
+def llm_query_batched(prompts: list[str]) -> list[str]:
+    """Batch LLM calls for efficiency (parallel in production)"""
     return [your_llm.generate(p) for p in prompts]
 
 # Create environment with LLM oracle (local mode)
-with REPLEnv(llm_query_fn=llm_query, llm_batch_fn=llm_batch) as env:
+with REPLEnv(llm_query_fn=llm_query, llm_batch_fn=llm_query_batched) as env:
     result = env.reset(
         context=massive_document,  # Could be 100K+ chars
         task_prompt="Summarize each section and find key themes"
@@ -323,7 +332,7 @@ with REPLEnv(llm_query_fn=llm_query, llm_batch_fn=llm_batch) as env:
 sections = context.split('\\n\\n')
 
 # Use LLM to summarize each section (recursive call!)
-summaries = llm_batch([f"Summarize: {s[:1000]}" for s in sections[:10]])
+summaries = llm_query_batched([f"Summarize: {s[:1000]}" for s in sections[:10]])
 
 # Combine summaries
 combined = '\\n'.join(summaries)
@@ -375,6 +384,7 @@ def collect_trajectory(env, policy, context, task):
 # Training loop
 with REPLEnv(
     reward_on_success=1.0,
+    reward_on_iteration=0.0,
     reward_on_error=-0.05,
     reward_on_failure=-0.1,
 ) as env:
@@ -412,6 +422,8 @@ env = REPLEnv(
 | `REPL_CONTEXT` | Initial context to load | "" |
 | `REPL_TASK_PROMPT` | Task description | "" |
 | `REPL_MAX_ITERATIONS` | Max steps per episode | 30 |
+| `HF_TOKEN` | HuggingFace token for llm_query (server fallback) | None |
+| `LLM_MODEL` | Model for llm_query/llm_query_batched | Qwen/Qwen3-Coder-480B-A35B-Instruct |
 
 ## Running the Server
 

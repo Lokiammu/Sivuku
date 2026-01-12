@@ -106,7 +106,7 @@ class REPLEnv:
         Args:
             base_url: Server URL. If None, runs locally without a server.
             llm_query_fn: Function for llm_query() calls (local mode only).
-            llm_batch_fn: Function for llm_batch() calls (local mode only).
+            llm_batch_fn: Function for llm_query_batched() calls (local mode only).
             max_output_length: Max stdout/stderr chars per execution (local only).
             context_preview_length: Chars to show in context preview (local only).
             reward_on_success: Reward when final answer submitted (local only).
