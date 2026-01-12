@@ -44,7 +44,6 @@ from .models import REPLAction, REPLObservation, REPLState, CodeBlockResult
 from .client import REPLEnv
 from .prompts import (
     RLM_SYSTEM_PROMPT,
-    RLM_SYSTEM_PROMPT_COMPACT,
     build_initial_prompt,
     build_continuation_prompt,
     build_messages,
@@ -62,7 +61,6 @@ __all__ = [
     "REPLEnv",
     # Prompts
     "RLM_SYSTEM_PROMPT",
-    "RLM_SYSTEM_PROMPT_COMPACT",
     "build_initial_prompt",
     "build_continuation_prompt",
     "build_messages",

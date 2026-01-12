@@ -1,3 +1,16 @@
+---
+title: REPL Environment Server
+emoji: 🎮
+colorFrom: yellow
+colorTo: indigo
+sdk: docker
+pinned: false
+app_port: 8000
+base_path: /web
+tags:
+  - openenv
+---
+
 # REPL Environment for OpenEnv
 
 A Python REPL environment for training language models on code execution tasks, based on the [Recursive Language Models (RLM)](https://arxiv.org/abs/2512.24601) paradigm.
@@ -12,6 +25,7 @@ The RLM paradigm allows language models to:
 
 ## Features
 
+- **Unified API**: Same `REPLEnv` class works for both local and remote execution
 - **Sandboxed Python Execution**: Safe code execution with restricted builtins
 - **Context Loading**: Load large contexts that agents can explore programmatically
 - **Multiple Finalization Patterns**:
@@ -24,39 +38,108 @@ The RLM paradigm allows language models to:
 
 ## Quick Start
 
+### Local Mode (No Server Required)
+
 ```python
-from repl_env import REPLEnv, REPLAction
+from repl_env import REPLEnv
 
-# Start from Docker
-env = REPLEnv.from_docker_image("repl-env:latest")
+# Create environment - runs locally by default
+with REPLEnv() as env:
+    result = env.reset(
+        context="This is a large document with lots of text...",
+        task_prompt="Find the word count"
+    )
 
-# Reset with context
-result = env.reset(
-    context="This is a large document with lots of text...",
-    task_prompt="Find the word count"
-)
+    # Execute code iteratively
+    result = env.execute("words = context.split()")
+    result = env.execute("count = len(words)")
+    result = env.execute("print(f'FINAL({count})')")
 
-# Execute code iteratively
-result = env.execute("words = context.split()")
-result = env.execute("count = len(words)")
-result = env.execute("print(f'FINAL({count})')")
-
-# Check result
-print(f"Done: {result.done}")
-print(f"Final Answer: {result.observation.metadata['final_answer']}")
-
-env.close()
+    print(f"Done: {result.done}")
+    print(f"Final Answer: {env.state().final_answer}")
 ```
 
-## Environment Configuration
+### Remote Server Mode
 
-| Environment Variable | Description | Default |
-|---------------------|-------------|---------|
-| `REPL_CONTEXT` | Initial context to load | "" |
-| `REPL_TASK_PROMPT` | Task description | "" |
-| `REPL_MAX_ITERATIONS` | Max steps per episode | 30 |
+```python
+from repl_env import REPLEnv
 
-## Action Space
+# Connect to a running server - same API!
+with REPLEnv(base_url="https://my-server.hf.space") as env:
+    result = env.reset(context="...", task_prompt="...")
+    result = env.execute("count = len(context)")
+    result = env.execute("print(f'FINAL({count})')")
+```
+
+### Local Mode with LLM Support
+
+```python
+from repl_env import REPLEnv
+
+def my_llm_query(prompt: str) -> str:
+    return your_llm.generate(prompt)
+
+def my_llm_batch(prompts: list[str]) -> list[str]:
+    return [my_llm_query(p) for p in prompts]
+
+# Pass LLM functions for recursive calls
+with REPLEnv(llm_query_fn=my_llm_query, llm_batch_fn=my_llm_batch) as env:
+    result = env.reset(context=large_document, task_prompt="Summarize this")
+
+    # Now the executed code can use llm_query() and llm_batch()!
+    result = env.execute("summary = llm_query('Summarize: ' + context[:1000])")
+```
+
+### From Docker or HuggingFace Hub
+
+```python
+from repl_env import REPLEnv
+
+# Start from Docker image
+env = REPLEnv.from_docker_image("repl-env:latest")
+
+# Or from HuggingFace Hub
+env = REPLEnv.from_hub("openenv/repl-env")
+```
+
+## API Reference
+
+### REPLEnv
+
+```python
+class REPLEnv:
+    def __init__(
+        self,
+        base_url: str | None = None,      # Server URL (None = local mode)
+        *,
+        # Local-only options
+        llm_query_fn: Callable | None = None,    # Function for llm_query()
+        llm_batch_fn: Callable | None = None,    # Function for llm_batch()
+        max_output_length: int = 8192,           # Max stdout/stderr chars
+        reward_on_success: float = 1.0,          # Reward on FINAL()
+        reward_on_error: float = -0.05,          # Reward on execution error
+        # Remote-only options
+        connect_timeout_s: float = 10.0,
+        message_timeout_s: float = 60.0,
+    ): ...
+
+    def reset(
+        self,
+        *,
+        context: str = "",              # Text to analyze (as `context` variable)
+        task_prompt: str = "",          # Task description
+        max_iterations: int = 30,       # Max code execution steps
+        seed: int | None = None,        # Random seed
+    ) -> StepResult[REPLObservation]: ...
+
+    def execute(self, code: str) -> StepResult[REPLObservation]: ...
+    def step(self, action: REPLAction) -> StepResult[REPLObservation]: ...
+    def submit_final_answer(self, answer: str) -> StepResult[REPLObservation]: ...
+    def state(self) -> REPLState: ...
+    def close(self) -> None: ...
+```
+
+### Action Space
 
 ```python
 class REPLAction:
@@ -65,7 +148,7 @@ class REPLAction:
     final_answer: str   # The final answer (if is_final=True)
 ```
 
-## Observation Space
+### Observation Space
 
 ```python
 class REPLObservation:
@@ -143,12 +226,16 @@ code_blocks = extract_code_blocks(response)  # ["count = len(context.split())\nF
 
 See the `examples/` directory for complete working examples:
 
-- **`examples/repl_with_llm.py`** - Full RLM loop with Qwen models
+- **`examples/repl_simple.py`** - Basic usage with unified API
+- **`examples/repl_oolong_simple.py`** - Full RLM loop with Qwen models on Oolong benchmark
 
-Run example:
+Run examples:
 ```bash
-# LLM example (requires GPU and transformers)
-python examples/repl_with_llm.py
+# Simple examples (no GPU required)
+python examples/repl_simple.py
+
+# Full RLM example (requires GPU and transformers)
+python examples/repl_oolong_simple.py
 ```
 
 ## Model Usage
@@ -159,40 +246,40 @@ A typical model inference loop where the LLM generates code and the environment 
 
 ```python
 from repl_env import REPLEnv
+from repl_env.prompts import RLM_SYSTEM_PROMPT, build_initial_prompt, extract_code_blocks, format_observation
 
-# Connect to running server (or use Docker)
-with REPLEnv(base_url="http://localhost:8000") as env:
-    # Reset with a task
+# Works with both local and remote!
+with REPLEnv(base_url="http://localhost:8000") as env:  # or REPLEnv() for local
     result = env.reset(
         context="The quick brown fox jumps over the lazy dog. " * 1000,
         task_prompt="Count how many times 'fox' appears"
     )
 
-    # Model inference loop
+    messages = [
+        {"role": "system", "content": RLM_SYSTEM_PROMPT},
+        {"role": "user", "content": build_initial_prompt(
+            task_prompt="Count how many times 'fox' appears",
+            context_length=result.observation.context_length,
+            context_preview=result.observation.context_preview,
+            variables=result.observation.available_variables,
+        )},
+    ]
+
     while not result.done:
-        # 1. Format observation for the model
-        prompt = f"""You are in a Python REPL. Execute code to solve the task.
-Task: {result.observation.metadata.get('task_prompt')}
-Context preview: {result.observation.context_preview}...
-Available variables: {result.observation.available_variables}
-Iteration: {result.observation.iteration}/{result.observation.max_iterations}
+        # Get code from LLM
+        response = your_llm.chat(messages)
+        code_blocks = extract_code_blocks(response)
 
-Last output: {result.observation.result.stdout}
+        for code in code_blocks:
+            result = env.execute(code)
+            if result.done:
+                break
 
-Generate Python code (end with FINAL(answer) when done):"""
+        # Update conversation
+        messages.append({"role": "assistant", "content": response})
+        messages.append({"role": "user", "content": format_observation(result.observation)})
 
-        # 2. Get code from LLM
-        code = your_llm.generate(prompt)
-
-        # 3. Execute in environment
-        result = env.execute(code)
-
-        # 4. Check for errors
-        if not result.observation.result.success:
-            print(f"Error: {result.observation.result.exception}")
-
-    # Episode complete
-    print(f"Final answer: {result.observation.metadata.get('final_answer')}")
+    print(f"Final answer: {env.state().final_answer}")
 ```
 
 ### Recursive LLM Calls (RLM Paradigm)
@@ -200,10 +287,8 @@ Generate Python code (end with FINAL(answer) when done):"""
 The key insight of RLM is that models can make recursive calls to themselves or other LLMs from within the code:
 
 ```python
-from repl_env.server.repl_environment import REPLEnvironment
-from repl_env.models import REPLAction
+from repl_env import REPLEnv
 
-# Define LLM oracle functions
 def llm_query(prompt: str) -> str:
     """Single LLM call - model can call this from executed code"""
     return your_llm.generate(prompt)
@@ -212,19 +297,15 @@ def llm_batch(prompts: list[str]) -> list[str]:
     """Batch LLM calls for efficiency"""
     return [your_llm.generate(p) for p in prompts]
 
-# Create environment with LLM oracle
-env = REPLEnvironment(
-    llm_query_fn=llm_query,
-    llm_batch_fn=llm_batch,
-)
+# Create environment with LLM oracle (local mode)
+with REPLEnv(llm_query_fn=llm_query, llm_batch_fn=llm_batch) as env:
+    result = env.reset(
+        context=massive_document,  # Could be 100K+ chars
+        task_prompt="Summarize each section and find key themes"
+    )
 
-obs = env.reset(
-    context=massive_document,  # Could be 100K+ chars
-    task_prompt="Summarize each section and find key themes"
-)
-
-# The model can now generate code like this:
-code = """
+    # The model can now generate code like this:
+    code = """
 # Split document into sections
 sections = context.split('\\n\\n')
 
@@ -239,8 +320,8 @@ answer['content'] = llm_query(f"Find key themes in: {combined}")
 answer['ready'] = True
 """
 
-obs = env.step(REPLAction(code=code))
-print(f"Done: {obs.done}, Answer: {obs.metadata['final_answer']}")
+    result = env.execute(code)
+    print(f"Done: {result.done}, Answer: {env.state().final_answer}")
 ```
 
 ### RL Training Integration
@@ -248,56 +329,54 @@ print(f"Done: {obs.done}, Answer: {obs.metadata['final_answer']}")
 For RL training, integrate with frameworks like TRL, prime-rl, or verifiers:
 
 ```python
-from repl_env.server.repl_environment import REPLEnvironment
-from repl_env.models import REPLAction
+from repl_env import REPLEnv
 
 def collect_trajectory(env, policy, context, task):
     """Collect a single trajectory for RL training"""
-    obs = env.reset(context=context, task_prompt=task)
+    result = env.reset(context=context, task_prompt=task)
 
     trajectory = []
     total_reward = 0
 
-    while not obs.done:
-        # Policy generates code (pseudo-code: replace with your LLM inference)
-        code = policy.generate(obs)
+    while not result.done:
+        # Policy generates code
+        code = policy.generate(result.observation)
 
         # Step environment
-        next_obs = env.step(REPLAction(code=code))
+        next_result = env.execute(code)
 
         # Store transition
         trajectory.append({
-            "observation": obs,
+            "observation": result.observation,
             "action": code,
-            "reward": next_obs.reward,
-            "next_observation": next_obs,
-            "done": next_obs.done,
+            "reward": next_result.reward,
+            "next_observation": next_result.observation,
+            "done": next_result.done,
         })
 
-        total_reward += next_obs.reward
-        obs = next_obs
+        total_reward += next_result.reward
+        result = next_result
 
     return trajectory, total_reward
 
 # Training loop
-env = REPLEnvironment(
+with REPLEnv(
     reward_on_success=1.0,
     reward_on_error=-0.05,
     reward_on_failure=-0.1,
-)
+) as env:
+    for epoch in range(num_epochs):
+        for context, task, ground_truth in dataset:
+            trajectory, reward = collect_trajectory(env, policy, context, task)
 
-for epoch in range(num_epochs):
-    for context, task, ground_truth in dataset:
-        trajectory, reward = collect_trajectory(env, policy, context, task)
+            # Verify answer correctness (optional external reward)
+            if trajectory:
+                final_answer = env.state().final_answer
+                if final_answer == ground_truth:
+                    reward += verification_bonus
 
-        # Verify answer correctness (optional external reward)
-        # Note: assumes trajectory is non-empty; add check in production code
-        final_answer = trajectory[-1]["next_observation"].metadata.get("final_answer")
-        if final_answer == ground_truth:
-            reward += verification_bonus
-
-        # Update policy (pseudo-code: use your RL framework - PPO, GRPO, DPO, etc.)
-        policy.update(trajectory, reward)
+            # Update policy (use your RL framework - PPO, GRPO, DPO, etc.)
+            policy.update(trajectory, reward)
 ```
 
 ### Reward Configuration
@@ -305,7 +384,7 @@ for epoch in range(num_epochs):
 Configure rewards for different outcomes:
 
 ```python
-env = REPLEnvironment(
+env = REPLEnv(
     reward_on_success=1.0,    # When FINAL() is called
     reward_on_iteration=0.0,  # Per step (can be negative to encourage efficiency)
     reward_on_error=-0.05,    # When code execution fails
@@ -313,7 +392,15 @@ env = REPLEnvironment(
 )
 ```
 
-## Running Locally
+## Environment Configuration
+
+| Environment Variable | Description | Default |
+|---------------------|-------------|---------|
+| `REPL_CONTEXT` | Initial context to load | "" |
+| `REPL_TASK_PROMPT` | Task description | "" |
+| `REPL_MAX_ITERATIONS` | Max steps per episode | 30 |
+
+## Running the Server
 
 ### Using UV
 ```bash

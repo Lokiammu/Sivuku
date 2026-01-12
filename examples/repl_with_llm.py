@@ -26,8 +26,7 @@ Usage:
 """
 from __future__ import annotations
 
-from repl_env.server.repl_environment import REPLEnvironment
-from repl_env.models import REPLAction
+from repl_env import REPLEnv
 from repl_env.prompts import (
     RLM_SYSTEM_PROMPT,
     build_initial_prompt,
@@ -67,7 +66,7 @@ def create_qwen_llm():
             **model_inputs,
             max_new_tokens=512,
             do_sample=True,
-            temperature=0.7,
+            top_k=50,
             top_p=0.9,
         )
 
@@ -102,14 +101,14 @@ def run_rlm_loop(
     Returns:
         The final answer string
     """
-    env = REPLEnvironment(
-        context=context,
-        task_prompt=task_prompt,
-        max_iterations=max_iterations,
-    )
-
-    try:
-        obs = env.reset()
+    # Use the unified REPLEnv API (local mode)
+    with REPLEnv() as env:
+        result = env.reset(
+            context=context,
+            task_prompt=task_prompt,
+            max_iterations=max_iterations,
+        )
+        obs = result.observation
 
         # Build initial messages using prompts from repl_env
         initial_user_prompt = build_initial_prompt(
@@ -153,15 +152,16 @@ def run_rlm_loop(
                 if verbose:
                     print(f"\nExecuting:\n{code[:200]}{'...' if len(code) > 200 else ''}")
 
-                obs = env.step(REPLAction(code=code))
+                result = env.execute(code)
+                obs = result.observation
 
                 if verbose:
                     print(f"Success: {obs.result.success}")
                     if obs.result.stdout:
                         print(f"Output: {obs.result.stdout[:200]}")
 
-                if obs.done:
-                    final_answer = obs.metadata.get("final_answer")
+                if result.done:
+                    final_answer = env.state().final_answer
                     if verbose:
                         print(f"\n=== Final Answer: {final_answer} ===")
                     return final_answer
@@ -175,9 +175,6 @@ def run_rlm_loop(
         if verbose:
             print("\nMax iterations reached without final answer")
         return None
-
-    finally:
-        env.close()
 
 
 def main():

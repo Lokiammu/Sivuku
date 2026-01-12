@@ -22,6 +22,8 @@ dependencies = [
     "requests>=2.31.0",
     # Environment-specific dependencies
     "smolagents>=1.22.0,<2",
+    # LLM support via HuggingFace Inference API
+    "huggingface_hub>=0.20.0",
 ]
 
 [project.optional-dependencies]

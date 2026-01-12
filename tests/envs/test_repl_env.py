@@ -316,5 +316,137 @@ class TestModels:
         assert state.context == "hello"
 
 
+class TestREPLEnvUnifiedClient:
+    """Tests for the unified REPLEnv client (local mode)."""
+
+    def test_local_mode_basic(self):
+        """Test basic local mode execution."""
+        from repl_env import REPLEnv
+
+        with REPLEnv() as env:
+            result = env.reset()
+            assert not result.done
+            assert result.observation.iteration == 0
+
+            result = env.execute("x = 42")
+            assert result.observation.result.success
+
+            result = env.execute("print(f'FINAL({x})')")
+            assert result.done
+            assert env.state().final_answer == "42"
+
+    def test_local_mode_with_context(self):
+        """Test local mode with context."""
+        from repl_env import REPLEnv
+
+        with REPLEnv() as env:
+            result = env.reset(context="Hello World", task_prompt="Count chars")
+            assert result.observation.context_length == 11
+            assert "context" in result.observation.available_variables
+
+            result = env.execute("count = len(context)")
+            assert result.observation.result.success
+
+    def test_local_mode_with_llm_functions(self):
+        """Test local mode with LLM functions."""
+        from repl_env import REPLEnv
+
+        def mock_query(prompt):
+            return f"Response: {prompt[:20]}"
+
+        def mock_batch(prompts):
+            return [mock_query(p) for p in prompts]
+
+        with REPLEnv(llm_query_fn=mock_query, llm_batch_fn=mock_batch) as env:
+            result = env.reset(context="Test")
+            assert "llm_query" in result.observation.available_variables
+            assert "llm_batch" in result.observation.available_variables
+
+            result = env.execute("r = llm_query('Hello')")
+            assert result.observation.result.success
+
+            result = env.execute("print(r)")
+            assert "Response: Hello" in result.observation.result.stdout
+
+    def test_local_mode_max_iterations(self):
+        """Test local mode max iterations."""
+        from repl_env import REPLEnv
+
+        with REPLEnv() as env:
+            result = env.reset(max_iterations=2)
+
+            result = env.execute("x = 1")
+            assert not result.done
+
+            result = env.execute("x = 2")
+            assert result.done
+            assert "Maximum iterations" in result.observation.result.stdout
+
+    def test_local_mode_rewards(self):
+        """Test local mode reward configuration."""
+        from repl_env import REPLEnv
+
+        with REPLEnv(reward_on_success=1.0, reward_on_error=-0.5) as env:
+            env.reset()
+
+            # Error should give negative reward
+            result = env.execute("raise ValueError()")
+            assert result.reward == -0.5
+
+            # Success should give positive reward
+            result = env.execute("print('FINAL(done)')")
+            assert result.reward == 1.0
+
+    def test_execute_convenience_method(self):
+        """Test execute() convenience method."""
+        from repl_env import REPLEnv
+
+        with REPLEnv() as env:
+            env.reset()
+            result = env.execute("x = 1 + 1")
+            assert result.observation.result.success
+
+    def test_submit_final_answer(self):
+        """Test submit_final_answer() method."""
+        from repl_env import REPLEnv
+
+        with REPLEnv() as env:
+            env.reset()
+            result = env.submit_final_answer("my answer")
+            assert result.done
+            assert env.state().final_answer == "my answer"
+
+    def test_state_method(self):
+        """Test state() method."""
+        from repl_env import REPLEnv
+
+        with REPLEnv() as env:
+            env.reset(context="test", task_prompt="do something")
+            state = env.state()
+            assert state.context == "test"
+            assert state.task_prompt == "do something"
+
+    def test_list_variables(self):
+        """Test list_variables() method."""
+        from repl_env import REPLEnv
+
+        with REPLEnv() as env:
+            env.reset()
+            env.execute("my_var = 123")
+            variables = env.list_variables()
+            assert "my_var" in variables
+
+    def test_context_manager(self):
+        """Test context manager properly closes."""
+        from repl_env import REPLEnv
+
+        env = REPLEnv()
+        with env:
+            env.reset()
+            env.execute("x = 1")
+        # After exiting context, internal state should be cleaned up
+        assert env._local_env is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
