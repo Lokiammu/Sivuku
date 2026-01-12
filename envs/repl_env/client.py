@@ -189,6 +189,7 @@ class REPLEnv:
             hf_token: Optional HuggingFace token for llm_query/llm_query_batched.
                       When provided, the server uses this token for sub-LLM calls
                       instead of its own configured token.
+                      Security: Token is NOT stored in state or logged.
             llm_model: Optional model name for LLM functions (default: Qwen3-Coder-480B).
 
         Returns:

@@ -130,8 +130,11 @@ class REPLEnvironment(Environment):
 
         This allows clients to use their own HF token instead of the server's.
 
+        Security: The token is used only to initialize the InferenceClient
+        and is NOT stored in state, logged, or persisted anywhere.
+
         Args:
-            hf_token: HuggingFace API token
+            hf_token: HuggingFace API token (not logged or persisted)
             llm_model: Model to use (default: Qwen/Qwen3-Coder-480B-A35B-Instruct)
         """
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -204,6 +207,7 @@ class REPLEnvironment(Environment):
             task_prompt: Task description (overrides initial_task_prompt)
             hf_token: Optional HuggingFace token for llm_query/llm_query_batched.
                       If provided, creates LLM functions using this token.
+                      Security: Token is NOT stored in state or logged.
             llm_model: Optional model name for LLM functions (default: from env or Qwen3-Coder)
             **kwargs: Additional reset parameters
 
