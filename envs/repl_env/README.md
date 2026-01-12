@@ -207,14 +207,11 @@ from repl_env.prompts import (
     RLM_SYSTEM_PROMPT,           # Base prompt with llm_query_batched
     RLM_SYSTEM_PROMPT_QWEN,      # For Qwen models (adds cost warning)
 
-    # Prompt building (official RLM style)
+    # Prompt building
     QueryMetadata,               # Context metadata dataclass
     build_rlm_system_prompt,     # Build system messages with metadata
     build_user_prompt,           # Build user prompt for each iteration
-
-    # Legacy prompt building (simpler)
-    build_initial_prompt,        # Build initial user prompt
-    build_continuation_prompt,   # Build continuation prompt after execution
+    build_initial_prompt,        # Convenience wrapper for iteration 0
 
     # Parsing utilities
     extract_code_blocks,         # Extract code from ```repl``` or ```python``` blocks

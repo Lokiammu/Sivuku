@@ -46,14 +46,11 @@ from .prompts import (
     # System prompts
     RLM_SYSTEM_PROMPT,
     RLM_SYSTEM_PROMPT_QWEN,
-    # Prompt building (official RLM style)
+    # Prompt building
     QueryMetadata,
     build_rlm_system_prompt,
     build_user_prompt,
-    # Legacy prompt building
     build_initial_prompt,
-    build_continuation_prompt,
-    build_messages,
     # Parsing utilities
     extract_code_blocks,
     format_observation,
@@ -70,14 +67,11 @@ __all__ = [
     # System prompts
     "RLM_SYSTEM_PROMPT",
     "RLM_SYSTEM_PROMPT_QWEN",
-    # Prompt building (official RLM style)
+    # Prompt building
     "QueryMetadata",
     "build_rlm_system_prompt",
     "build_user_prompt",
-    # Legacy prompt building
     "build_initial_prompt",
-    "build_continuation_prompt",
-    "build_messages",
     # Parsing utilities
     "extract_code_blocks",
     "format_observation",
