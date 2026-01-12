@@ -43,10 +43,18 @@ References:
 from .models import REPLAction, REPLObservation, REPLState, CodeBlockResult
 from .client import REPLEnv
 from .prompts import (
+    # System prompts
     RLM_SYSTEM_PROMPT,
+    RLM_SYSTEM_PROMPT_QWEN,
+    # Prompt building (official RLM style)
+    QueryMetadata,
+    build_rlm_system_prompt,
+    build_user_prompt,
+    # Legacy prompt building
     build_initial_prompt,
     build_continuation_prompt,
     build_messages,
+    # Parsing utilities
     extract_code_blocks,
     format_observation,
 )
@@ -59,8 +67,14 @@ __all__ = [
     "CodeBlockResult",
     # Client
     "REPLEnv",
-    # Prompts
+    # System prompts
     "RLM_SYSTEM_PROMPT",
+    "RLM_SYSTEM_PROMPT_QWEN",
+    # Prompt building (official RLM style)
+    "QueryMetadata",
+    "build_rlm_system_prompt",
+    "build_user_prompt",
+    # Legacy prompt building
     "build_initial_prompt",
     "build_continuation_prompt",
     "build_messages",

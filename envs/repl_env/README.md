@@ -181,6 +181,11 @@ result = env.execute("print(f'FINAL({answer})')")
 ### Pattern 3: FINAL_VAR() for variable reference
 ```python
 result = env.execute("my_result = 'The answer is 42'")
+# Direct call (recommended) - pass variable name as string
+result = env.execute('FINAL_VAR("my_result")')
+# -> done=True, final_answer="The answer is 42"
+
+# Or via print pattern
 result = env.execute("print('FINAL_VAR(my_result)')")
 # -> done=True, final_answer="The answer is 42"
 ```
@@ -197,28 +202,36 @@ result = env.execute("answer['ready'] = True")
 The `prompts` module provides RLM-style prompts and parsing utilities:
 
 ```python
-from repl_env import (
-    RLM_SYSTEM_PROMPT,           # Full system prompt for capable models
-    RLM_SYSTEM_PROMPT_COMPACT,   # Shorter prompt for smaller models
+from repl_env.prompts import (
+    # System prompts (from official RLM repo)
+    RLM_SYSTEM_PROMPT,           # Base prompt with llm_query_batched
+    RLM_SYSTEM_PROMPT_QWEN,      # For Qwen models (adds cost warning)
+
+    # Prompt building (official RLM style)
+    QueryMetadata,               # Context metadata dataclass
+    build_rlm_system_prompt,     # Build system messages with metadata
+    build_user_prompt,           # Build user prompt for each iteration
+
+    # Legacy prompt building (simpler)
     build_initial_prompt,        # Build initial user prompt
     build_continuation_prompt,   # Build continuation prompt after execution
-    extract_code_blocks,         # Extract Python code from LLM responses
-    format_observation,          # Format observation for next LLM turn
+
+    # Parsing utilities
+    extract_code_blocks,         # Extract code from ```repl``` or ```python``` blocks
+    format_observation,          # Format execution result for LLM
 )
 
-# Example: Build messages for chat API
-messages = [
-    {"role": "system", "content": RLM_SYSTEM_PROMPT},
-    {"role": "user", "content": build_initial_prompt(
-        task_prompt="Count words in the context",
-        context_length=1000,
-        context_preview="The quick brown fox...",
-        variables=["context", "answer"],
-    )},
-]
+# Example: Build messages using official RLM style
+query_metadata = QueryMetadata(
+    context_lengths=[len(context)],
+    context_total_length=len(context),
+    context_type="str",
+)
+messages = build_rlm_system_prompt(RLM_SYSTEM_PROMPT_QWEN, query_metadata)
+messages.append(build_user_prompt(root_prompt="Count words in the context", iteration=0))
 
-# Extract code from LLM response
-response = "Here's my solution:\n```python\ncount = len(context.split())\nFINAL(count)\n```"
+# Extract code from LLM response (supports ```repl``` and ```python```)
+response = "Here's my solution:\n```repl\ncount = len(context.split())\nFINAL(count)\n```"
 code_blocks = extract_code_blocks(response)  # ["count = len(context.split())\nFINAL(count)"]
 ```
 
@@ -226,15 +239,15 @@ code_blocks = extract_code_blocks(response)  # ["count = len(context.split())\nF
 
 See the `examples/` directory for complete working examples:
 
-- **`examples/repl_simple.py`** - Basic usage with unified API
-- **`examples/repl_oolong_simple.py`** - Full RLM loop with Qwen models on Oolong benchmark
+- **`examples/repl_with_llm.py`** - Full RLM loop with local Qwen model
+- **`examples/repl_oolong_simple.py`** - RLM on Oolong benchmark with HuggingFace Inference API
 
 Run examples:
 ```bash
-# Simple examples (no GPU required)
-python examples/repl_simple.py
+# Full RLM example with local model (requires GPU)
+python examples/repl_with_llm.py
 
-# Full RLM example (requires GPU and transformers)
+# Oolong benchmark with HF Inference API (requires HF_TOKEN)
 python examples/repl_oolong_simple.py
 ```
 
