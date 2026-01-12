@@ -121,12 +121,79 @@ class REPLEnvironment(Environment):
         self._state: Optional[REPLState] = None
         self._executor: Optional[PythonExecutor] = None
 
+    def _create_llm_functions(
+        self,
+        hf_token: str,
+        llm_model: Optional[str] = None,
+    ) -> None:
+        """Create LLM functions dynamically using client-provided token.
+
+        This allows clients to use their own HF token instead of the server's.
+
+        Args:
+            hf_token: HuggingFace API token
+            llm_model: Model to use (default: Qwen/Qwen3-Coder-480B-A35B-Instruct)
+        """
+        import os
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        try:
+            from huggingface_hub import InferenceClient
+        except ImportError:
+            # huggingface_hub not installed, skip LLM functions
+            return
+
+        model = llm_model or os.environ.get(
+            "LLM_MODEL", "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+        )
+        client = InferenceClient(model=model, token=hf_token)
+
+        def llm_query(prompt: str) -> str:
+            """Query the LLM with a prompt and return the response."""
+            try:
+                messages = [{"role": "user", "content": prompt}]
+                response = client.chat_completion(
+                    messages=messages,
+                    max_tokens=2048,
+                    temperature=0.7,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                return f"Error calling LLM: {e}"
+
+        def llm_query_batched(prompts: List[str]) -> List[str]:
+            """Query the LLM with multiple prompts in parallel."""
+            if not prompts:
+                return []
+
+            max_workers = min(len(prompts), 8)
+            results = [None] * len(prompts)
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_idx = {
+                    executor.submit(llm_query, prompt): idx
+                    for idx, prompt in enumerate(prompts)
+                }
+                for future in as_completed(future_to_idx):
+                    idx = future_to_idx[future]
+                    try:
+                        results[idx] = future.result()
+                    except Exception as e:
+                        results[idx] = f"Error: {e}"
+
+            return results
+
+        self.llm_query_fn = llm_query
+        self.llm_batch_fn = llm_query_batched
+
     def reset(
         self,
         seed: Optional[int] = None,
         episode_id: Optional[str] = None,
         context: Optional[str] = None,
         task_prompt: Optional[str] = None,
+        hf_token: Optional[str] = None,
+        llm_model: Optional[str] = None,
         **kwargs: Any,
     ) -> REPLObservation:
         """Reset the environment with optional new context.
@@ -136,6 +203,9 @@ class REPLEnvironment(Environment):
             episode_id: Optional episode identifier (if not provided, one is generated)
             context: Context to load (overrides initial_context)
             task_prompt: Task description (overrides initial_task_prompt)
+            hf_token: Optional HuggingFace token for llm_query/llm_query_batched.
+                      If provided, creates LLM functions using this token.
+            llm_model: Optional model name for LLM functions (default: from env or Qwen3-Coder)
             **kwargs: Additional reset parameters
 
         Returns:
@@ -143,6 +213,10 @@ class REPLEnvironment(Environment):
         """
         effective_context = context or self.initial_context
         effective_task_prompt = task_prompt or self.initial_task_prompt
+        
+        # If client provides hf_token, create LLM functions dynamically
+        if hf_token:
+            self._create_llm_functions(hf_token, llm_model)
 
         # Initialize state
         self._state = REPLState(

@@ -10,8 +10,12 @@ FastAPI application for the REPL Environment.
 This module creates an HTTP server that exposes the REPLEnvironment
 over HTTP and WebSocket endpoints, compatible with EnvClient.
 
-The server includes llm_query and llm_batch support via HuggingFace Inference API,
+The server includes llm_query and llm_query_batched support via HuggingFace Inference API,
 enabling the Recursive Language Model (RLM) paradigm.
+
+LLM Token Configuration:
+    1. Client can pass `hf_token` in reset() - RECOMMENDED
+    2. Server fallback: HF_TOKEN environment variable
 
 Usage:
     # Development (with auto-reload):
@@ -24,8 +28,8 @@ Usage:
     uv run --project . server
 
 Environment Variables:
-    HF_TOKEN: HuggingFace API token for Inference API (optional for public models)
-    LLM_MODEL: Model to use for llm_query/llm_batch (default: Qwen/Qwen3-1.7B)
+    HF_TOKEN: Fallback HuggingFace API token (client token takes priority)
+    LLM_MODEL: Model to use for llm_query/llm_query_batched (default: Qwen/Qwen3-Coder-480B-A35B-Instruct)
 """
 import os
 from typing import List
@@ -72,7 +76,7 @@ def create_llm_query_fn():
                 max_tokens=512,
                 temperature=0.7,
             )
-            return response.choices[0].message.content or ""
+            return response.choices[0].message.content
         except Exception as e:
             return f"Error calling LLM: {e}"
     

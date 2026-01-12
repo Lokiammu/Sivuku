@@ -11,8 +11,13 @@ This module provides a unified client for the REPL Environment that works
 with both remote servers (via WebSocket) and local execution (no server needed).
 
 Examples:
-    # Connect to remote server
+    # Connect to remote server with your HF token for sub-LLM calls
     env = REPLEnv(base_url="https://my-server.hf.space")
+    result = env.reset(
+        context="...",
+        task_prompt="...",
+        hf_token=os.environ["HF_TOKEN"],  # Server uses this for llm_query
+    )
 
     # Run locally (no server)
     env = REPLEnv()
@@ -21,7 +26,6 @@ Examples:
     env = REPLEnv(llm_query_fn=my_llm, llm_batch_fn=my_batch)
 
     # All use the same interface
-    result = env.reset(context="...", task_prompt="...")
     result = env.execute("x = len(context)")
     env.close()
 """
@@ -170,6 +174,8 @@ class REPLEnv:
         max_iterations: int = 30,
         seed: Optional[int] = None,
         episode_id: Optional[str] = None,
+        hf_token: Optional[str] = None,
+        llm_model: Optional[str] = None,
     ) -> StepResult[REPLObservation]:
         """
         Reset the environment for a new episode.
@@ -180,6 +186,10 @@ class REPLEnv:
             max_iterations: Maximum code execution steps before timeout.
             seed: Optional random seed for reproducibility.
             episode_id: Optional custom episode identifier.
+            hf_token: Optional HuggingFace token for llm_query/llm_query_batched.
+                      When provided, the server uses this token for sub-LLM calls
+                      instead of its own configured token.
+            llm_model: Optional model name for LLM functions (default: Qwen3-Coder-480B).
 
         Returns:
             StepResult with initial observation.
@@ -194,6 +204,8 @@ class REPLEnv:
                 episode_id=episode_id,
                 context=context,
                 task_prompt=task_prompt,
+                hf_token=hf_token,
+                llm_model=llm_model,
             )
             return self._wrap_observation(obs)
         else:
@@ -205,6 +217,8 @@ class REPLEnv:
                 max_iterations=max_iterations,
                 seed=seed,
                 episode_id=episode_id,
+                hf_token=hf_token,
+                llm_model=llm_model,
             )
 
     def step(self, action: REPLAction) -> StepResult[REPLObservation]:

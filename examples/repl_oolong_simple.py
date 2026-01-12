@@ -98,7 +98,13 @@ def main():
         env = REPLEnv(llm_query_fn=local_llm_query, llm_batch_fn=local_llm_batch)
 
     # Reset environment - same API for both local and remote
-    result = env.reset(context=context, task_prompt=task_prompt, max_iterations=MAX_ITERATIONS)
+    # Pass hf_token so the server uses our token for llm_query/llm_query_batched
+    result = env.reset(
+        context=context,
+        task_prompt=task_prompt,
+        max_iterations=MAX_ITERATIONS,
+        hf_token=HF_TOKEN,  # Server will use this token for sub-LLM calls
+    )
     obs = result.observation
 
     print(f"Context loaded: {obs.context_length:,} chars")
