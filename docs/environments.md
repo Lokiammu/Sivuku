@@ -254,7 +254,7 @@ The OpenEnv community has built a catalog of ready-to-run environments that cove
           <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6H6zm8 1.5L18.5 9H14V4.5z" fill="currentColor"/>
         </svg>
       </a>
-      <a class="environment-card__icon environment-card__icon--hf" href="https://huggingface.co/spaces/sergiopaniego/repl" target="_blank" rel="noreferrer noopener" aria-label="REPL on Hugging Face">
+      <a class="environment-card__icon environment-card__icon--hf" href="https://huggingface.co/spaces/openenv/repl" target="_blank" rel="noreferrer noopener" aria-label="REPL on Hugging Face">
         <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="" aria-hidden="true" />
       </a>
     </div>
