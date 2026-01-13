@@ -236,6 +236,7 @@ class TestREPLEnvironment:
 
     def test_llm_functions_injected(self):
         """Test LLM functions are injected when provided."""
+
         def mock_query(prompt):
             return f"Response to: {prompt}"
 
