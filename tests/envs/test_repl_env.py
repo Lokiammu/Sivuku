@@ -8,6 +8,9 @@
 
 import pytest
 
+# Skip entire module if smolagents is not installed
+pytest.importorskip("smolagents", reason="smolagents is not installed")
+
 from repl_env.models import REPLAction, REPLObservation, REPLState, CodeBlockResult
 from repl_env.server.repl_environment import REPLEnvironment
 from repl_env.server.python_executor import PythonExecutor
