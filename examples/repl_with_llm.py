@@ -26,6 +26,9 @@ Usage:
 """
 from __future__ import annotations
 
+import os
+from huggingface_hub import InferenceClient
+
 from repl_env import REPLEnv
 from repl_env.prompts import (
     RLM_SYSTEM_PROMPT,
@@ -37,16 +40,14 @@ from repl_env.prompts import (
 
 def create_qwen_llm():
     """Create an LLM function using the smallest Qwen instruct model."""
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-
-    model_name = "Qwen/Qwen3-1.7B"
+    #from transformers import AutoModelForCausalLM, AutoTokenizer
+    HF_TOKEN = os.environ.get("HF_TOKEN", None)
+    model_name = "Qwen/Qwen3-Coder-480B-A35B-Instruct"
     print(f"Loading model: {model_name}")
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        dtype="auto",
-        device_map="auto",
+    client = InferenceClient(
+        model=model_name,
+        token=HF_TOKEN,
     )
 
     # Disable thinking mode for Qwen3
@@ -54,29 +55,12 @@ def create_qwen_llm():
 
     def llm_fn(messages: list[dict]) -> str:
         """Generate response using Qwen model."""
-        text = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=enable_thinking,
+        response = client.chat.completions.create(
+            messages=messages,
+            max_tokens=2048,  # Inrecreased for longer code responses
+            temperature=0.7,
         )
-        model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
-
-        generated_ids = model.generate(
-            **model_inputs,
-            max_new_tokens=512,
-            do_sample=True,
-            top_k=50,
-            top_p=0.9,
-        )
-
-        generated_ids = [
-            output_ids[len(input_ids):]
-            for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-        ]
-
-        response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-        return response
+        return response.choices[0].message.content
 
     return llm_fn
 
