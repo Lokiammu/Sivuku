@@ -86,11 +86,13 @@ def run_rlm_loop(
         The final answer string
     """
     # Use the unified REPLEnv API (local mode)
+    # Note: env max_iterations should be higher than LLM loop iterations
+    # because each code block counts as one env iteration
     with REPLEnv() as env:
         result = env.reset(
             context=context,
             task_prompt=task_prompt,
-            max_iterations=max_iterations,
+            max_iterations=max_iterations * 5,  # Allow ~5 code blocks per LLM turn
         )
         obs = result.observation
 
@@ -141,13 +143,18 @@ def run_rlm_loop(
 
                 if verbose:
                     print(f"Success: {obs.result.success}")
+                    print(f"Env iteration: {obs.iteration}/{obs.max_iterations}")
                     if obs.result.stdout:
                         print(f"Output: {obs.result.stdout[:200]}")
 
                 if result.done:
                     final_answer = env.state().final_answer
                     if verbose:
-                        print(f"\n=== Final Answer: {final_answer} ===")
+                        # Check if done due to FINAL() or max iterations
+                        if final_answer:
+                            print(f"\n=== Final Answer: {final_answer} ===")
+                        else:
+                            print(f"\n=== Environment terminated (iteration {obs.iteration}/{obs.max_iterations}) ===")
                     return final_answer
 
             # Format observation for next iteration
@@ -155,9 +162,11 @@ def run_rlm_loop(
             messages.append({"role": "assistant", "content": response})
             messages.append({"role": "user", "content": obs_text})
 
-        # Max iterations reached
+        # LLM loop max iterations reached (this is separate from env max_iterations)
         if verbose:
-            print("\nMax iterations reached without final answer")
+            print(f"\nLLM loop max iterations ({max_iterations}) reached")
+            print("Note: Each code block counts as one env iteration.")
+            print(f"Final env state: iteration {obs.iteration}/{obs.max_iterations}")
         return None
 
 

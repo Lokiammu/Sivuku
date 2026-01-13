@@ -145,6 +145,7 @@ def main():
             obs = result.observation
 
             print(f"Success: {obs.result.success}")
+            print(f"Env iteration: {obs.iteration}/{obs.max_iterations}")
             if obs.result.stdout:
                 print(f"Output: {obs.result.stdout[:300]}{'...' if len(obs.result.stdout) > 300 else ''}")
             if obs.result.stderr:
@@ -153,10 +154,14 @@ def main():
             if result.done:
                 state = env.state()
                 final_answer = state.final_answer
+                if final_answer:
+                    print(f"\n=== FINAL answer detected ===")
+                else:
+                    print(f"\n=== Environment terminated (max iterations) ===")
                 break
 
-        if final_answer is not None:
-            break
+        if result.done:
+            break  # Exit outer loop when env is done (with or without answer)
 
         # Add assistant response and observation + next user prompt
         messages.append({"role": "assistant", "content": response})
