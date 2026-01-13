@@ -44,7 +44,7 @@ jobs:
             -v \
             --tb=short
         env:
-          PYTHONPATH: src
+          PYTHONPATH: src:envs
 
   lint:
     runs-on: ubuntu-latest

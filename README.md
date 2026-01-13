@@ -45,7 +45,7 @@ For a detailed quick start, check out the [docs page](https://meta-pytorch.org/O
 ## OpenEnv on partner platforms:
 
 - [Lightning AI Studio](https://lightning.ai/environments?section=featured)
-- [TRL example](https://huggingface.co/docs/trl/main/en/openenv)
+- [TRL example](https://huggingface.co/docs/trl/openenv)
 - [Unsloth Google Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb)
 - [ART example](https://art.openpipe.ai/integrations/openenv-integration)
 - [Oumi example](https://github.com/oumi-ai/oumi/blob/main/notebooks/Oumi%20-%20OpenEnv%20GRPO%20with%20trl.ipynb)
@@ -285,7 +285,7 @@ The goal of this project is to support a broad set of open and closed tools to h
 See GRPO BlackJack training example: [`examples/grpo_blackjack/`](examples/grpo_blackjack/)
 
 ### TRL
-See the [TRL example](https://huggingface.co/docs/trl/main/en/openenv) on how to integrate OpenEnv environments with GRPO training.
+See the [TRL example](https://huggingface.co/docs/trl/openenv) on how to integrate OpenEnv environments with GRPO training.
 
 ### Unsloth
 See the 2048 game example based on gpt-oss: [Colab notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb)
