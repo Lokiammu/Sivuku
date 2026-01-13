@@ -21,7 +21,7 @@ Usage:
     python -m envs.julia_env.server.app
 """
 
-from openenv.core.env_server import create_app
+from openenv.core.env_server.http_server import create_app
 
 from julia_env.models import JuliaAction, JuliaObservation
 from julia_env.server.julia_codeact_env import JuliaCodeActEnv
@@ -29,12 +29,6 @@ from julia_env.server.julia_codeact_env import JuliaCodeActEnv
 # Create the app with web interface and README integration
 # Pass the class (factory) instead of an instance for WebSocket session support
 app = create_app(JuliaCodeActEnv, JuliaAction, JuliaObservation, env_name="julia_env")
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
 def main():

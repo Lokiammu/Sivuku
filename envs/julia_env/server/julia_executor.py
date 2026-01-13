@@ -30,7 +30,6 @@ import tempfile
 import traceback
 from concurrent.futures import ProcessPoolExecutor, TimeoutError
 from dataclasses import dataclass
-from multiprocessing import Manager
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,6 @@ logger.addHandler(logging.NullHandler())
 _pool: Optional[ProcessPoolExecutor] = None
 _pool_size: int = 0
 _pool_timeout: int = 120
-_manager: Optional[Manager] = None
 
 
 @dataclass

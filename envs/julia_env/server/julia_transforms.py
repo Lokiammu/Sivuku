@@ -41,8 +41,11 @@ class JuliaSafetyTransform(Transform):
         if not isinstance(observation, JuliaObservation):
             return observation
 
-        # Extract last executed code from metadata
-        code = observation.metadata.get("last_code", "") if observation.metadata else ""
+        # Extract executed code from metadata (core_code + test_code)
+        if observation.metadata:
+            code = observation.metadata.get("core_code", "") + "\n" + observation.metadata.get("test_code", "")
+        else:
+            code = ""
 
         for pattern in self.dangerous_patterns:
             if re.search(pattern, code):
@@ -72,7 +75,10 @@ class JuliaQualityTransform(Transform):
         if not isinstance(observation, JuliaObservation):
             return observation
 
-        code = observation.metadata.get("last_code", "") if observation.metadata else ""
+        if observation.metadata:
+            code = observation.metadata.get("core_code", "") + "\n" + observation.metadata.get("test_code", "")
+        else:
+            code = ""
         reward = observation.reward or 0.0
 
         # Reward concise code
