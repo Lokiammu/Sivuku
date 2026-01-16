@@ -90,6 +90,9 @@ jobs:
           - name: unity-env
             dockerfile: server/Dockerfile
             context: envs/unity_env
+          - name: openapp-env
+            dockerfile: server/Dockerfile
+            context: envs/openapp_env
 
     steps:
       - name: Checkout code
