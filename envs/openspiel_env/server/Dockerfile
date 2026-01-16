@@ -54,6 +54,9 @@ ENV OPENSPIEL_GAME=catch
 ENV OPENSPIEL_AGENT_PLAYER=0
 ENV OPENSPIEL_OPPONENT_POLICY=random
 
+# Uvicorn configuration
+ENV WORKERS=1
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
@@ -61,4 +64,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=120s --retries=3 \
 EXPOSE 8000
 
 # Run the FastAPI server
-CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "120"]
+CMD uvicorn server.app:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 120 --workers ${WORKERS}
