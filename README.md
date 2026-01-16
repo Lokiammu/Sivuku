@@ -15,19 +15,25 @@ An e2e framework for creating, deploying and using isolated execution environmen
 
 ## Quick Start
 
-Install OpenEnv with pip from this repo like so: 
+Install the OpenEnv core package:
 
-```sh
-pip install https://github.com/meta-pytorch/OpenEnv.git
+```bash
+pip install openenv-core
 ```
 
-You can then use an OpenEnv from the Hugging Face hub like so:
+Install an environment client (e.g., Echo):
+
+```bash
+pip install git+https://huggingface.co/spaces/openenv/echo-env
+```
+
+Then use the environment:
 
 ```python
-from envs.echo_env import EchoAction, EchoEnv
+from echo_env import EchoAction, EchoEnv
 
-# Automatically start container and connect
-client = EchoEnv.from_hub("openenv/echo-env")
+# Connect to a running Space
+client = EchoEnv(base_url="https://openenv-echo-env.hf.space")
 
 # Reset the environment
 result = client.reset()
@@ -39,7 +45,7 @@ print(result.observation.echoed_message)  # "Hello, World!"
 print(result.reward)  # 1.3 (based on message length)
 
 # Cleanup
-client.close()  # Stops and removes container
+client.close()
 ```
 
 For a detailed quick start, check out the [docs page](https://meta-pytorch.org/OpenEnv/quickstart/).
@@ -214,10 +220,11 @@ See [`envs/README.md`](envs/README.md) for a complete guide on building environm
 ### For Environment Users
 
 To use an environment:
-1. Import from `envs.your_env`: `from envs.echo_env import EchoAction, EchoEnv`
-2. Create client: `client = EchoEnv.from_docker_image("echo-env:latest")`
-3. Interact: `client.reset()`, `client.step(action)`, `client.state()`
-4. Cleanup: `client.close()`
+1. Install the client: `pip install git+https://huggingface.co/spaces/openenv/echo-env`
+2. Import: `from echo_env import EchoAction, EchoEnv`
+3. Create client: `client = EchoEnv(base_url="https://openenv-echo-env.hf.space")`
+4. Interact: `client.reset()`, `client.step(action)`, `client.state()`
+5. Cleanup: `client.close()`
 
 See example scripts in `examples/` directory.
 
