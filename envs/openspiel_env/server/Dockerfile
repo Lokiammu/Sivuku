@@ -4,36 +4,61 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-# Use the pre-built OpenSpiel base image
-# Built from: docker build -t openspiel-base:latest -f envs/openspiel_env/server/Dockerfile.openspiel-base .
-# In GitHub Actions, this is overridden to use the GHCR base image
-ARG OPENSPIEL_BASE_IMAGE=openspiel-base:latest
+# =============================================================================
+# OpenSpiel Environment Dockerfile
+# =============================================================================
+#
+# Uses a pre-built OpenSpiel base image to avoid long build times (~30-60 min).
+# The base image contains compiled OpenSpiel (C++ and Python bindings).
+#
+# DEFAULT (recommended for HuggingFace Spaces):
+#   Uses pre-built image from GHCR - no C++ compilation needed
+#
+# BUILD YOUR OWN BASE IMAGE (if you need custom OpenSpiel configuration):
+#   1. Build the base image first (takes ~30-60 min):
+#      docker build -t openspiel-base:latest -f server/Dockerfile.openspiel-base .
+#   2. Then build with your local base image:
+#      docker build --build-arg OPENSPIEL_BASE_IMAGE=openspiel-base:latest -t openspiel-env .
+#
+# =============================================================================
+
+# Default: use pre-built image from GHCR (skips C++ compilation)
+ARG OPENSPIEL_BASE_IMAGE=ghcr.io/meta-pytorch/openenv-openspiel-base:sha-e622c7e
 FROM ${OPENSPIEL_BASE_IMAGE}
 
-# Copy OpenEnv core (base image already set WORKDIR=/app)
 WORKDIR /app
-COPY src/core/ /app/src/core/
 
-# Copy OpenSpiel environment
-COPY envs/openspiel_env/ /app/envs/openspiel_env/
+# Install git (needed for pip install from git repos in pyproject.toml)
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy environment code (context is the environment directory)
+COPY . /app/env
+
+# Install Python dependencies from pyproject.toml
+WORKDIR /app/env
+RUN pip3 install --no-cache-dir .
+
+WORKDIR /app
 
 # Copy README for web interface documentation
-COPY envs/openspiel_env/README.md /app/README.md
+COPY README.md /app/README.md
 
-# Extend Python path for OpenEnv (base image set PYTHONPATH=/app/src)
-# We prepend OpenSpiel paths
-ENV PYTHONPATH=/repo:/repo/build/python:/app/src
+# Python path configuration
+# - /repo and /repo/build/python: OpenSpiel paths from base image
+# - /app/env: Environment code
+ENV PYTHONPATH=/repo:/repo/build/python:/app/env
 
 # OpenSpiel-specific environment variables (can be overridden at runtime)
 ENV OPENSPIEL_GAME=catch
 ENV OPENSPIEL_AGENT_PLAYER=0
 ENV OPENSPIEL_OPPONENT_POLICY=random
 
-# Health check (curl is provided by openenv-base)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Note: EXPOSE 8000 already set by openenv-base
+EXPOSE 8000
 
-# Run the FastAPI server (uvicorn installed by openenv-base)
-CMD ["uvicorn", "envs.openspiel_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the FastAPI server
+CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "120"]
