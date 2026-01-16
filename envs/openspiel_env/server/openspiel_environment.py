@@ -14,10 +14,17 @@ via the OpenEnv Environment interface.
 import uuid
 from typing import Any, Dict
 
-from openenv.core.env_server import Action, Environment, Observation
-
-from ..models import OpenSpielAction, OpenSpielObservation, OpenSpielState
-from .opponent_policies import get_opponent_policy, OpponentPolicy
+# Support both in-repo and standalone imports
+try:
+    # In-repo imports (when running from OpenEnv repository)
+    from openenv.core.env_server.interfaces import Environment
+    from ..models import OpenSpielAction, OpenSpielObservation, OpenSpielState
+    from .opponent_policies import get_opponent_policy, OpponentPolicy
+except ImportError:
+    # Standalone imports (when environment is standalone with openenv from pip)
+    from openenv.core.env_server.interfaces import Environment
+    from models import OpenSpielAction, OpenSpielObservation, OpenSpielState
+    from server.opponent_policies import get_opponent_policy, OpponentPolicy
 
 # Import OpenSpiel
 try:
@@ -107,7 +114,7 @@ class OpenSpielEnvironment(Environment):
         # Track last opponent action for learning
         self._last_opponent_action: int | None = None
 
-    def reset(self) -> Observation:
+    def reset(self) -> OpenSpielObservation:
         """
         Reset the environment and return initial observation.
 
@@ -131,7 +138,7 @@ class OpenSpielEnvironment(Environment):
         # Convert to OpenEnv observation
         return self._make_observation(time_step)
 
-    def step(self, action: Action) -> Observation:
+    def step(self, action: OpenSpielAction) -> OpenSpielObservation:  # type: ignore[override]
         """
         Execute agent's action and return resulting observation.
 
