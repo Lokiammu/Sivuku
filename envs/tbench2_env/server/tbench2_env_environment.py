@@ -607,7 +607,8 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
         assert self._task_dir is not None, "Task directory not set"
 
         # Run pytest in the container's /task directory
-        cmd = "cd /task && python -m pytest -q tests/ -rA"
+        # Use exit code marker for consistency with local mode
+        cmd = "cd /task && python -m pytest -q tests/ -rA; echo __TB2_EXIT_CODE__:$?"
 
         exit_code, output = self._container.exec_run(
             cmd=f"bash -c '{cmd}'",
@@ -615,11 +616,21 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
             stdout=True,
             stderr=True,
         )
-        # exec_run returns the actual exit code directly (not a wait status)
         output_str = output.decode("utf-8", errors="replace")
 
-        reward = 1.0 if exit_code == 0 else 0.0
-        info = {"tests_passed": exit_code == 0, "exit_code": exit_code}
+        # Parse exit code from marker (same logic as local mode)
+        ec = 1
+        marker = "__TB2_EXIT_CODE__"
+        for line in output_str.splitlines()[::-1]:
+            if marker in line:
+                try:
+                    ec = int(line.split(":", 1)[1].strip())
+                except Exception:
+                    ec = 1
+                break
+
+        reward = 1.0 if ec == 0 else 0.0
+        info = {"tests_passed": ec == 0, "exit_code": ec}
         return output_str, reward, info
 
     def _evaluate_local(self) -> tuple[str, float, dict[str, Any]]:
