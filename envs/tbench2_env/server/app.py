@@ -28,28 +28,46 @@ Usage:
     python -m server.app
 """
 
+import os
+
+
 try:
     from openenv.core.env_server.http_server import create_app
 
     # In-repo imports
     from tbench2_env.models import Tbench2Action, Tbench2Observation
 
-    from .tbench2_env_environment import Tbench2Environment
+    from .tbench2_env_environment import Tbench2DockerEnvironment, Tbench2Environment
 except Exception as e:  # pragma: no cover
     # Standalone imports (when environment is standalone with openenv from pip)
     from openenv.core.env_server.http_server import create_app
-    from server.tbench2_env_environment import Tbench2Environment
+    from server.tbench2_env_environment import Tbench2DockerEnvironment, Tbench2Environment
 
     from models import Tbench2Action, Tbench2Observation
     _IMPORT_ERROR = e
 
 
+# Determine which environment class to use based on TB2_MODE
+_TB2_MODE = os.getenv("TB2_MODE", "local").lower()
+
+if _TB2_MODE == "docker":
+    _DEFAULT_ENVIRONMENT = Tbench2DockerEnvironment
+    _ENV_SUFFIX = " (Docker mode)"
+elif _TB2_MODE == "auto":
+    # Auto-detect: try Docker, fall back to local
+    _DEFAULT_ENVIRONMENT = Tbench2Environment
+    _ENV_SUFFIX = " (auto-detect mode)"
+else:
+    _DEFAULT_ENVIRONMENT = Tbench2Environment
+    _ENV_SUFFIX = " (local mode)"
+
+
 # Create the app with web interface and README integration
 app = create_app(
-    Tbench2Environment,
+    _DEFAULT_ENVIRONMENT,
     Tbench2Action,
     Tbench2Observation,
-    env_name="tbench2_env",
+    env_name="tbench2_env" + _ENV_SUFFIX,
     max_concurrent_envs=1,  # increase this number to allow more concurrent WebSocket sessions
 )
 

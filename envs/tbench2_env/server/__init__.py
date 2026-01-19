@@ -6,7 +6,7 @@
 
 """Tbench2 Env environment server components."""
 
-from .tbench2_env_environment import Tbench2Environment
+from .tbench2_env_environment import Tbench2DockerEnvironment, Tbench2Environment
 
 
-__all__ = ["Tbench2Environment"]
+__all__ = ["Tbench2Environment", "Tbench2DockerEnvironment"]

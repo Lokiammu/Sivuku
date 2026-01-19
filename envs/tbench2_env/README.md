@@ -13,11 +13,14 @@ tags:
   - spaces
 ---
 
-# TB2 Environment (Spaces-Compatible)
+# TB2 Environment (Terminal-Bench 2)
 
-OpenEnv wrapper for Terminal-Bench 2 tasks that runs **locally inside the server container** (no Docker-in-Docker). This is designed for Hugging Face Spaces, where a Docker daemon is not available. It can execute commands and run task tests with pytest in the task directory.
+OpenEnv wrapper for [Terminal-Bench 2](https://github.com/laude-institute/terminal-bench-2) tasks. Supports two execution modes:
 
-> Note: TB2 tasks often specify a Docker image in `task.toml`. This local mode ignores those images, so tasks that rely on custom images may fail. Use a Docker-backed runner on a machine with Docker for full fidelity.
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **Local** | Runs commands in the server process (no Docker) | Hugging Face Spaces, environments without Docker access |
+| **Docker** | Runs each task in its own container | Full TB2.0 fidelity with custom task images |
 
 ## Quick Start
 
@@ -36,6 +39,40 @@ print(result.reward, result.done)
 
 env.close()
 ```
+
+## Execution Modes
+
+### Local Mode (Default)
+
+Commands execute directly in the server process. Ideal for HF Spaces where Docker-in-Docker is unavailable.
+
+```bash
+# Default - local mode
+python -m tbench2_env.server.app
+
+# Or explicitly set mode
+TB2_MODE=local python -m tbench2_env.server.app
+```
+
+**Note:** Local mode ignores Docker images specified in task.toml. Tasks requiring specific runtime environments may fail.
+
+### Docker Mode
+
+Each task runs in its own Docker container, using the image specified in the task's `task.toml`:
+
+```bash
+# Enable Docker mode
+TB2_MODE=docker python -m tbench2_env.server.app
+```
+
+**Requirements:**
+- Docker socket mounted at `/var/run/docker.sock`
+- Sufficient disk space for container images
+- Network access to pull images if not cached
+
+**Environment Variables for Docker Mode:**
+- `TB2_MODE=docker` - Enable Docker-backed execution
+- Docker socket must be accessible (mounted volume)
 
 ## Action Types
 
@@ -68,10 +105,13 @@ env.step(Tbench2Action(action_type="view", session_id="sess1"))
 
 ## Environment Variables
 
-- `TB2_TASKS_DIR`: Path to a local Terminal-Bench-2 repo checkout (optional).
-- `TB2_OUTPUT_DIR`: Directory to write session logs (default: `/tmp/tbench2_env_runs`).
-- `TB2_CACHE_DIR`: Where to download/extract the TB2 repo if `TB2_TASKS_DIR` is unset.
-- `TB2_REPO_URL`: Repo zip URL for auto-download (default: `https://github.com/laude-institute/terminal-bench-2/archive/refs/heads/main.zip`).
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TB2_MODE` | `local` | Execution mode: `local` or `docker` |
+| `TB2_TASKS_DIR` | (auto-download) | Path to local Terminal-Bench-2 repo checkout |
+| `TB2_OUTPUT_DIR` | `/tmp/tbench2_env_runs` | Directory for session logs and cache |
+| `TB2_CACHE_DIR` | `$TB2_OUTPUT_DIR/repo_cache` | Where to extract TB2 repo |
+| `TB2_REPO_URL` | (GitHub main.zip) | Repo zip URL for auto-download |
 
 ## Reward
 
@@ -81,13 +121,19 @@ Binary reward on `evaluate` action:
 
 Intermediate steps return `reward=None`.
 
-## Running Locally
+## Running the Server
 
 ```bash
-# Auto-download from GitHub (default)
-python -m tbench2_env.server.app
+# Install dependencies
+uv sync --all-extras
 
-# Use a local repo checkout
+# Local mode (default, for Spaces)
+python -m tbench2_env.server.app --port 8000
+
+# Docker mode (full TB2.0 compatibility)
+TB2_MODE=docker python -m tbench2_env.server.app --port 8000
+
+# With local TB2 repo
 TB2_TASKS_DIR=/path/to/terminal-bench-2 python -m tbench2_env.server.app
 ```
 

@@ -52,6 +52,7 @@ class Tbench2State(State):
 
     task_id: str = Field(default="")
     task_path: str = Field(default="")
+    session_id: str = Field(default="")
     terminal_ready: bool = Field(default=False)
     last_action_type: str = Field(default="")
     last_command: str = Field(default="")
