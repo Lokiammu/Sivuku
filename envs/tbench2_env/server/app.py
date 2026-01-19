@@ -44,6 +44,7 @@ except Exception as e:  # pragma: no cover
     from server.tbench2_env_environment import Tbench2DockerEnvironment, Tbench2Environment
 
     from models import Tbench2Action, Tbench2Observation
+
     _IMPORT_ERROR = e
 
 

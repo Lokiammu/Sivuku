@@ -8,7 +8,6 @@
 Data models for the TB2 environment.
 """
 
-
 from pydantic import Field
 
 

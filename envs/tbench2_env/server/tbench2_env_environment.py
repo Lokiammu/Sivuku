@@ -41,8 +41,7 @@ def _require_terminal_toolkit() -> Any:
     global _CAMEL_IMPORT_ERROR
     if _CAMEL_IMPORT_ERROR is not None:
         raise RuntimeError(
-            "camel-ai (TerminalToolkit) is required for TB2. "
-            "Install from PyPI or from the CAMEL repo."
+            "camel-ai (TerminalToolkit) is required for TB2. Install from PyPI or from the CAMEL repo."
         ) from _CAMEL_IMPORT_ERROR
 
     try:
@@ -50,8 +49,7 @@ def _require_terminal_toolkit() -> Any:
     except Exception as exc:  # pragma: no cover
         _CAMEL_IMPORT_ERROR = exc
         raise RuntimeError(
-            "camel-ai (TerminalToolkit) is required for TB2. "
-            "Install from PyPI or from the CAMEL repo."
+            "camel-ai (TerminalToolkit) is required for TB2. Install from PyPI or from the CAMEL repo."
         ) from exc
 
     return TerminalToolkit
@@ -270,9 +268,7 @@ class Tbench2Environment(Environment[Tbench2Action, Tbench2Observation, Tbench2S
         self._task_dir = None
         self._instruction = ""
 
-    def _resolve_task_path(
-        self, task_id: str | None, task_path: str | None
-    ) -> Path:
+    def _resolve_task_path(self, task_id: str | None, task_path: str | None) -> Path:
         if task_path:
             resolved = Path(task_path).expanduser().resolve()
             if not resolved.exists():
@@ -305,11 +301,7 @@ class Tbench2Environment(Environment[Tbench2Action, Tbench2Observation, Tbench2S
 
         _read_timeout(self._task_dir, fallback=900.0)  # Validate timeout config
         tests_dir = self._task_dir / "tests"
-        cmd = (
-            f"cd {self._task_dir} && "
-            f"python -m pytest -q {tests_dir} -rA; "
-            f"echo __TB2_EXIT_CODE__:$?"
-        )
+        cmd = f"cd {self._task_dir} && python -m pytest -q {tests_dir} -rA; echo __TB2_EXIT_CODE__:$?"
         output = self._terminal_toolkit.shell_exec(
             id="tb2-tests",
             command=cmd,
@@ -370,11 +362,11 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
         if self._docker_client is None:
             try:
                 import docker
+
                 self._docker_client = docker.from_env()
             except Exception as exc:
                 raise RuntimeError(
-                    "Docker client not available. Ensure Docker socket is mounted. "
-                    f"Error: {exc}"
+                    f"Docker client not available. Ensure Docker socket is mounted. Error: {exc}"
                 ) from exc
         return self._docker_client
 
@@ -437,7 +429,12 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
         )
 
     def _start_container(self, task_dir: Path, trial_dir: Path) -> None:
-        """Start a Docker container for the task."""
+        """Start a Docker container for the task.
+
+        Uses file copying instead of bind mounts to support Docker-in-Docker
+        scenarios where the server runs inside a container. Bind mounts reference
+        host paths, which don't exist when the server is containerized.
+        """
         docker = self._get_docker_client()
 
         try:
@@ -448,26 +445,20 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
                 logging.info(f"Pulling image {self._task_image}...")
                 docker.images.pull(self._task_image)
 
-            # Create volume mount for task files
-            volumes = {
-                str(task_dir): {"bind": "/task", "mode": "ro"}
-            }
-
-            # Create working directory
-            workdir = trial_dir / "container_work"
-            workdir.mkdir(parents=True, exist_ok=True)
-            volumes[str(workdir)] = {"bind": "/work", "mode": "rw"}
-
-            # Start container
+            # Start container WITHOUT bind mounts (for DinD compatibility)
             self._container = docker.containers.run(
                 image=self._task_image,
                 command="sleep infinity",
                 detach=True,
                 network_mode="host",
-                volumes=volumes,
                 working_dir="/task",
                 remove=False,
             )
+
+            # Copy task files into container using tar archive
+            # This works in Docker-in-Docker because we read files from our
+            # filesystem and stream them to the container via the Docker API
+            self._copy_dir_to_container(task_dir, "/task")
 
             self._state = Tbench2State(
                 episode_id=str(uuid4()),
@@ -479,6 +470,30 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
 
         except Exception as exc:
             raise RuntimeError(f"Failed to start container: {exc}") from exc
+
+    def _copy_dir_to_container(self, src_dir: Path, dest_path: str) -> None:
+        """Copy a directory into the container using tar archive.
+
+        This method streams files via the Docker API, avoiding bind mount
+        issues in Docker-in-Docker scenarios.
+        """
+        import io
+        import tarfile
+
+        if self._container is None:
+            raise RuntimeError("Container not started")
+
+        # Create tar archive in memory
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            for item in src_dir.rglob("*"):
+                arcname = str(item.relative_to(src_dir))
+                tar.add(str(item), arcname=arcname)
+
+        tar_stream.seek(0)
+
+        # Copy to container
+        self._container.put_archive(dest_path, tar_stream.getvalue())
 
     def _exec_in_container(self, command: str, workdir: str = "/task") -> tuple[int, str]:
         """Execute a command inside the container."""
@@ -527,6 +542,7 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
                 else:
                     # Fallback to local execution
                     import subprocess
+
                     result = subprocess.run(
                         action.command,
                         shell=True,
@@ -540,9 +556,7 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
             elif action.action_type == "write_file":
                 if self._container:
                     # Write to container
-                    exit_code, _ = self._exec_in_container(
-                        f"cat > {action.file_path} << 'EOF'\n{action.content}\nEOF"
-                    )
+                    exit_code, _ = self._exec_in_container(f"cat > {action.file_path} << 'EOF'\n{action.content}\nEOF")
                     success = exit_code == 0
                     output = f"Wrote to {action.file_path}"
                 else:
@@ -592,8 +606,8 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
             raise RuntimeError("Container not started.")
         assert self._task_dir is not None, "Task directory not set"
 
-        tests_dir = self._task_dir / "tests"
-        cmd = f"cd /task && python -m pytest -q {tests_dir} -rA; echo __TB2_EXIT_CODE__:$?"
+        # Run pytest in the container's /task directory
+        cmd = "cd /task && python -m pytest -q tests/ -rA"
 
         exit_code, output = self._container.exec_run(
             cmd=f"bash -c '{cmd}'",
@@ -601,11 +615,12 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
             stdout=True,
             stderr=True,
         )
-        exit_code = exit_code >> 8  # Get actual exit code from exec result
+        # exec_run returns the actual exit code directly (not a wait status)
+        output_str = output.decode("utf-8", errors="replace")
 
         reward = 1.0 if exit_code == 0 else 0.0
         info = {"tests_passed": exit_code == 0, "exit_code": exit_code}
-        return output, reward, info
+        return output_str, reward, info
 
     def _evaluate_local(self) -> tuple[str, float, dict[str, Any]]:
         """Evaluate task locally (fallback)."""
@@ -616,6 +631,7 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
         cmd = f"cd {self._task_dir} && python -m pytest -q {tests_dir} -rA; echo __TB2_EXIT_CODE__:$?"
 
         import subprocess
+
         result = subprocess.run(
             cmd,
             shell=True,
@@ -645,9 +661,7 @@ class Tbench2DockerEnvironment(Environment[Tbench2Action, Tbench2Observation, Tb
         self._task_dir = None
         self._instruction = ""
 
-    def _resolve_task_path(
-        self, task_id: str | None, task_path: str | None
-    ) -> Path:
+    def _resolve_task_path(self, task_id: str | None, task_path: str | None) -> Path:
         if task_path:
             resolved = Path(task_path).expanduser().resolve()
             if not resolved.exists():
