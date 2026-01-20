@@ -1,0 +1,5 @@
+name: kernrl
+version: "0.1.0"
+description: "RL environment for GPU kernel optimization"
+action: KernelAction
+observation: KernelObservation
