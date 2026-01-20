@@ -86,9 +86,7 @@ class EnvironmentInfo:
                 f"pip install {self.package_name}"
             ) from e
         except AttributeError as e:
-            raise ImportError(
-                f"Class {self.client_class_name} not found in {self.client_module_path}: {e}"
-            ) from e
+            raise ImportError(f"Class {self.client_class_name} not found in {self.client_module_path}: {e}") from e
 
     def get_action_class(self) -> Type:
         """
@@ -110,9 +108,7 @@ class EnvironmentInfo:
                 f"pip install {self.package_name}"
             ) from e
         except AttributeError as e:
-            raise ImportError(
-                f"Class {self.action_class_name} not found in {self.client_module_path}: {e}"
-            ) from e
+            raise ImportError(f"Class {self.action_class_name} not found in {self.client_module_path}: {e}") from e
 
     def get_observation_class(self) -> Type:
         """
@@ -134,9 +130,7 @@ class EnvironmentInfo:
                 f"pip install {self.package_name}"
             ) from e
         except AttributeError as e:
-            raise ImportError(
-                f"Class {self.observation_class_name} not found in {self.client_module_path}: {e}"
-            ) from e
+            raise ImportError(f"Class {self.observation_class_name} not found in {self.client_module_path}: {e}") from e
 
 
 def _normalize_env_name(name: str) -> str:
@@ -178,9 +172,9 @@ def _is_hub_url(name: str) -> bool:
         True if it looks like a Hub URL
 
     Examples:
-        >>> _is_hub_url("meta-pytorch/echo-env")
+        >>> _is_hub_url("meta-pytorch/echo_env")
         True
-        >>> _is_hub_url("https://huggingface.co/meta-pytorch/echo-env")
+        >>> _is_hub_url("https://huggingface.co/meta-pytorch/echo_env")
         True
         >>> _is_hub_url("echo")
         False
@@ -223,9 +217,7 @@ def _infer_class_name(env_name: str, class_type: str) -> str:
         raise ValueError(f"Unknown class type: {class_type}")
 
 
-def _load_manifest_from_package(
-    package_name: str, module_name: str
-) -> Optional[Dict[str, Any]]:
+def _load_manifest_from_package(package_name: str, module_name: str) -> Optional[Dict[str, Any]]:
     """
     Load openenv.yaml manifest from an installed package.
 
@@ -257,9 +249,7 @@ def _load_manifest_from_package(
         return None
 
 
-def _create_env_info_from_package(
-    package_name: str, module_name: str, version: str
-) -> Optional[EnvironmentInfo]:
+def _create_env_info_from_package(package_name: str, module_name: str, version: str) -> Optional[EnvironmentInfo]:
     """
     Create EnvironmentInfo from an installed package.
 
@@ -289,11 +279,7 @@ def _create_env_info_from_package(
     env_key = env_name.replace("_env", "") if env_name.endswith("_env") else env_name
 
     # Get description
-    description = (
-        manifest.get("description", f"{env_name} environment")
-        if manifest
-        else f"{env_name} environment"
-    )
+    description = manifest.get("description", f"{env_name} environment") if manifest else f"{env_name} environment"
 
     # Get spec version
     spec_version = manifest.get("spec_version") if manifest else None
@@ -303,12 +289,8 @@ def _create_env_info_from_package(
     if manifest and "action" in manifest and "observation" in manifest:
         # Custom format (like coding_env)
         client_class_name = _infer_class_name(env_name, "client")
-        action_class_name = manifest.get(
-            "action", _infer_class_name(env_name, "action")
-        )
-        observation_class_name = manifest.get(
-            "observation", _infer_class_name(env_name, "observation")
-        )
+        action_class_name = manifest.get("action", _infer_class_name(env_name, "action"))
+        observation_class_name = manifest.get("observation", _infer_class_name(env_name, "observation"))
     else:
         # Use conventions
         client_class_name = _infer_class_name(env_name, "client")
@@ -387,15 +369,11 @@ class EnvironmentDiscovery:
 
             try:
                 # Create environment info
-                env_info = _create_env_info_from_package(
-                    package_name, module_name, version
-                )
+                env_info = _create_env_info_from_package(package_name, module_name, version)
 
                 if env_info:
                     environments[env_info.env_key] = env_info
-                    logger.debug(
-                        f"Discovered environment: {env_info.env_key} ({package_name})"
-                    )
+                    logger.debug(f"Discovered environment: {env_info.env_key} ({package_name})")
 
             except Exception as e:
                 logger.warning(f"Failed to load environment from {package_name}: {e}")
