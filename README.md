@@ -24,7 +24,7 @@ pip install openenv-core
 Install an environment client (e.g., Echo):
 
 ```bash
-pip install git+https://huggingface.co/spaces/openenv/echo-env
+pip install git+https://huggingface.co/spaces/openenv/echo_env
 ```
 
 Then use the environment:
