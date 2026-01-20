@@ -2,7 +2,7 @@
 title: TB2 Environment Server
 emoji: "🧪"
 colorFrom: blue
-colorTo: "#22C55E"
+colorTo: blue
 sdk: docker
 pinned: false
 app_port: 8000
