@@ -1,7 +1,7 @@
 ---
 title: TB2 Environment Server
 emoji: "🧪"
-colorFrom: "#0F766E"
+colorFrom: blue
 colorTo: "#22C55E"
 sdk: docker
 pinned: false
