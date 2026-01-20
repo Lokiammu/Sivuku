@@ -34,7 +34,7 @@ from repl_env.prompts import (
     RLM_SYSTEM_PROMPT,
     build_initial_prompt,
     extract_code_blocks,
-    format_observation,
+    format_observations,
 )
 
 
@@ -121,6 +121,7 @@ def run_rlm_loop(
 
             # Extract and execute code blocks
             code_blocks = extract_code_blocks(response)
+            code_block_observations = []
 
             if not code_blocks:
                 # No code, ask LLM to provide code
@@ -140,6 +141,7 @@ def run_rlm_loop(
 
                 result = env.execute(code)
                 obs = result.observation
+                code_block_observations.append(obs)
 
                 if verbose:
                     print(f"Success: {obs.result.success}")
@@ -158,7 +160,7 @@ def run_rlm_loop(
                     return final_answer
 
             # Format observation for next iteration
-            obs_text = format_observation(obs)
+            obs_text = format_observations(code_block_observations)
             messages.append({"role": "assistant", "content": response})
             messages.append({"role": "user", "content": obs_text})
 
