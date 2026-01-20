@@ -11,7 +11,7 @@
 # It includes the minimal dependencies needed to run HTTP environment servers
 # and uv for fast dependency management.
 #
-# Build from repo root: docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+# Build from repo root: docker build -t openenv-base:latest -f src/openenv/core/containers/images/Dockerfile .
 # Tag:   docker tag openenv-base:latest openenv-base:0.2.0
 #
 
