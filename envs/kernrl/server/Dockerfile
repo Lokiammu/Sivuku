@@ -1,41 +1,84 @@
-# GPU-enabled Dockerfile for kernrl environment
-# Requires NVIDIA GPU runtime
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
 
-FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
+# Multi-stage build using openenv-base
+# This Dockerfile is flexible and works for both:
+# - In-repo environments (with local src/core)
+# - Standalone environments (with openenv-core from pip)
+# The build script (openenv build) handles context detection and sets appropriate build args.
 
-# Set environment
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED=1
-ENV KERNRL_PROBLEMS_DIR=/app/env/problems
+ARG BASE_IMAGE=ghcr.io/meta-pytorch/openenv-base:latest
+FROM ${BASE_IMAGE} AS builder
 
+WORKDIR /app
+
+# Build argument to control whether we're building standalone or in-repo
+ARG BUILD_MODE=in-repo
+
+# Copy environment code (always at root of build context)
+COPY . /app/env
+
+# For in-repo builds, openenv-core is already in the pyproject.toml dependencies
+# For standalone builds, openenv-core will be installed from pip via pyproject.toml
 WORKDIR /app/env
 
-# Install system dependencies
+# Ensure uv is available (for local builds where base image lacks it)
+RUN if ! command -v uv >/dev/null 2>&1; then \
+        curl -LsSf https://astral.sh/uv/install.sh | sh && \
+        mv /root/.local/bin/uv /usr/local/bin/uv && \
+        mv /root/.local/bin/uvx /usr/local/bin/uvx; \
+    fi
+
+# Install git for building from git repos (build-time only)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3.11-dev \
-    python3-pip \
     git \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && ln -sf /usr/bin/python3.11 /usr/bin/python \
-    && ln -sf /usr/bin/python3.11 /usr/bin/python3
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy environment files
-COPY . .
+# Install dependencies using uv sync
+# First pass: install dependencies without the project (for better caching)
+# Second pass: install the project itself
+RUN --mount=type=cache,target=/root/.cache/uv \
+    if [ -f uv.lock ]; then \
+        uv sync --frozen --no-install-project --no-editable; \
+    else \
+        uv sync --no-install-project --no-editable; \
+    fi
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -e .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    if [ -f uv.lock ]; then \
+        uv sync --frozen --no-editable; \
+    else \
+        uv sync --no-editable; \
+    fi
 
-# Install PyTorch with CUDA support and Triton
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cu121
-RUN pip install --no-cache-dir triton
+# Final runtime stage
+FROM ${BASE_IMAGE}
 
-# Expose port
-EXPOSE 8000
+WORKDIR /app
 
-# Set environment variables
+# Copy the virtual environment from builder
+COPY --from=builder /app/env/.venv /app/.venv
+
+# Copy the environment code
+COPY --from=builder /app/env /app/env
+
+# Set PATH to use the virtual environment
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Set PYTHONPATH so imports work correctly
+ENV PYTHONPATH="/app/env:$PYTHONPATH"
+
+# Set environment variables for kernrl
+ENV KERNRL_PROBLEMS_DIR="/app/env/problems"
 ENV ENABLE_WEB_INTERFACE=true
 
-# Run the server
-CMD ["python", "-m", "uvicorn", "kernrl.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Health check using Python (more portable than curl/wget)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+
+# Run the FastAPI server
+# The module path is constructed to work with the /app/env structure
+CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port 8000"]

@@ -1,5 +1,6 @@
+spec_version: 1
 name: kernrl
-version: "0.1.0"
-description: "RL environment for GPU kernel optimization"
-action: KernelAction
-observation: KernelObservation
+type: space
+runtime: fastapi
+app: server.app:app
+port: 8000

@@ -7,26 +7,49 @@
 """
 FastAPI application for the kernrl GPU kernel optimization environment.
 
+This module creates an HTTP server that exposes the KernelOptEnvironment
+over HTTP and WebSocket endpoints, compatible with EnvClient.
+
 Usage:
-    # Development:
-    uvicorn kernrl.server.app:app --reload --host 0.0.0.0 --port 8000
+    # Development (with auto-reload):
+    uvicorn server.app:app --reload --host 0.0.0.0 --port 8000
 
     # Production:
-    uvicorn kernrl.server.app:app --host 0.0.0.0 --port 8000
+    uvicorn server.app:app --host 0.0.0.0 --port 8000 --workers 4
+
+    # Or run directly:
+    uv run --project . server
 """
 
-from openenv.core.env_server import create_app
+# Support both in-repo and standalone imports
+try:
+    # In-repo imports (when running from OpenEnv repository)
+    from openenv.core.env_server.http_server import create_app
+    from ..models import KernelAction, KernelObservation
+    from .kernrl_environment import KernelOptEnvironment
+except ImportError:
+    # Standalone imports (when environment is standalone with openenv from pip)
+    from openenv.core.env_server.http_server import create_app
+    from models import KernelAction, KernelObservation
+    from server.kernrl_environment import KernelOptEnvironment
 
-from kernrl.models import KernelAction, KernelObservation
-from kernrl.server.kernel_env import KernelOptEnv
-
-# Create the app with OpenEnv's standard interface
-app = create_app(KernelOptEnv, KernelAction, KernelObservation, env_name="kernrl")
+# Create the app with web interface and README integration
+# Pass the class (factory) instead of an instance for WebSocket session support
+app = create_app(KernelOptEnvironment, KernelAction, KernelObservation, env_name="kernrl")
 
 
 def main():
-    """Main entry point for running the server."""
+    """
+    Entry point for direct execution via uv run or python -m.
+
+    This function enables running the server without Docker:
+        uv run --project . server
+        python -m envs.kernrl.server.app
+        openenv serve kernrl
+
+    """
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 

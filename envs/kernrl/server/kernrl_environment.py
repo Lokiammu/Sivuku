@@ -5,26 +5,37 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-GPU Kernel Optimization Environment.
+GPU Kernel Optimization Environment Implementation.
 
 Server-side environment for evaluating CUDA/Triton kernels against
-PyTorch reference implementations.
+PyTorch reference implementations. Provides compilation checking,
+correctness verification, and performance benchmarking.
 """
 
 import os
-import uuid
 import random
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 
-from openenv.core.env_server.interfaces import Action, Environment, Observation
-
-from ..models import KernelAction, KernelObservation, KernelState
-from .evaluator import LocalGPUEvaluator
+# Support both in-repo and standalone imports
+try:
+    # In-repo imports (when running from OpenEnv repository)
+    from openenv.core.env_server.interfaces import Environment
+    from openenv.core.env_server.types import State
+    from ..models import KernelAction, KernelObservation, KernelState
+    from .evaluator import LocalGPUEvaluator
+except ImportError:
+    # Standalone imports (when environment is standalone with openenv from pip)
+    from openenv.core.env_server.interfaces import Environment
+    from openenv.core.env_server.types import State
+    from models import KernelAction, KernelObservation, KernelState
+    from server.evaluator import LocalGPUEvaluator
 
 
 class Problem:
     """A kernel optimization problem."""
+
     def __init__(self, id: str, level: int, name: str, description: str, reference_code: str):
         self.id = id
         self.level = level
@@ -33,17 +44,26 @@ class Problem:
         self.reference_code = reference_code
 
 
-class KernelOptEnv(Environment):
+class KernelOptEnvironment(Environment):
     """
     GPU Kernel Optimization Environment.
 
-    Agents submit CUDA/Triton kernel code and receive feedback including:
+    A reinforcement learning environment that trains LLMs to write optimized
+    CUDA/Triton kernels. Agents submit kernel code and receive feedback including:
     - Compilation status and errors
     - Correctness against reference implementation
     - Speedup compared to PyTorch baseline
     - Profiling data from NSight Systems/Compute
 
-    Requires local GPU with CUDA toolkit for full profiling support.
+    Requires local GPU with CUDA toolkit for full evaluation support.
+
+    Example:
+        >>> env = KernelOptEnvironment()
+        >>> obs = env.reset(problem_id="L1_23_Softmax")
+        >>> print(obs.problem_description)
+        >>>
+        >>> obs = env.step(KernelAction(code=triton_kernel))
+        >>> print(f"Speedup: {obs.speedup}x")
     """
 
     def __init__(
@@ -60,6 +80,22 @@ class KernelOptEnv(Environment):
         enable_ncu: bool = False,
         timeout: int = 60,
     ):
+        """
+        Initialize the kernel optimization environment.
+
+        Args:
+            problems_dir: Path to problems directory, or None for default
+            max_turns: Maximum turns per episode
+            gpu: CUDA device to use (e.g., "cuda:0")
+            levels: List of problem levels to include
+            atol: Absolute tolerance for correctness checking
+            rtol: Relative tolerance for correctness checking
+            warmup_runs: Number of warmup runs before benchmarking
+            benchmark_runs: Number of benchmark runs for timing
+            enable_nsys: Enable NSight Systems profiling
+            enable_ncu: Enable NSight Compute profiling
+            timeout: Timeout in seconds for kernel execution
+        """
         self.problems_dir = Path(problems_dir) if problems_dir else self._default_problems_dir()
         self.max_turns = max_turns
         self.gpu = gpu
@@ -84,6 +120,7 @@ class KernelOptEnv(Environment):
         self._state = KernelState()
         self._current_problem: Optional[Problem] = None
         self._feedbacks: list[str] = []
+        self._reset_count = 0
 
     def _default_problems_dir(self) -> Path:
         """Default to problems directory relative to package."""
@@ -166,11 +203,11 @@ Device: {self.gpu}
                 name = torch.cuda.get_device_name(idx)
                 mem = torch.cuda.get_device_properties(idx).total_memory / 1e9
                 return f"{name} ({mem:.1f} GB)"
-        except:
+        except Exception:
             pass
         return f"GPU: {self.gpu}"
 
-    def reset(self, problem_id: Optional[str] = None) -> Observation:
+    def reset(self, problem_id: Optional[str] = None) -> KernelObservation:
         """
         Reset environment and start a new episode.
 
@@ -178,7 +215,7 @@ Device: {self.gpu}
             problem_id: Specific problem to use, or None for random selection
 
         Returns:
-            Initial observation with problem description
+            Initial KernelObservation with problem description
         """
         if problem_id:
             self._current_problem = next(
@@ -197,7 +234,8 @@ Device: {self.gpu}
             self._current_problem = random.choice(self.problems)
 
         self._state = KernelState(
-            episode_id=str(uuid.uuid4()),
+            episode_id=str(uuid4()),
+            step_count=0,
             problem_id=self._current_problem.id,
             turn=0,
             max_turns=self.max_turns,
@@ -205,6 +243,7 @@ Device: {self.gpu}
             solved=False,
         )
         self._feedbacks = []
+        self._reset_count += 1
 
         return KernelObservation(
             problem_id=self._current_problem.id,
@@ -215,9 +254,11 @@ Device: {self.gpu}
             max_turns=self.max_turns,
             feedback="",
             compilation_success=True,
+            done=False,
+            reward=0.0,
         )
 
-    def step(self, action: Action) -> Observation:
+    def step(self, action: KernelAction) -> KernelObservation:  # type: ignore[override]
         """
         Execute kernel code and return evaluation results.
 
@@ -234,6 +275,7 @@ Device: {self.gpu}
             raise RuntimeError("Must call reset() before step()")
 
         self._state.turn += 1
+        self._state.step_count += 1
 
         # Evaluate the kernel
         eval_result = self.evaluator.evaluate(
@@ -255,6 +297,12 @@ Device: {self.gpu}
             eval_result.benchmark and eval_result.benchmark.speedup > 1.05):
             self._state.solved = True
 
+        # Calculate reward
+        reward = self._calculate_reward(eval_result)
+
+        # Check if done
+        done = self._state.turn >= self.max_turns or self._state.solved
+
         return KernelObservation(
             problem_id=self._current_problem.id,
             problem_description=self._current_problem.description,
@@ -268,7 +316,28 @@ Device: {self.gpu}
             correctness_pass=eval_result.correctness.correct if eval_result.correctness else None,
             max_diff=eval_result.correctness.max_diff if eval_result.correctness else None,
             speedup=eval_result.benchmark.speedup if eval_result.benchmark else None,
+            done=done,
+            reward=reward,
+            metadata={"step": self._state.turn, "solved": self._state.solved},
         )
+
+    def _calculate_reward(self, eval_result) -> float:
+        """Calculate reward based on evaluation results."""
+        if not eval_result.compilation.success:
+            return -0.5  # Penalty for compilation failure
+
+        if eval_result.correctness and not eval_result.correctness.correct:
+            return -0.25  # Penalty for incorrect output
+
+        if eval_result.benchmark and eval_result.benchmark.speedup:
+            # Reward proportional to speedup
+            speedup = eval_result.benchmark.speedup
+            if speedup > 1.0:
+                return min(speedup - 1.0, 2.0)  # Cap reward at 2.0
+            else:
+                return (speedup - 1.0) * 0.5  # Smaller penalty for being slower
+
+        return 0.0
 
     @property
     def state(self) -> KernelState:
@@ -283,8 +352,7 @@ Device: {self.gpu}
     @property
     def reward(self) -> float:
         """Get reward for current state."""
-        # Reward is computed by evaluator and included in eval_result
-        return 0.0  # Placeholder - actual reward comes from eval_result
+        return 0.0  # Actual reward is returned in step()
 
     def list_problems(self) -> list[str]:
         """List all available problem IDs."""
@@ -292,4 +360,5 @@ Device: {self.gpu}
 
     @property
     def num_problems(self) -> int:
+        """Get number of available problems."""
         return len(self.problems)

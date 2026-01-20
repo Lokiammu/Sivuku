@@ -4,4 +4,8 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-"""kernrl server package."""
+"""kernrl environment server components."""
+
+from .kernrl_environment import KernelOptEnvironment
+
+__all__ = ["KernelOptEnvironment"]
