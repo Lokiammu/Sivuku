@@ -1,5 +1,5 @@
 spec_version: 1
-name: tbench2_env
+name: tbench2
 type: space
 runtime: fastapi
 app: server.app:app
