@@ -272,25 +272,24 @@ class JuliaCodeActEnv(Environment):
 
     def _calculate_reward(
         self, code_compiles: bool, tests_passed: int, tests_failed: int
-    ) -> int:
+    ) -> float:
         """
-        Optimized integer reward for Julia GRPO.
-        Strong signal shaping: rewards correctness, penalizes instability,
-        and gives higher incentive for near-perfect results.
+        Normalized percentage-based reward for Julia GRPO.
+        Returns rewards in [-1, 1.5] range for comparability across problems.
         """
-
-        # Code doesn't compile — immediate strong penalty
         if not code_compiles:
-            return -3
+            return -1.0
 
-        reward = 1
+        total_tests = tests_passed + tests_failed
+        if total_tests == 0:
+            return 0.0  # No signal when no tests run
 
-        reward += 3 * tests_passed - 1 * tests_failed
+        pass_rate = tests_passed / total_tests
 
-        if tests_failed == 0 and tests_passed > 0:
-            reward += 2
-
-        return reward
+        # Scaled 0-1 with bonus for perfection
+        if pass_rate == 1.0:
+            return 1.5  # Bonus for passing all tests
+        return pass_rate
 
     def _apply_transform(self, observation: JuliaObservation) -> JuliaObservation:
         """Apply safety and quality transforms to observation."""

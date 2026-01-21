@@ -11,7 +11,6 @@ Safety and quality transforms for Julia code.
 """
 
 import re
-from openenv.core.env_server import CompositeTransform
 from openenv.core.env_server.interfaces import Transform
 from ..models import JuliaObservation
 
@@ -61,39 +60,8 @@ class JuliaSafetyTransform(Transform):
 
 
 # -------------------------
-# Quality Transform
-# -------------------------
-class JuliaQualityTransform(Transform):
-    """Evaluates and rewards Julia code quality."""
-
-    def __init__(self, concise_bonus=1, max_length_threshold=120):
-        self.concise_bonus = concise_bonus
-        self.max_length_threshold = max_length_threshold
-
-    def __call__(self, observation):
-        # Only act on JuliaObservation objects
-        if not isinstance(observation, JuliaObservation):
-            return observation
-
-        if observation.metadata:
-            code = observation.metadata.get("core_code", "") + "\n" + observation.metadata.get("test_code", "")
-        else:
-            code = ""
-        reward = observation.reward or 0.0
-
-        # Reward concise code
-        if len(code.strip()) <= self.max_length_threshold:
-            reward += self.concise_bonus
-        else:
-            reward -= 0.1  # slight penalty for verbosity
-
-        observation.reward = reward
-        return observation
-
-
-# -------------------------
-# Composite Transform
+# Factory
 # -------------------------
 def create_safe_julia_transform():
-    """Combines safety and quality transforms into one pipeline."""
-    return CompositeTransform([JuliaSafetyTransform(), JuliaQualityTransform()])
+    """Creates safety transform for Julia code."""
+    return JuliaSafetyTransform()
