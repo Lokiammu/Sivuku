@@ -49,7 +49,7 @@ class GridWorldEnvironment(Environment):
         # )
 
     def reset(self) -> GridWorldObservation:
-        print("Resetting Grid World environment...")
+        
         
         # Update State
         self.agent_x = 0
