@@ -15,19 +15,25 @@ An e2e framework for creating, deploying and using isolated execution environmen
 
 ## Quick Start
 
-Install OpenEnv with pip from this repo like so: 
+Install the OpenEnv core package:
 
-```sh
-pip install https://github.com/meta-pytorch/OpenEnv.git
+```bash
+pip install openenv-core
 ```
 
-You can then use an OpenEnv from the Hugging Face hub like so:
+Install an environment client (e.g., Echo):
+
+```bash
+pip install git+https://huggingface.co/spaces/openenv/echo_env
+```
+
+Then use the environment:
 
 ```python
-from envs.echo_env import EchoAction, EchoEnv
+from echo_env import EchoAction, EchoEnv
 
-# Automatically start container and connect
-client = EchoEnv.from_hub("openenv/echo-env")
+# Connect to a running Space
+client = EchoEnv(base_url="https://openenv-echo-env.hf.space")
 
 # Reset the environment
 result = client.reset()
@@ -39,7 +45,7 @@ print(result.observation.echoed_message)  # "Hello, World!"
 print(result.reward)  # 1.3 (based on message length)
 
 # Cleanup
-client.close()  # Stops and removes container
+client.close()
 ```
 
 For a detailed quick start, check out the [docs page](https://meta-pytorch.org/OpenEnv/quickstart/).
@@ -214,10 +220,11 @@ See [`envs/README.md`](envs/README.md) for a complete guide on building environm
 ### For Environment Users
 
 To use an environment:
-1. Import from `envs.your_env`: `from envs.echo_env import EchoAction, EchoEnv`
-2. Create client: `client = EchoEnv.from_docker_image("echo-env:latest")`
-3. Interact: `client.reset()`, `client.step(action)`, `client.state()`
-4. Cleanup: `client.close()`
+1. Install the client: `pip install git+https://huggingface.co/spaces/openenv/echo-env`
+2. Import: `from echo_env import EchoAction, EchoEnv`
+3. Create client: `client = EchoEnv(base_url="https://openenv-echo-env.hf.space")`
+4. Interact: `client.reset()`, `client.step(action)`, `client.state()`
+5. Cleanup: `client.close()`
 
 See example scripts in `examples/` directory.
 
@@ -248,14 +255,56 @@ For detailed options: `openenv init --help` and `openenv push --help`.
 3. **Container Isolation**: Each environment runs in its own container
 4. **Simple APIs**: Minimal, intuitive interfaces
 
+## Development
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/meta-pytorch/OpenEnv.git
+cd OpenEnv
+
+# Install core package in editable mode
+pip install -e .
+# Or using uv (faster)
+uv pip install -e .
+```
+
+### Running Tests
+
+OpenEnv uses a modular dependency structure: the core package is minimal, and each environment has its own dependencies. This means some tests require environment-specific packages.
+
+```bash
+# Install pytest (required for running tests)
+uv pip install pytest
+
+# Run all tests (skips tests requiring uninstalled dependencies)
+PYTHONPATH=src:envs uv run pytest tests/ -v --tb=short
+
+# Run a specific test file
+PYTHONPATH=src:envs uv run pytest tests/envs/test_echo_environment.py -v
+```
+
+**To run environment-specific tests**, install that environment's dependencies:
+
+```bash
+# Example: Install coding_env with dev dependencies (includes smolagents + pytest)
+uv pip install -e "envs/coding_env[dev]"
+
+# Then run coding_env tests
+PYTHONPATH=src:envs uv run pytest tests/envs/test_python_codeact_rewards.py -v
+```
+
+Tests will be automatically skipped if their required dependencies aren't installed.
+
 ## Requirements
 
-- Python 3.11+
+- Python 3.10+
 - Docker Desktop or Docker Engine
 - FastAPI >= 0.104.0
 - Uvicorn >= 0.24.0
 - Requests >= 2.25.0
-- smolagents (for coding environment)
+- Environment-specific dependencies (e.g., smolagents for coding_env)
 
 ## Supported RL Tools
 The goal of this project is to support a broad set of open and closed tools to help standardize the agentic RL community. If you have a project that supports OpenEnv environments, please put up a PR to add your tool name along with a link to your documentation.

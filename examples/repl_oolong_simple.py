@@ -20,7 +20,8 @@ from datasets import load_dataset
 from huggingface_hub import InferenceClient
 
 # HuggingFace token for Inference API
-HF_TOKEN = os.environ.get("HF_TOKEN", None)
+HF_TOKEN = os.environ.get("HF_TOKEN")
+
 
 from repl_env import REPLEnv
 from repl_env.prompts import (
@@ -29,7 +30,7 @@ from repl_env.prompts import (
     build_rlm_system_prompt,
     build_user_prompt,
     extract_code_blocks,
-    format_observation,
+    format_observations,
 )
 
 # ============== CONFIGURATION ==============
@@ -132,6 +133,8 @@ def main():
         print(f"LLM: {response[:400]}{'...' if len(response) > 400 else ''}")
 
         code_blocks = extract_code_blocks(response)
+        code_block_observations = []
+
         if not code_blocks:
             messages.append({"role": "assistant", "content": response})
             messages.append({"role": "user", "content": "Please provide code in ```repl``` blocks."})
@@ -143,6 +146,7 @@ def main():
             # Execute code - same API for both local and remote!
             result = env.execute(code)
             obs = result.observation
+            code_block_observations.append(obs)
 
             print(f"Success: {obs.result.success}")
             print(f"Env iteration: {obs.iteration}/{obs.max_iterations}")
@@ -165,7 +169,7 @@ def main():
 
         # Add assistant response and observation + next user prompt
         messages.append({"role": "assistant", "content": response})
-        observation_text = format_observation(obs)
+        observation_text = format_observations(code_block_observations)
         next_prompt = build_user_prompt(root_prompt=task_prompt, iteration=i)
         messages.append({"role": "user", "content": observation_text + "\n\n" + next_prompt["content"]})
 
