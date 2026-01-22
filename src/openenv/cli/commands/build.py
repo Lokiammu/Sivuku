@@ -131,12 +131,21 @@ def _prepare_inrepo_build(env_path: Path, repo_root: Path, temp_dir: Path) -> Pa
     build_dir = temp_dir / env_path.name
     shutil.copytree(env_path, build_dir, symlinks=True)
 
-    # Copy OpenEnv package to temp directory
-    package_src = repo_root / "src" / "openenv"
+    # Copy OpenEnv package metadata + sources to temp directory
+    package_src = repo_root / "src"
+    package_dest = build_dir / "openenv"
     if package_src.exists():
-        package_dest = build_dir / "openenv"
-        shutil.copytree(package_src, package_dest, symlinks=True)
-        console.print(f"[cyan]Copied OpenEnv package to:[/cyan] {package_dest}")
+        package_dest.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(package_src, package_dest / "src", symlinks=True)
+
+        for filename in ("pyproject.toml", "README.md"):
+            src_file = repo_root / filename
+            if src_file.exists():
+                shutil.copy2(src_file, package_dest / filename)
+
+        console.print(
+            f"[cyan]Copied OpenEnv package to:[/cyan] {package_dest}"
+        )
 
         # Update pyproject.toml to reference local OpenEnv copy
         pyproject_path = build_dir / "pyproject.toml"
@@ -162,7 +171,7 @@ def _prepare_inrepo_build(env_path: Path, repo_root: Path, temp_dir: Path) -> Pa
 
                     # Write back with local core reference
                     pyproject["project"]["dependencies"] = new_deps + [
-                        "openenv @ file:///app/env/openenv"
+                        "openenv-core @ file:///app/env/openenv"
                     ]
 
                     # Write updated pyproject.toml
