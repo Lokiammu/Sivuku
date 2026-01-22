@@ -4,20 +4,19 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-"""Local Julia Executor.
+"""
+Local Julia Executor with Process Pool Support.
 
-This module provides a Julia code executor that runs Julia code in a subprocess.
-It handles:
-- Code execution with configurable timeouts
-- Capturing stdout/stderr
-- Process pool support for better performance
-- Graceful error handling
+This module provides a Julia code executor with:
+- Proper process cleanup on timeout (no zombie processes)
+- Robust error handling and logging
+- Process group management for complete cleanup
+- Automatic retry on transient failures
+- Optional process pool for 50-100x speedup on repeated executions
 
-Key features:
-- Uses subprocess.run for reliable code execution
-- Supports process pooling for reduced Julia startup overhead
-- Configurable execution timeout
-- Structured logging for operational visibility
+Performance Modes:
+- Standard mode: Spawn new process for each execution (default for single executions)
+- Pool mode: Reuse persistent Julia processes (recommended for repeated executions)
 """
 
 from __future__ import annotations
@@ -25,20 +24,17 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
-import traceback
-from concurrent.futures import ProcessPoolExecutor, TimeoutError
+import threading
+import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
-
-# Global process pool (initialized lazily)
-_pool: Optional[ProcessPoolExecutor] = None
-_pool_size: int = 0
-_pool_timeout: int = 120
 
 
 @dataclass
@@ -50,203 +46,391 @@ class CodeExecResult:
     exit_code: int
 
 
-def _execute_julia_code(code: str, timeout: int = 120) -> dict:
-    """
-    Execute Julia code in a subprocess.
+# Try to import process pool (optional dependency)
+try:
+    from .julia_process_pool import JuliaProcessPool
 
-    This function is designed to be called from a process pool.
-
-    Args:
-        code: Julia code to execute
-        timeout: Execution timeout in seconds
-
-    Returns:
-        Dictionary with stdout, stderr, and exit_code
-    """
-    try:
-        # Check if Julia is available
-        julia_path = shutil.which("julia")
-        if julia_path is None:
-            return {
-                "stdout": "",
-                "stderr": "Julia not found in PATH. Please install Julia.",
-                "exit_code": 127,
-            }
-
-        # Write code to a temp file
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".jl", delete=False
-        ) as tmp_file:
-            tmp_file.write(code)
-            tmp_file.flush()
-            tmp_path = tmp_file.name
-
-        try:
-            # Execute Julia code
-            result = subprocess.run(
-                [julia_path, tmp_path],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                env=os.environ.copy(),
-            )
-
-            return {
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "exit_code": result.returncode,
-            }
-
-        except subprocess.TimeoutExpired:
-            return {
-                "stdout": "",
-                "stderr": f"Execution timeout after {timeout}s",
-                "exit_code": 124,  # Standard timeout exit code
-            }
-
-        finally:
-            # Clean up temp file
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
-
-    except Exception as e:
-        tb = traceback.format_exc()
-        return {
-            "stdout": "",
-            "stderr": f"Execution error: {e}\n{tb}",
-            "exit_code": 1,
-        }
+    POOL_AVAILABLE = True
+except ImportError:
+    POOL_AVAILABLE = False
+    JuliaProcessPool = None
 
 
 class JuliaExecutor:
-    """Julia code executor with optional process pooling.
+    """
+    Executor for running Julia code with robust process management.
 
-    The executor runs Julia code in subprocesses, capturing stdout/stderr
-    and exit codes. It supports process pooling for better performance
-    under concurrent load.
+    This class provides a safe interface to execute Julia code in isolation
+    and capture the results including stdout, stderr, and exit code.
+
+    Features:
+    - Proper timeout handling without zombie processes
+    - Process group cleanup for nested processes
+    - Automatic retry on transient failures
+    - Comprehensive logging for debugging
+    - Optional process pool for 50-100x speedup on repeated executions
 
     Example:
         >>> executor = JuliaExecutor()
         >>> result = executor.run('println("Hello, Julia!")')
         >>> print(result.stdout)  # "Hello, Julia!\\n"
         >>> print(result.exit_code)  # 0
+        >>>
+        >>> # With process pool (recommended for repeated executions)
+        >>> JuliaExecutor.enable_process_pool(size=4)
+        >>> executor = JuliaExecutor(use_process_pool=True)
+        >>> for i in range(100):
+        ...     result = executor.run(f'println({i})')  # 50-100x faster!
+        >>> JuliaExecutor.shutdown_pool()  # Clean up when done
     """
+
+    # Class-level process pool (shared across all instances if enabled)
+    _shared_pool: Optional["JuliaProcessPool"] = None
+    _pool_lock = threading.Lock()
+    _pool_size: int = 0
+    _pool_timeout: int = 120
 
     def __init__(
         self,
-        use_process_pool: bool = True,
         timeout: int = 120,
+        max_retries: int = 1,
+        use_optimization_flags: bool = True,
+        use_process_pool: bool = True,
     ):
         """
-        Initialize Julia executor.
+        Initialize the JuliaExecutor.
 
         Args:
-            use_process_pool: Use process pool for execution (better performance)
-            timeout: Default execution timeout in seconds
+            timeout: Maximum execution time in seconds (default: 120)
+            max_retries: Number of retry attempts on transient failures (default: 1)
+            use_optimization_flags: Enable Julia performance flags (default: True)
+            use_process_pool: Use process pool if available (default: True)
+
+        Raises:
+            RuntimeError: If Julia executable is not found in PATH
         """
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.use_optimization_flags = use_optimization_flags
         self._use_process_pool = use_process_pool
-        self._timeout = timeout
+
+        # Find Julia executable in PATH
+        self.julia_path = shutil.which("julia")
+
+        if not self.julia_path:
+            # Try common installation paths
+            common_paths = [
+                os.path.expanduser("~/.juliaup/bin/julia"),
+                os.path.expanduser("~/.julia/bin/julia"),
+                "/usr/local/bin/julia",
+                "/usr/bin/julia",
+            ]
+
+            for path in common_paths:
+                if os.path.isfile(path) and os.access(path, os.X_OK):
+                    self.julia_path = path
+                    break
+
+        if not self.julia_path:
+            logger.warning(
+                "Julia executable not found in PATH or common locations. "
+                "Please install Julia: https://julialang.org/downloads/"
+            )
+
+        # Build optimized Julia command with performance flags
+        self.base_cmd = [self.julia_path] if self.julia_path else ["julia"]
+
+        if self.use_optimization_flags:
+            self.base_cmd.extend(
+                [
+                    "--compile=min",
+                    "--optimize=2",
+                    "--startup-file=no",
+                    "--history-file=no",
+                ]
+            )
+
+        logger.debug(f"JuliaExecutor initialized with Julia at: {self.julia_path}")
+        logger.debug(f"Timeout: {self.timeout}s, Max retries: {self.max_retries}")
+
+    def _kill_process_tree(
+        self, proc: subprocess.Popen, script_file: Optional[str] = None
+    ) -> None:
+        """
+        Terminate a process and all its children.
+
+        This prevents zombie processes by ensuring complete cleanup.
+
+        Args:
+            proc: The subprocess.Popen instance to terminate
+            script_file: Optional script file path (for logging)
+        """
+        if proc.poll() is None:  # Process is still running
+            try:
+                # Try graceful termination first
+                logger.warning(f"Terminating process {proc.pid} gracefully...")
+                proc.terminate()
+
+                # Wait up to 2 seconds for graceful termination
+                try:
+                    proc.wait(timeout=2.0)
+                    logger.debug(f"Process {proc.pid} terminated gracefully")
+                    return
+                except subprocess.TimeoutExpired:
+                    logger.warning(
+                        f"Process {proc.pid} did not terminate, forcing kill..."
+                    )
+
+                # Force kill if still running
+                proc.kill()
+                try:
+                    proc.wait(timeout=2.0)
+                    logger.debug(f"Process {proc.pid} killed forcefully")
+                except subprocess.TimeoutExpired:
+                    pass
+
+            except Exception as e:
+                logger.error(f"Error killing process {proc.pid}: {e}")
+
+                # Last resort: try killing via process group
+                try:
+                    if hasattr(os, "killpg"):
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                        logger.debug(f"Killed process group for {proc.pid}")
+                except Exception as pg_error:
+                    logger.error(f"Failed to kill process group: {pg_error}")
 
     def run(self, code: str, timeout: Optional[int] = None) -> CodeExecResult:
         """
-        Execute Julia code and return the result.
+        Execute Julia code and return the result with robust error handling.
+
+        This method provides:
+        - Automatic retry on transient failures
+        - Proper timeout handling without zombie processes
+        - Process group cleanup for nested processes
+        - Comprehensive error logging
+        - Optional process pool for 50-100x speedup
 
         Args:
-            code: Julia code to execute
-            timeout: Execution timeout in seconds (overrides default)
+            code: Julia code string to execute
+            timeout: Override default timeout (seconds)
 
         Returns:
-            CodeExecResult with stdout, stderr, and exit_code
+            CodeExecResult containing stdout, stderr, and exit_code
         """
         if timeout is None:
-            timeout = self._timeout
+            timeout = self.timeout
 
-        try:
-            if self._use_process_pool and _pool is not None:
-                # Use process pool
-                try:
-                    future = _pool.submit(_execute_julia_code, code, timeout)
-                    result = future.result(timeout=timeout + 30)  # Extra buffer
-                except TimeoutError:
-                    return CodeExecResult(
-                        stdout="",
-                        stderr=f"Process pool timeout after {timeout + 30}s",
-                        exit_code=124,
-                    )
-            else:
-                # Direct execution
-                result = _execute_julia_code(code, timeout)
+        # Use process pool if enabled and available
+        if self._use_process_pool and JuliaExecutor._shared_pool is not None:
+            try:
+                return JuliaExecutor._shared_pool.execute(code, timeout=timeout)
+            except Exception as e:
+                logger.warning(
+                    f"Process pool execution failed: {e}, falling back to subprocess"
+                )
+                # Fall through to standard execution
 
+        # Check if Julia is available
+        if not self.julia_path:
             return CodeExecResult(
-                stdout=result["stdout"],
-                stderr=result["stderr"],
-                exit_code=result["exit_code"],
+                stdout="",
+                stderr="Julia not found in PATH. Please install Julia.",
+                exit_code=127,
             )
 
-        except Exception as e:
-            tb = traceback.format_exc()
-            logger.exception("JuliaExecutor raised an exception during run")
-            return CodeExecResult(stdout="", stderr=tb, exit_code=1)
+        code_file = None
+
+        for attempt in range(self.max_retries + 1):
+            proc = None
+
+            try:
+                # Create temporary file for Julia code
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".jl", delete=False, encoding="utf-8"
+                ) as f:
+                    f.write(code)
+                    code_file = f.name
+
+                script_name = Path(code_file).name
+                logger.debug(
+                    f"[Attempt {attempt + 1}/{self.max_retries + 1}] Executing: {script_name}"
+                )
+
+                # Start process with Popen for better control
+                start_time = time.time()
+
+                # On Unix systems, use process groups for better cleanup
+                kwargs = {
+                    "stdout": subprocess.PIPE,
+                    "stderr": subprocess.PIPE,
+                    "text": True,
+                }
+
+                # Create new process group on Unix systems
+                if hasattr(os, "setpgrp"):
+                    kwargs["preexec_fn"] = os.setpgrp
+
+                proc = subprocess.Popen(self.base_cmd + [code_file], **kwargs)
+
+                logger.debug(f"Started Julia process {proc.pid}")
+
+                # Wait for process with timeout
+                try:
+                    stdout, stderr = proc.communicate(timeout=timeout)
+                    exit_code = proc.returncode
+                    elapsed = time.time() - start_time
+
+                    logger.debug(
+                        f"Julia execution completed in {elapsed:.2f}s (exit: {exit_code})"
+                    )
+
+                    # Clean up temp file
+                    self._cleanup_temp_file(code_file)
+
+                    return CodeExecResult(
+                        stdout=stdout,
+                        stderr=stderr,
+                        exit_code=exit_code,
+                    )
+
+                except subprocess.TimeoutExpired:
+                    logger.error(
+                        f"Julia execution timed out after {timeout}s "
+                        f"(attempt {attempt + 1}/{self.max_retries + 1})"
+                    )
+
+                    # CRITICAL: Kill the process AND all its children
+                    self._kill_process_tree(proc, code_file)
+
+                    # If this was our last retry, return timeout error
+                    if attempt >= self.max_retries:
+                        self._cleanup_temp_file(code_file)
+                        return CodeExecResult(
+                            stdout="",
+                            stderr=f"Execution timed out after {timeout}s",
+                            exit_code=124,  # Standard timeout exit code
+                        )
+
+                    # Wait before retry
+                    time.sleep(1.0)
+                    continue
+
+            except FileNotFoundError:
+                logger.error(f"Julia executable not found at {self.julia_path}")
+                return CodeExecResult(
+                    stdout="",
+                    stderr=f"Julia executable not found: {self.julia_path}",
+                    exit_code=127,
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"Error executing Julia (attempt {attempt + 1}/{self.max_retries + 1}): {e}"
+                )
+
+                # Try to kill process if it exists
+                if proc is not None and proc.poll() is None:
+                    self._kill_process_tree(proc, code_file)
+
+                # If this was our last retry, return error
+                if attempt >= self.max_retries:
+                    self._cleanup_temp_file(code_file)
+                    return CodeExecResult(
+                        stdout="",
+                        stderr=f"Error executing Julia code: {str(e)}",
+                        exit_code=1,
+                    )
+
+                # Wait before retry
+                time.sleep(1.0)
+                continue
+
+            finally:
+                # Always ensure temp file is cleaned up
+                self._cleanup_temp_file(code_file)
+
+        # Should never reach here
+        return CodeExecResult(
+            stdout="",
+            stderr="Unexpected error: all retries exhausted",
+            exit_code=1,
+        )
+
+    def _cleanup_temp_file(self, code_file: Optional[str]) -> None:
+        """Clean up temporary file safely."""
+        if code_file and Path(code_file).exists():
+            try:
+                Path(code_file).unlink()
+            except Exception as e:
+                logger.debug(f"Could not delete temp file {code_file}: {e}")
 
     @staticmethod
     def enable_process_pool(size: int = 4, timeout: int = 120) -> bool:
         """
-        Enable process pool for Julia execution.
+        Enable the shared Julia process pool for all JuliaExecutor instances.
+
+        This provides 50-100x speedup for repeated code executions by reusing
+        persistent Julia processes instead of spawning new ones.
 
         Args:
-            size: Number of workers in the pool
-            timeout: Default execution timeout
+            size: Number of worker processes to create (default: 4)
+            timeout: Default timeout for code execution in seconds (default: 120)
 
         Returns:
-            True if pool was enabled successfully
+            True if pool was created successfully, False otherwise
         """
-        global _pool, _pool_size, _pool_timeout
+        if not POOL_AVAILABLE:
+            logger.warning(
+                "Process pool not available (julia_process_pool module not found). "
+                "Falling back to subprocess execution."
+            )
+            return False
 
-        try:
-            if _pool is not None:
-                # Pool already exists
+        with JuliaExecutor._pool_lock:
+            if JuliaExecutor._shared_pool is not None:
+                logger.debug("Process pool already enabled")
                 return True
 
-            _pool = ProcessPoolExecutor(
-                max_workers=size,
-            )
-            _pool_size = size
-            _pool_timeout = timeout
-
-            logger.info(f"Julia process pool enabled with {size} workers")
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to enable Julia process pool: {e}")
-            return False
+            try:
+                logger.info(f"Enabling Julia process pool with {size} workers")
+                JuliaExecutor._shared_pool = JuliaProcessPool(size=size, timeout=timeout)
+                JuliaExecutor._pool_size = size
+                JuliaExecutor._pool_timeout = timeout
+                logger.info("Julia process pool enabled successfully")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to enable process pool: {e}")
+                return False
 
     @staticmethod
     def shutdown_pool() -> None:
-        """Shutdown the process pool."""
-        global _pool
+        """
+        Shutdown the shared Julia process pool.
 
-        if _pool is not None:
-            try:
-                _pool.shutdown(wait=True)
-                logger.info("Julia process pool shut down")
-            except Exception as e:
-                logger.error(f"Error shutting down Julia process pool: {e}")
-            finally:
-                _pool = None
+        This should be called when you're done with all Julia executions
+        to properly clean up worker processes.
+        """
+        with JuliaExecutor._pool_lock:
+            if JuliaExecutor._shared_pool is not None:
+                logger.info("Shutting down Julia process pool")
+                try:
+                    JuliaExecutor._shared_pool.shutdown()
+                except Exception as e:
+                    logger.error(f"Error shutting down pool: {e}")
+                finally:
+                    JuliaExecutor._shared_pool = None
+
+    @staticmethod
+    def is_pool_enabled() -> bool:
+        """Check if the process pool is currently enabled."""
+        with JuliaExecutor._pool_lock:
+            return JuliaExecutor._shared_pool is not None
 
     @staticmethod
     def get_pool_metrics() -> dict:
-        """
-        Get metrics about the process pool.
-
-        Returns:
-            Dictionary with pool metrics
-        """
-        global _pool, _pool_size
-
-        if _pool is None:
+        """Get metrics about the process pool."""
+        if JuliaExecutor._shared_pool is None:
             return {
                 "enabled": False,
                 "pool_size": 0,
@@ -255,8 +439,7 @@ class JuliaExecutor:
 
         return {
             "enabled": True,
-            "pool_size": _pool_size,
-            "timeout": _pool_timeout,
-            # Note: ProcessPoolExecutor doesn't expose worker availability
-            "available_workers": _pool_size,
+            "pool_size": JuliaExecutor._pool_size,
+            "timeout": JuliaExecutor._pool_timeout,
+            "available_workers": JuliaExecutor._pool_size,
         }

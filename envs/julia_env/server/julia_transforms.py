@@ -11,8 +11,16 @@ Safety and quality transforms for Julia code.
 """
 
 import re
-from openenv.core.env_server.interfaces import Transform
-from ..models import JuliaObservation
+
+# Support both in-repo and standalone imports
+try:
+    # In-repo imports
+    from openenv.core.env_server.interfaces import Transform
+    from ..models import JuliaObservation
+except ImportError:
+    # Standalone imports
+    from openenv.core.env_server.interfaces import Transform
+    from models import JuliaObservation
 
 
 # -------------------------

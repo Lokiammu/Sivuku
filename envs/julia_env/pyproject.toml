@@ -36,4 +36,5 @@ packages = ["julia_env", "julia_env.server"]
 package-dir = { "julia_env" = ".", "julia_env.server" = "server" }
 
 [tool.setuptools.package-data]
-julia_env = ["**/*.yaml", "**/*.yml"]
+julia_env = ["**/*.yaml", "**/*.yml", "**/*.jl"]
+"julia_env.server" = ["*.jl"]
