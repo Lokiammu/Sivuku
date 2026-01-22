@@ -131,12 +131,13 @@ def _prepare_inrepo_build(env_path: Path, repo_root: Path, temp_dir: Path) -> Pa
     build_dir = temp_dir / env_path.name
     shutil.copytree(env_path, build_dir, symlinks=True)
 
-    # Copy OpenEnv package metadata + sources to temp directory
-    package_src = repo_root / "src"
+    # Copy OpenEnv package metadata + sources to temp directory.
+    # Keep the src/ layout since pyproject.toml uses package-dir = {"" = "src"}.
+    package_src = repo_root / "src" / "openenv"
     package_dest = build_dir / "openenv"
     if package_src.exists():
         package_dest.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(package_src, package_dest / "src", symlinks=True)
+        shutil.copytree(package_src, package_dest / "src" / "openenv", symlinks=True)
 
         for filename in ("pyproject.toml", "README.md"):
             src_file = repo_root / filename
