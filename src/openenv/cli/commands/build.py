@@ -143,9 +143,7 @@ def _prepare_inrepo_build(env_path: Path, repo_root: Path, temp_dir: Path) -> Pa
             if src_file.exists():
                 shutil.copy2(src_file, package_dest / filename)
 
-        console.print(
-            f"[cyan]Copied OpenEnv package to:[/cyan] {package_dest}"
-        )
+        console.print(f"[cyan]Copied OpenEnv package to:[/cyan] {package_dest}")
 
         # Update pyproject.toml to reference local OpenEnv copy
         pyproject_path = build_dir / "pyproject.toml"
