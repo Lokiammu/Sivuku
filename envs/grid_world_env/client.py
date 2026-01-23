@@ -16,9 +16,6 @@ except ImportError:
     from core.client_types import StepResult
     from core.env_server.types import State
 
-# from core.http_env_client import HTTPEnvClient
-# from core.client_types import StepResult
-# from .models import GridWorldAction, GridWorldObservation, GridWorldState, MoveAction
 
 from .models import GridWorldAction, GridWorldObservation, MoveAction
 
