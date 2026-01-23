@@ -29,17 +29,6 @@ class GridWorldEnv(EnvClient[GridWorldAction, GridWorldObservation, State]):
     GridWorld Pydantic models for automatic (de)serialization.
     """
 
-    # # Added this __init__ method ===
-    # # This tells the base client which model to use for the .state() method.
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(
-    #         action_model=GridWorldAction,
-    #         observation_model=GridWorldObservation,
-    #         state_model=GridWorldState, 
-    #         *args, 
-    #         **kwargs
-        # )
-    # ==========================================
 
     def step_move(self, move: MoveAction) -> StepResult[GridWorldObservation]:
         """
