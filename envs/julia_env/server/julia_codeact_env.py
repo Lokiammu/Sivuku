@@ -11,7 +11,9 @@ This module provides a server-side environment implementation for executing
 Julia code actions using JuliaExecutor.
 """
 
+import logging
 import re
+import time
 import uuid
 
 # Support both in-repo and standalone imports
@@ -27,6 +29,12 @@ except ImportError:
     from models import JuliaAction, JuliaObservation, JuliaState
     from server.julia_executor import JuliaExecutor
     from server.julia_transforms import create_safe_julia_transform
+
+# Get logger for this module (inherits from julia_env logger)
+logger = logging.getLogger("julia_env.codeact")
+
+# Request counter for tracking
+_request_counter = 0
 
 
 class JuliaCodeActEnv(Environment):
@@ -102,18 +110,48 @@ class JuliaCodeActEnv(Environment):
             **kwargs: Optional parameters including:
                 - timeout: Execution timeout in seconds (default: 120)
         """
+        global _request_counter
+        _request_counter += 1
+        request_id = _request_counter
+
         if not isinstance(action, JuliaAction):
+            logger.error(f"[REQ-{request_id}] Invalid action type: {type(action)}")
             raise ValueError(f"Expected JuliaAction, got {type(action)}")
 
         # Get timeout from kwargs (default handled by executor)
         timeout = kwargs.get("timeout")
+
+        # Log request details
+        code_preview = action.core_code[:200] + "..." if len(action.core_code) > 200 else action.core_code
+        logger.info(f"[REQ-{request_id}] === NEW EXECUTION REQUEST ===")
+        logger.info(f"[REQ-{request_id}] Session: {self._state.episode_id}, Step: {self._state.step_count}")
+        logger.info(f"[REQ-{request_id}] Code length: {len(action.core_code)} chars, Test length: {len(action.test_code or '')} chars")
+        logger.debug(f"[REQ-{request_id}] Code preview: {code_preview}")
+        logger.info(f"[REQ-{request_id}] Timeout: {timeout}s" if timeout else f"[REQ-{request_id}] Timeout: default")
+
+        start_time = time.time()
 
         # Single execution: Run core_code + test_code together (if test_code provided)
         if action.test_code:
             combined_code = action.core_code + "\n\n" + action.test_code
         else:
             combined_code = action.core_code
-        full_result = self._executor.run(combined_code, timeout=timeout)
+
+        try:
+            full_result = self._executor.run(combined_code, timeout=timeout)
+            execution_time = time.time() - start_time
+
+            logger.info(f"[REQ-{request_id}] Execution completed in {execution_time:.2f}s, exit_code={full_result.exit_code}")
+
+            # Log stderr if present (often contains errors or test output)
+            if full_result.stderr:
+                stderr_preview = full_result.stderr[:500] + "..." if len(full_result.stderr) > 500 else full_result.stderr
+                logger.debug(f"[REQ-{request_id}] Stderr: {stderr_preview}")
+
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"[REQ-{request_id}] EXECUTION FAILED after {execution_time:.2f}s: {e}")
+            raise
 
         # Parse test results from execution output
         tests_passed, tests_failed = self._parse_test_results(
@@ -144,6 +182,12 @@ class JuliaCodeActEnv(Environment):
 
         # Calculate reward based on compilation and test results
         reward = self._calculate_reward(code_compiles, tests_passed, tests_failed)
+
+        # Log final results
+        logger.info(
+            f"[REQ-{request_id}] RESULT: compiles={code_compiles}, "
+            f"tests_passed={tests_passed}, tests_failed={tests_failed}, reward={reward:.2f}"
+        )
 
         # Update environment state
         self._state.step_count += 1

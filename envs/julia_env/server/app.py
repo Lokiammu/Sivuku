@@ -104,8 +104,11 @@ logger = setup_logging()
 
 def initialize_julia_pool():
     """Initialize the Julia process pool for better performance."""
+    port = int(os.getenv("PORT", "8000"))
+
     logger.info("=" * 80)
     logger.info("Starting Julia Environment Server")
+    logger.info(f"Container Port: {port}")
     logger.info(f"Max Workers: {MAX_WORKERS}")
     logger.info(f"Execution Timeout: {EXECUTION_TIMEOUT}s")
     logger.info(f"Log File: {LOG_FILE}")
@@ -122,7 +125,7 @@ def initialize_julia_pool():
         logger.warning("Julia process pool not available, using subprocess mode")
 
     logger.info("Julia Environment Server initialized successfully")
-    print(f"Julia Environment Server started with {MAX_WORKERS} concurrent workers")
+    print(f"Julia Environment Server started on port {port} with {MAX_WORKERS} concurrent workers")
 
 
 def shutdown_julia_pool():
@@ -151,6 +154,39 @@ app = create_app(
 )
 
 
+# Add request logging middleware
+import time as time_module
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Log all incoming HTTP requests for debugging."""
+
+    async def dispatch(self, request: Request, call_next):
+        start_time = time_module.time()
+        path = request.url.path
+
+        # Skip health check logging to reduce noise
+        if path in ["/health", "/pool_status"]:
+            return await call_next(request)
+
+        logger.debug(f"HTTP Request: {request.method} {path}")
+
+        response = await call_next(request)
+
+        elapsed = time_module.time() - start_time
+        logger.debug(f"HTTP Response: {request.method} {path} -> {response.status_code} ({elapsed:.2f}s)")
+
+        return response
+
+app.add_middleware(RequestLoggingMiddleware)
+
+
+# Track active WebSocket connections
+_active_ws_connections = 0
+_total_ws_connections = 0
+
+
 # Add custom health endpoint with pool metrics
 @app.get("/pool_status")
 async def pool_status():
@@ -160,6 +196,8 @@ async def pool_status():
         "timeout": EXECUTION_TIMEOUT,
         "pool_enabled": JuliaExecutor.is_pool_enabled(),
         "pool_metrics": JuliaExecutor.get_pool_metrics(),
+        "active_ws_connections": _active_ws_connections,
+        "total_ws_connections": _total_ws_connections,
     }
 
 
