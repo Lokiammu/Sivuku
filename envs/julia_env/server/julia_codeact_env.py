@@ -47,6 +47,9 @@ class JuliaCodeActEnv(Environment):
         >>> print(env.state.last_exit_code)  # 0
     """
 
+    # Allow concurrent sessions - each session has its own isolated state
+    SUPPORTS_CONCURRENT_SESSIONS = True
+
     def __init__(self, use_process_pool: bool = True):
         """
         Initialize the Julia Code Act Environment.

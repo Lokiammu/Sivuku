@@ -8,16 +8,14 @@
 FastAPI application for the Julia Environment with concurrent execution support.
 
 This module creates an HTTP server that exposes the JuliaCodeActEnv
-over HTTP endpoints with optimized async execution for handling multiple
-concurrent requests efficiently.
+over HTTP and WebSocket endpoints with optimized async execution for handling
+multiple concurrent requests efficiently.
 
 Features:
-- Async Julia code execution to avoid blocking
-- ThreadPoolExecutor for bounded concurrent request handling
+- WebSocket support for persistent sessions (required by OpenEnv clients)
+- Julia Process Pool for 50-100x speedup on repeated executions
 - Automatic error recovery and retry logic
 - Comprehensive logging to file and console
-- Worker health monitoring
-- 10x+ performance improvement over single-threaded version
 
 Environment Variables:
 - JULIA_MAX_WORKERS: Number of concurrent Julia executions (default: 8)
@@ -28,37 +26,31 @@ Environment Variables:
 
 Usage:
     # Development (with auto-reload):
-    uvicorn julia_env.server.app:app --reload --host 0.0.0.0 --port 8000
+    uvicorn server.app:app --reload --host 0.0.0.0 --port 8000
 
     # Production:
-    uvicorn julia_env.server.app:app --host 0.0.0.0 --port 8000
+    uvicorn server.app:app --host 0.0.0.0 --port 8000
 
     # Or run directly:
-    python -m julia_env.server.app
+    python -m server.app
 """
 
-import asyncio
+import atexit
 import logging
 import os
 import sys
-import traceback
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
-from datetime import datetime
 from logging.handlers import RotatingFileHandler
-from typing import Any, Dict
-
-from fastapi import Body, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
 
 # Support both in-repo and standalone imports
 try:
     # In-repo imports (when running from OpenEnv repository)
+    from openenv.core.env_server.http_server import create_app
     from ..models import JuliaAction, JuliaObservation
     from .julia_codeact_env import JuliaCodeActEnv
     from .julia_executor import JuliaExecutor
 except ImportError:
     # Standalone imports (when environment is standalone)
+    from openenv.core.env_server.http_server import create_app
     from models import JuliaAction, JuliaObservation
     from server.julia_codeact_env import JuliaCodeActEnv
     from server.julia_executor import JuliaExecutor
@@ -68,10 +60,6 @@ MAX_WORKERS = int(os.getenv("JULIA_MAX_WORKERS", "8"))
 EXECUTION_TIMEOUT = int(os.getenv("JULIA_EXECUTION_TIMEOUT", "120"))
 LOG_FILE = os.getenv("JULIA_LOG_FILE", "/tmp/julia_env.log")
 LOG_LEVEL = os.getenv("JULIA_LOG_LEVEL", "INFO")
-ENABLE_WEB = os.getenv("ENABLE_WEB_INTERFACE", "false").lower() in ("true", "1", "yes")
-
-# Global thread pool executor for CPU-bound Julia tasks
-executor = None
 
 
 def setup_logging():
@@ -110,14 +98,12 @@ def setup_logging():
     return logger
 
 
+# Setup logging
 logger = setup_logging()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan context manager for startup/shutdown with health monitoring"""
-    global executor
-
+def initialize_julia_pool():
+    """Initialize the Julia process pool for better performance."""
     logger.info("=" * 80)
     logger.info("Starting Julia Environment Server")
     logger.info(f"Max Workers: {MAX_WORKERS}")
@@ -126,358 +112,55 @@ async def lifespan(app: FastAPI):
     logger.info(f"Log Level: {LOG_LEVEL}")
     logger.info("=" * 80)
 
-    # Startup: Create thread pool with error handling
-    try:
-        executor = ThreadPoolExecutor(
-            max_workers=MAX_WORKERS, thread_name_prefix="julia_worker"
-        )
-        logger.info(f"Thread pool created with {MAX_WORKERS} workers")
+    # Enable Julia process pool for better performance
+    pool_enabled = JuliaExecutor.enable_process_pool(
+        size=MAX_WORKERS, timeout=EXECUTION_TIMEOUT
+    )
+    if pool_enabled:
+        logger.info(f"Julia process pool enabled with {MAX_WORKERS} workers")
+    else:
+        logger.warning("Julia process pool not available, using subprocess mode")
 
-        # Enable Julia process pool for better performance
-        pool_enabled = JuliaExecutor.enable_process_pool(
-            size=MAX_WORKERS, timeout=EXECUTION_TIMEOUT
-        )
-        if pool_enabled:
-            logger.info(f"Julia process pool enabled with {MAX_WORKERS} workers")
-        else:
-            logger.warning("Julia process pool not available, using subprocess mode")
+    logger.info("Julia Environment Server initialized successfully")
+    print(f"Julia Environment Server started with {MAX_WORKERS} concurrent workers")
 
-        logger.info("Julia Environment Server started successfully")
-        print(f"Julia Environment Server started with {MAX_WORKERS} concurrent workers")
-    except Exception as e:
-        logger.error(f"Failed to start server: {e}")
-        logger.error(traceback.format_exc())
-        raise
 
-    yield
-
-    # Shutdown: Cleanup with grace period
+def shutdown_julia_pool():
+    """Shutdown the Julia process pool."""
     logger.info("Shutting down Julia Environment Server...")
-    try:
-        # Shutdown Julia process pool first
-        JuliaExecutor.shutdown_pool()
-        logger.info("Julia process pool shutdown complete")
-
-        # Then shutdown thread pool
-        executor.shutdown(wait=True, cancel_futures=False)
-        logger.info("Thread pool shutdown complete")
-    except Exception as e:
-        logger.error(f"Error during shutdown: {e}")
-
-    logger.info("Julia Environment Server shutdown complete")
+    JuliaExecutor.shutdown_pool()
+    logger.info("Julia process pool shutdown complete")
     print("Julia Environment Server shutdown complete")
 
 
-# Create FastAPI app with lifespan management
-app = FastAPI(
-    title="Julia Environment Server",
-    description="Async Julia code execution environment with concurrent request support and auto-recovery",
-    version="2.1.0",
-    lifespan=lifespan,
+# Initialize the pool at module load time
+initialize_julia_pool()
+
+# Register cleanup on exit
+atexit.register(shutdown_julia_pool)
+
+
+# Create the app using OpenEnv's create_app for WebSocket support
+# Pass the class (factory) instead of an instance for session support
+app = create_app(
+    JuliaCodeActEnv,
+    JuliaAction,
+    JuliaObservation,
+    env_name="julia_env",
+    max_concurrent_envs=MAX_WORKERS,
 )
 
 
-# Global exception handler for uncaught errors
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Handle all uncaught exceptions to prevent worker crashes"""
-    error_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    logger.error(f"[ERROR-{error_id}] Uncaught exception in {request.url.path}")
-    logger.error(f"[ERROR-{error_id}] Request: {request.method} {request.url}")
-    logger.error(f"[ERROR-{error_id}] Exception: {type(exc).__name__}: {exc}")
-    logger.error(f"[ERROR-{error_id}] Traceback:\n{traceback.format_exc()}")
-
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal server error",
-            "type": type(exc).__name__,
-            "message": str(exc),
-            "error_id": error_id,
-            "timestamp": datetime.now().isoformat(),
-        },
-    )
-
-
-async def execute_julia_async(
-    action: JuliaAction, request_id: str = None
-) -> JuliaObservation:
-    """
-    Execute Julia code asynchronously in thread pool with timeout and error recovery.
-
-    This runs the CPU-bound Julia execution in a separate thread to avoid
-    blocking the event loop, allowing the server to handle multiple requests
-    concurrently.
-
-    Features:
-    - Timeout protection
-    - Automatic retry on transient failures
-    - Comprehensive error logging
-    - Resource cleanup
-    """
-    if request_id is None:
-        request_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-
-    loop = asyncio.get_event_loop()
-    max_retries = 2
-    retry_count = 0
-
-    logger.debug(
-        f"[{request_id}] Starting Julia execution (timeout: {EXECUTION_TIMEOUT}s)"
-    )
-
-    while retry_count <= max_retries:
-        env = None
-        try:
-            # Create a fresh environment instance for this request
-            # This ensures thread safety and allows concurrent execution
-            env = JuliaCodeActEnv()
-
-            # Run the blocking step() call in thread pool with timeout
-            observation = await asyncio.wait_for(
-                loop.run_in_executor(executor, env.step, action),
-                timeout=EXECUTION_TIMEOUT,
-            )
-
-            logger.debug(f"[{request_id}] Julia execution completed successfully")
-            logger.debug(
-                f"[{request_id}] Result: tests_passed={observation.tests_passed}, "
-                f"tests_failed={observation.tests_failed}, reward={observation.reward}"
-            )
-
-            return observation
-
-        except asyncio.TimeoutError:
-            retry_count += 1
-            logger.warning(
-                f"[{request_id}] Julia execution timeout (attempt {retry_count}/{max_retries + 1})"
-            )
-
-            if retry_count > max_retries:
-                logger.error(
-                    f"[{request_id}] Julia execution failed after {max_retries + 1} attempts"
-                )
-                # Return a failure observation
-                return JuliaObservation(
-                    stdout="",
-                    stderr=f"Execution timeout after {EXECUTION_TIMEOUT}s",
-                    exit_code=-1,
-                    tests_passed=0,
-                    tests_failed=0,
-                    code_compiles=False,
-                    reward=-1.0,
-                )
-
-            # Wait a bit before retry
-            await asyncio.sleep(0.5)
-
-        except Exception as e:
-            retry_count += 1
-            logger.error(
-                f"[{request_id}] Julia execution error (attempt {retry_count}/{max_retries + 1}): {e}"
-            )
-            logger.error(f"[{request_id}] Traceback:\n{traceback.format_exc()}")
-
-            if retry_count > max_retries:
-                logger.error(
-                    f"[{request_id}] Julia execution failed permanently after {max_retries + 1} attempts"
-                )
-                # Return a failure observation
-                return JuliaObservation(
-                    stdout="",
-                    stderr=f"Execution error: {str(e)}",
-                    exit_code=-1,
-                    tests_passed=0,
-                    tests_failed=0,
-                    code_compiles=False,
-                    reward=-1.0,
-                )
-
-            # Wait a bit before retry
-            await asyncio.sleep(0.5)
-
-        finally:
-            # Clean up environment resources if possible
-            if env is not None:
-                try:
-                    del env
-                except Exception as cleanup_error:
-                    logger.debug(f"[{request_id}] Cleanup warning: {cleanup_error}")
-
-    # Should never reach here
-    return JuliaObservation(
-        stdout="",
-        stderr="Unexpected error in execution loop",
-        exit_code=-1,
-        tests_passed=0,
-        tests_failed=0,
-        code_compiles=False,
-        reward=-1.0,
-    )
-
-
-@app.post("/reset")
-async def reset(request: Dict[str, Any] = Body(default={})) -> Dict[str, Any]:
-    """
-    Reset endpoint - returns initial observation.
-
-    Creates a fresh environment instance for the new episode.
-    """
-    request_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    logger.info(f"[{request_id}] Reset request received")
-
-    try:
-        # Run reset in thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
-        env = JuliaCodeActEnv()
-        observation = await asyncio.wait_for(
-            loop.run_in_executor(executor, env.reset),
-            timeout=30.0,  # Reset should be quick
-        )
-
-        # Serialize observation (use model_dump for Pydantic models)
-        obs_dict = observation.model_dump()
-        reward = obs_dict.pop("reward", None)
-        done = obs_dict.pop("done", False)
-        obs_dict.pop("metadata", None)
-
-        logger.info(f"[{request_id}] Reset completed successfully")
-
-        return {
-            "observation": obs_dict,
-            "reward": reward,
-            "done": done,
-        }
-    except asyncio.TimeoutError:
-        logger.error(f"[{request_id}] Reset timeout")
-        raise HTTPException(status_code=504, detail="Reset operation timed out")
-    except Exception as e:
-        logger.error(f"[{request_id}] Reset error: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
-
-
-@app.post("/step")
-async def step(request: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Step endpoint - executes Julia code and returns observation.
-
-    Runs Julia code execution asynchronously to handle multiple concurrent requests.
-    Each request gets its own environment instance for thread safety.
-    """
-    request_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-
-    try:
-        action_data = request.get("action", {})
-        if not action_data:
-            logger.warning(f"[{request_id}] Step request with empty action")
-            raise HTTPException(status_code=400, detail="Action data is required")
-
-        # Deserialize action
-        metadata = action_data.pop("metadata", {})
-        action = JuliaAction(**action_data)
-        action.metadata = metadata
-
-        logger.info(f"[{request_id}] Step request received")
-        logger.debug(
-            f"[{request_id}] Action: core_code_length={len(action.core_code) if action.core_code else 0}, "
-            f"test_code_length={len(action.test_code) if action.test_code else 0}"
-        )
-
-        # Execute Julia code asynchronously with timeout and retry
-        observation = await execute_julia_async(action, request_id)
-
-        # Serialize observation (use model_dump for Pydantic models)
-        obs_dict = observation.model_dump()
-        reward = obs_dict.pop("reward", None)
-        done = obs_dict.pop("done", False)
-        obs_dict.pop("metadata", None)
-
-        logger.info(
-            f"[{request_id}] Step completed - reward={reward}, "
-            f"tests_passed={observation.tests_passed}, tests_failed={observation.tests_failed}"
-        )
-
-        return {
-            "observation": obs_dict,
-            "reward": reward,
-            "done": done,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[{request_id}] Step endpoint error: {e}")
-        logger.error(f"[{request_id}] Traceback:\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Step execution failed: {str(e)}")
-
-
-@app.get("/state")
-async def get_state() -> Dict[str, Any]:
-    """
-    State endpoint - returns environment metadata and server health.
-
-    Returns general server state including worker pool metrics.
-    """
-    try:
-        pool_metrics = JuliaExecutor.get_pool_metrics()
-
-        state = {
-            "max_workers": MAX_WORKERS,
-            "executor_type": "ThreadPoolExecutor",
-            "status": "ready",
-            "timeout": EXECUTION_TIMEOUT,
-            "log_file": LOG_FILE,
-            "process_pool": pool_metrics,
-        }
-
-        # Try to add memory info if psutil is available
-        try:
-            import psutil
-
-            process = psutil.Process()
-            memory_info = process.memory_info()
-            state["memory_mb"] = memory_info.rss / 1024 / 1024
-            state["threads"] = len(process.threads())
-        except ImportError:
-            pass
-
-        return state
-
-    except Exception as e:
-        logger.warning(f"Could not get full state info: {e}")
-        return {
-            "max_workers": MAX_WORKERS,
-            "executor_type": "ThreadPoolExecutor",
-            "status": "ready",
-        }
-
-
-@app.get("/health")
-async def health() -> Dict[str, str]:
-    """
-    Health check endpoint.
-
-    Returns healthy status if the server is operational and can accept requests.
-    """
-    try:
-        # Quick health check - verify executor is available
-        if executor is None:
-            logger.error("Health check failed: executor not initialized")
-            raise HTTPException(status_code=503, detail="Service not ready")
-
-        return {
-            "status": "healthy",
-            "workers": str(MAX_WORKERS),
-            "timeout": str(EXECUTION_TIMEOUT),
-            "pool_enabled": str(JuliaExecutor.is_pool_enabled()),
-            "timestamp": datetime.now().isoformat(),
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Health check error: {e}")
-        raise HTTPException(status_code=503, detail="Health check failed")
+# Add custom health endpoint with pool metrics
+@app.get("/pool_status")
+async def pool_status():
+    """Get Julia process pool status."""
+    return {
+        "max_workers": MAX_WORKERS,
+        "timeout": EXECUTION_TIMEOUT,
+        "pool_enabled": JuliaExecutor.is_pool_enabled(),
+        "pool_metrics": JuliaExecutor.get_pool_metrics(),
+    }
 
 
 def main():
