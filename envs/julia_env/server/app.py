@@ -44,7 +44,6 @@ import sys
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from dataclasses import asdict
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from typing import Any, Dict
@@ -336,8 +335,8 @@ async def reset(request: Dict[str, Any] = Body(default={})) -> Dict[str, Any]:
             timeout=30.0,  # Reset should be quick
         )
 
-        # Serialize observation
-        obs_dict = asdict(observation)
+        # Serialize observation (use model_dump for Pydantic models)
+        obs_dict = observation.model_dump()
         reward = obs_dict.pop("reward", None)
         done = obs_dict.pop("done", False)
         obs_dict.pop("metadata", None)
@@ -388,8 +387,8 @@ async def step(request: Dict[str, Any]) -> Dict[str, Any]:
         # Execute Julia code asynchronously with timeout and retry
         observation = await execute_julia_async(action, request_id)
 
-        # Serialize observation
-        obs_dict = asdict(observation)
+        # Serialize observation (use model_dump for Pydantic models)
+        obs_dict = observation.model_dump()
         reward = obs_dict.pop("reward", None)
         done = obs_dict.pop("done", False)
         obs_dict.pop("metadata", None)
