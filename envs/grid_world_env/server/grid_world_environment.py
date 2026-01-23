@@ -54,7 +54,6 @@ class GridWorldEnvironment(Environment):
         # Update State
         self.agent_x = 0
         self.agent_y = 0
-        # self._state.episode_steps = 0
         
         # === FIX 1: Standard OpenEnv State tracking ===
         self._state.step_count = 0
