@@ -159,83 +159,104 @@ class JuliaWorkerProcess:
                 self.process.stdin.write(self.END_CODE + "\n")
                 self.process.stdin.flush()
 
-                # Read response with timeout
-                start_time = time.time()
-                stdout_lines = []
-                stderr_lines = []
-                exit_code = -1
+                # Use threading for proper timeout handling
+                # The blocking readline() would otherwise prevent timeout detection
+                result_container: dict = {
+                    "stdout_lines": [],
+                    "stderr_lines": [],
+                    "exit_code": -1,
+                    "completed": False,
+                    "error": None,
+                }
 
-                current_section = None  # Track which section we're reading
+                def read_output():
+                    """Read output in a separate thread."""
+                    stdout_lines = []
+                    stderr_lines = []
+                    exit_code = -1
+                    current_section = None
 
-                while True:
-                    # Check timeout
-                    if time.time() - start_time > timeout:
-                        logger.error(f"Worker {self.worker_id} execution timed out")
-                        self.is_healthy = False
-                        self._kill_process()
-                        return CodeExecResult(
-                            stdout="",
-                            stderr=f"Execution timed out after {timeout} seconds",
-                            exit_code=-1,
-                        )
-
-                    # Read line
                     try:
-                        line = self.process.stdout.readline()
+                        while True:
+                            line = self.process.stdout.readline()
 
-                        if not line:
-                            # EOF - process died
-                            logger.error(f"Worker {self.worker_id} died unexpectedly")
-                            self.is_healthy = False
-                            return CodeExecResult(
-                                stdout="".join(stdout_lines),
-                                stderr="Worker process died unexpectedly",
-                                exit_code=-1,
-                            )
+                            if not line:
+                                # EOF - process died
+                                result_container["error"] = "Worker process died unexpectedly"
+                                return
 
-                        line = line.rstrip("\n")
+                            line = line.rstrip("\n")
 
-                        # Check for delimiters
-                        if line == self.START_OUTPUT:
-                            current_section = "stdout"
-                            continue
-                        elif line == self.START_ERROR:
-                            current_section = "stderr"
-                            continue
-                        elif line.startswith(self.EXIT_CODE_PREFIX):
-                            # Parse exit code
-                            exit_code_str = line[
-                                len(self.EXIT_CODE_PREFIX) : -3
-                            ]  # Remove prefix and ">>>"
-                            exit_code = int(exit_code_str)
-                            continue
-                        elif line == self.END_EXECUTION:
-                            # Execution complete
-                            break
+                            # Check for delimiters
+                            if line == self.START_OUTPUT:
+                                current_section = "stdout"
+                                continue
+                            elif line == self.START_ERROR:
+                                current_section = "stderr"
+                                continue
+                            elif line.startswith(self.EXIT_CODE_PREFIX):
+                                # Parse exit code
+                                exit_code_str = line[
+                                    len(self.EXIT_CODE_PREFIX) : -3
+                                ]  # Remove prefix and ">>>"
+                                exit_code = int(exit_code_str)
+                                continue
+                            elif line == self.END_EXECUTION:
+                                # Execution complete
+                                break
 
-                        # Accumulate output
-                        if current_section == "stdout":
-                            stdout_lines.append(line)
-                        elif current_section == "stderr":
-                            stderr_lines.append(line)
+                            # Accumulate output
+                            if current_section == "stdout":
+                                stdout_lines.append(line)
+                            elif current_section == "stderr":
+                                stderr_lines.append(line)
+
+                        result_container["stdout_lines"] = stdout_lines
+                        result_container["stderr_lines"] = stderr_lines
+                        result_container["exit_code"] = exit_code
+                        result_container["completed"] = True
 
                     except Exception as e:
-                        logger.error(f"Error reading from worker {self.worker_id}: {e}")
-                        self.is_healthy = False
-                        return CodeExecResult(
-                            stdout="".join(stdout_lines),
-                            stderr=f"Error reading from worker: {str(e)}",
-                            exit_code=-1,
-                        )
+                        result_container["error"] = f"Error reading from worker: {str(e)}"
+
+                # Start reader thread
+                reader_thread = threading.Thread(target=read_output, daemon=True)
+                reader_thread.start()
+
+                # Wait for completion with timeout
+                reader_thread.join(timeout=timeout)
+
+                if reader_thread.is_alive():
+                    # Timeout - kill the process
+                    logger.error(f"Worker {self.worker_id} execution timed out after {timeout}s")
+                    self.is_healthy = False
+                    self._kill_process()
+                    return CodeExecResult(
+                        stdout="",
+                        stderr=f"Execution timed out after {timeout} seconds",
+                        exit_code=-1,
+                    )
+
+                # Check for errors
+                if result_container["error"]:
+                    logger.error(f"Worker {self.worker_id}: {result_container['error']}")
+                    self.is_healthy = False
+                    return CodeExecResult(
+                        stdout="".join(result_container["stdout_lines"]),
+                        stderr=result_container["error"],
+                        exit_code=-1,
+                    )
 
                 # Reconstruct output (add newlines back)
+                stdout_lines = result_container["stdout_lines"]
+                stderr_lines = result_container["stderr_lines"]
                 stdout_str = "\n".join(stdout_lines) + ("\n" if stdout_lines else "")
                 stderr_str = "\n".join(stderr_lines) + ("\n" if stderr_lines else "")
 
                 return CodeExecResult(
                     stdout=stdout_str,
                     stderr=stderr_str,
-                    exit_code=exit_code,
+                    exit_code=result_container["exit_code"],
                 )
 
             finally:
