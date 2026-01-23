@@ -15,6 +15,55 @@ Protocol:
   - "<<<END_EXECUTION>>>" - execution complete
 """
 
+# Preload commonly used modules to reduce JIT compilation overhead
+# This is done once at worker startup, so subsequent code executions are faster
+using Test
+
+# Warm up the Test framework and common operations by running simple tests
+# This pre-compiles the @test and @testset macros plus common Julia operations
+let
+    # Warm up Test framework
+    @testset "warmup" begin
+        @test 1 + 1 == 2
+        @test "hello" == "hello"
+        @test [1, 2, 3] == [1, 2, 3]
+    end
+
+    # Warm up common string operations
+    occursin("a", "abc")
+    replace("hello", "l" => "x")
+    split("a,b,c", ",")
+    join(["a", "b"], ",")
+    lowercase("ABC")
+    uppercase("abc")
+    strip("  hello  ")
+
+    # Warm up common array operations
+    arr = [3, 1, 2]
+    push!(arr, 4)
+    pop!(arr)
+    append!(arr, [5, 6])
+    sort(arr)
+    reverse(arr)
+    length(arr)
+    isempty(Int[])
+
+    # Warm up common math operations
+    div(10, 3)
+    mod(10, 3)
+    abs(-5)
+    sqrt(4.0)
+    floor(Int, 3.7)
+    ceil(Int, 3.2)
+
+    # Warm up Dict operations
+    d = Dict("a" => 1, "b" => 2)
+    get(d, "a", 0)
+    haskey(d, "a")
+    keys(d)
+    values(d)
+end
+
 # Delimiters for communication protocol
 const START_OUTPUT = "<<<START_OUTPUT>>>"
 const START_ERROR = "<<<START_ERROR>>>"
@@ -157,3 +206,4 @@ end
 
 # Run main loop
 main()
+
