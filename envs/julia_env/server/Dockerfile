@@ -28,6 +28,11 @@ RUN curl -fsSL https://install.julialang.org | sh -s -- --yes --default-channel 
 # Add Julia to PATH
 ENV PATH="/root/.juliaup/bin:${PATH}"
 
+# Configure juliaup to prevent runtime network calls
+# Set the default channel explicitly and mark juliaup as initialized
+ENV JULIAUP_CHANNEL="1.10"
+RUN juliaup default 1.10
+
 # Verify Julia installation
 RUN julia --version
 
@@ -73,8 +78,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Julia installation from builder
+# juliaup stores the manager in ~/.juliaup and actual Julia versions in ~/.julia/juliaup
 COPY --from=builder /root/.juliaup /root/.juliaup
-ENV PATH="/root/.juliaup/bin:${PATH}"
+COPY --from=builder /root/.julia /root/.julia
+
+# Create a direct symlink to Julia binary, bypassing the juliaup wrapper
+# This prevents juliaup from trying to check for updates at runtime
+# The juliaup wrapper (at ~/.juliaup/bin/julia) triggers network calls;
+# the actual Julia binary is in ~/.julia/juliaup/julia-*/bin/julia
+RUN echo "Looking for Julia binary..." && \
+    ls -la /root/.julia/juliaup/ && \
+    JULIA_BIN=$(find /root/.julia/juliaup -type f -executable -name "julia" 2>/dev/null | head -1) && \
+    if [ -z "$JULIA_BIN" ]; then \
+        echo "ERROR: Could not find Julia binary. Contents of .julia/juliaup:" && \
+        find /root/.julia -name "julia*" -ls && \
+        exit 1; \
+    fi && \
+    ln -sf "$JULIA_BIN" /usr/local/bin/julia && \
+    echo "Linked Julia from: $JULIA_BIN"
+
+# Verify Julia works without network
+RUN julia --version
+
+ENV PATH="/usr/local/bin:${PATH}"
+
+# Disable juliaup's version update checks (as fallback if juliaup wrapper is used)
+ENV JULIAUP_CHANNEL="1.10"
 
 # Copy the virtual environment from builder
 COPY --from=builder /app/env/.venv /app/.venv
