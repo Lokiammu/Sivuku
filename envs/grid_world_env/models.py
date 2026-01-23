@@ -39,13 +39,3 @@ class GridWorldObservation(Observation):
     reward: float = Field(0.0, description="Reward received from the last action")
     done: bool = Field(False, description="Whether the episode has ended")
 
-
-# # --- State Model ---
-# @dataclass
-# class GridWorldState(State):
-#     agent_x: int = 0
-#     agent_y: int = 0
-#     goal_x: int = 0
-#     goal_y: int = 0
-#     grid_size: int = 0
-#     episode_steps: int = 0
