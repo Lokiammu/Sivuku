@@ -45,10 +45,8 @@ class GridWorldEnvironment(Environment):
         self.agent_x = 0
         self.agent_y = 0
         
-        # === FIX 1: Standard OpenEnv State tracking ===
         self._state.step_count = 0
         self._state.episode_id = str(uuid.uuid4())
-        # ==============================================
         # Return initial observation (reward must be float 0.0, not None)
         return GridWorldObservation(
             x=self.agent_x,
