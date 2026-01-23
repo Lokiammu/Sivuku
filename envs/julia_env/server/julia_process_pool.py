@@ -414,24 +414,10 @@ class JuliaProcessPool:
 
                     # Worker is unhealthy, try to recover
                     if self.auto_recover and not self.shutdown_flag:
-                        logger.warning(
-                            f"Worker {worker.worker_id} is unhealthy, attempting recovery"
-                        )
-                        try:
-                            worker.shutdown()
-                            worker = JuliaWorkerProcess(
-                                worker_id=worker.worker_id,
-                                julia_path=self.julia_path,
-                                worker_script=self.worker_script,
-                                optimization_flags=self.optimization_flags,
-                            )
-                            # Update in workers list
-                            self.workers[worker.worker_id] = worker
+                        worker = self._recover_worker(worker)
+                        if worker.is_healthy:
                             return worker
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to recover worker {worker.worker_id}: {e}"
-                            )
+                        # Recovery failed, continue to next worker
 
             # No workers available, wait a bit
             time.sleep(0.1)
@@ -439,11 +425,57 @@ class JuliaProcessPool:
         logger.error("Timeout waiting for available worker")
         return None
 
+    def _recover_worker(self, worker: JuliaWorkerProcess) -> JuliaWorkerProcess:
+        """
+        Attempt to recover an unhealthy worker by restarting it.
+
+        Args:
+            worker: The unhealthy worker to recover
+
+        Returns:
+            The recovered worker (new instance) or the original if recovery fails
+        """
+        logger.warning(
+            f"Worker {worker.worker_id} is unhealthy, attempting recovery"
+        )
+        try:
+            worker.shutdown()
+            new_worker = JuliaWorkerProcess(
+                worker_id=worker.worker_id,
+                julia_path=self.julia_path,
+                worker_script=self.worker_script,
+                optimization_flags=self.optimization_flags,
+            )
+            # Update in workers list
+            self.workers[new_worker.worker_id] = new_worker
+            logger.info(f"Worker {new_worker.worker_id} recovered successfully")
+            return new_worker
+        except Exception as e:
+            logger.error(
+                f"Failed to recover worker {worker.worker_id}: {e}"
+            )
+            # Return original worker - it will be retried next time
+            return worker
+
     def _return_worker(self, worker: JuliaWorkerProcess) -> None:
-        """Return a worker to the available pool."""
+        """
+        Return a worker to the available pool.
+
+        If the worker is unhealthy and auto_recover is enabled, attempts to
+        recover the worker before returning it to the pool. This ensures
+        workers are not leaked when they fail during execution.
+        """
         with self.pool_lock:
-            if worker.is_healthy and not self.shutdown_flag:
-                self.available_workers.append(worker)
+            if self.shutdown_flag:
+                return
+
+            # If worker is unhealthy, try to recover it immediately
+            if not worker.is_healthy and self.auto_recover:
+                worker = self._recover_worker(worker)
+
+            # Always return the worker to the pool (healthy or not)
+            # Unhealthy workers will be recovered when next acquired
+            self.available_workers.append(worker)
 
     def execute(self, code: str, timeout: Optional[int] = None) -> CodeExecResult:
         """
