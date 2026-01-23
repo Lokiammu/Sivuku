@@ -37,16 +37,6 @@ class GridWorldEnvironment(Environment):
             episode_id=str(uuid.uuid4()), step_count=0
         )
         
-        # Initialize State
-        # self._state = GridWorldState(
-        #     agent_x=0,
-        #     agent_y=0,
-        #     goal_x=self.goal_pos[0],
-        #     goal_y=self.goal_pos[1],
-        #     grid_size=self.grid_size,
-        #     episode_steps=0,
-        #     step_count=0  # Initialize the standard counter
-        # )
 
     def reset(self) -> GridWorldObservation:
         
