@@ -38,4 +38,3 @@ class GridWorldObservation(Observation):
 
     reward: float = Field(0.0, description="Reward received from the last action")
     done: bool = Field(False, description="Whether the episode has ended")
-
