@@ -40,7 +40,7 @@ class ReasoningGymEnvironment(Environment):
     Example:
         >>> env = ReasoningGymEnvironment()
         >>> # Create dataset
-        >>> obs = env.reset(dataset_name='leg_counting', dataset_config={}, seed=42, size=10)
+        >>> obs = env.reset(dataset_name='leg_counting', dataset_config={"min_animals": 5}, seed=42, size=10) 
         >>> print(obs.question)  # "How many legs does a cat have?"
         >>>
         >>> # Answer question
