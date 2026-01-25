@@ -44,6 +44,10 @@ try:
     print(f"Reward: {result.reward}")  # 1.0
     print(f"Done: {result.done}")  # True (single-step episodes)
 
+    # Access dataset metadata if available
+    if result.observation.dataset_metadata:
+        print(f"Metadata: {result.observation.dataset_metadata}")  # Dataset-specific info
+
     # Get next question from same dataset
     result = env.reset()  # No params = reuse dataset
     print(f"Next question: {result.observation.question}")
@@ -231,6 +235,7 @@ env = ReasoningGymEnv(base_url="http://localhost:8000")
 # Use as normal
 result = env.reset(
     dataset_name='leg_counting',
+    dataset_config={"min_animals": 5, "max_animals": 15}
     seed=42,
     size=10
 )
