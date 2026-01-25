@@ -20,7 +20,10 @@ from reasoning_gym.composite import DatasetSpec
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
-from models import ReasoningGymAction, ReasoningGymObservation
+try:
+    from models import ReasoningGymAction, ReasoningGymObservation
+except ImportError:
+    from ..models import ReasoningGymAction, ReasoningGymObservation
 
 
 class ReasoningGymEnvironment(Environment):
@@ -40,7 +43,7 @@ class ReasoningGymEnvironment(Environment):
     Example:
         >>> env = ReasoningGymEnvironment()
         >>> # Create dataset
-        >>> obs = env.reset(dataset_name='leg_counting', dataset_config={"min_animals": 5}, seed=42, size=10) 
+        >>> obs = env.reset(dataset_name='leg_counting', dataset_config={"min_animals": 5}, seed=42, size=10)
         >>> print(obs.question)  # "How many legs does a cat have?"
         >>>
         >>> # Answer question

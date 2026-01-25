@@ -36,7 +36,10 @@ except Exception as e:  # pragma: no cover
     ) from e
 
 # Import from local models.py (PYTHONPATH includes /app/env in Docker)
-from models import ReasoningGymAction, ReasoningGymObservation
+try:
+    from models import ReasoningGymAction, ReasoningGymObservation
+except ImportError:
+    from ..models import ReasoningGymAction, ReasoningGymObservation
 from .reasoning_gym_environment import ReasoningGymEnvironment
 
 
