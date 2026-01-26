@@ -64,12 +64,16 @@ LOG_LEVEL = os.getenv("JULIA_LOG_LEVEL", "INFO")
 
 def setup_logging():
     """Configure logging to both file and console with rotation."""
-    logger = logging.getLogger("julia_env")
-    logger.setLevel(getattr(logging, LOG_LEVEL))
+    # Configure both julia_env and openenv hierarchies to share handlers
+    julia_logger = logging.getLogger("julia_env")
+    openenv_logger = logging.getLogger("openenv")
+
+    julia_logger.setLevel(getattr(logging, LOG_LEVEL))
+    openenv_logger.setLevel(getattr(logging, LOG_LEVEL))
 
     # Prevent duplicate handlers
-    if logger.handlers:
-        return logger
+    if julia_logger.handlers:
+        return julia_logger
 
     # Create formatters
     detailed_formatter = logging.Formatter(
@@ -85,7 +89,8 @@ def setup_logging():
         )
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(detailed_formatter)
-        logger.addHandler(file_handler)
+        julia_logger.addHandler(file_handler)
+        openenv_logger.addHandler(file_handler)
     except Exception as e:
         print(f"Warning: Could not create log file {LOG_FILE}: {e}")
 
@@ -93,9 +98,10 @@ def setup_logging():
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(detailed_formatter)
-    logger.addHandler(console_handler)
+    julia_logger.addHandler(console_handler)
+    openenv_logger.addHandler(console_handler)
 
-    return logger
+    return julia_logger
 
 
 # Setup logging

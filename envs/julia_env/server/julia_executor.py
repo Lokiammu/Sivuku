@@ -33,8 +33,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+# Use julia_env hierarchy to inherit handlers from app.py's setup_logging()
+logger = logging.getLogger("julia_env.executor")
 
 
 @dataclass
