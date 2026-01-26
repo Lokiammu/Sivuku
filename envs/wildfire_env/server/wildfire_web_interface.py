@@ -7,7 +7,6 @@ and wildfire-specific features, without modifying the base web_interface.py.
 
 from typing import Optional
 import json
-from dataclasses import asdict
 
 # Support both in-repo and standalone imports
 try:

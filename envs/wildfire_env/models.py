@@ -1,5 +1,6 @@
-from dataclasses import dataclass, field
 from typing import List, Optional
+
+from pydantic import Field
 
 # Support both in-repo and standalone imports
 try:
@@ -13,15 +14,20 @@ except ImportError:
 # 0 = empty/ash, 1 = fuel (healthy), 2 = burning, 3 = firebreak, 4 = watered (damp)
 # (You can tweak encodings, but keep them ints for compact obs.)
 
-@dataclass
+
 class WildfireAction(Action):
-    # action: "break" (build firebreak), "water" (drop water), "wait"
+    """Action for wildfire environment.
+    
+    action: "break" (build firebreak), "water" (drop water), "wait"
+    x, y: Optional coordinates for water/break actions
+    """
     action: str
     x: Optional[int] = None
     y: Optional[int] = None
 
-@dataclass
+
 class WildfireObservation(Observation):
+    """Observation from wildfire environment."""
     grid: List[int]                 # flattened grid H*W, ints in {0..4}
     width: int
     height: int
@@ -34,8 +40,9 @@ class WildfireObservation(Observation):
     remaining_water: int = 0
     remaining_breaks: int = 0
 
-@dataclass
+
 class WildfireState(State):
+    """State for wildfire environment."""
     episode_id: str = ""
     step_count: int = 0
     total_burned: int = 0
@@ -49,6 +56,6 @@ class WildfireState(State):
     remaining_water: int = 20       # simple resource constraint
     remaining_breaks: int = 50
     # internal full grid as flattened ints
-    grid: List[int] = field(default_factory=list)
+    grid: List[int] = Field(default_factory=list)
     # burn timers for each cell (track how long cells have been burning/damp)
-    burn_timers: List[int] = field(default_factory=list)
+    burn_timers: List[int] = Field(default_factory=list)
