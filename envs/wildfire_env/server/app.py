@@ -16,6 +16,11 @@ def create_wildfire_environment():
     """Factory function that creates WildfireEnvironment with config."""
     return WildfireEnvironment(width=W, height=H)
 
+# Check if web interface should be enabled for custom routes
+enable_web = (
+    os.getenv("ENABLE_WEB_INTERFACE", "false").lower() in ("true", "1", "yes")
+)
+
 # Create the app with web interface support
 # create_app handles ENABLE_WEB_INTERFACE automatically
 app = create_app(
@@ -25,16 +30,28 @@ app = create_app(
     env_name="wildfire_env",
 )
 
-# Check if web interface should be enabled for custom routes
-enable_web = (
-    os.getenv("ENABLE_WEB_INTERFACE", "false").lower() in ("true", "1", "yes")
-)
-
+# Override the default /web route with our custom wildfire interface
+# This must be done AFTER create_app to ensure it overrides the default route
 if enable_web:
     # Load metadata for custom wildfire interface
     env_instance = create_wildfire_environment()
     metadata = load_environment_metadata(env_instance, "wildfire_env")
 
+    # Remove any existing /web GET route and add our custom one
+    # FastAPI uses the first matching route, so we need to remove the default one first
+    routes_to_remove = []
+    for route in app.routes:
+        # Check if this is a GET route for /web
+        if hasattr(route, 'path') and route.path == '/web':
+            if hasattr(route, 'methods') and 'GET' in route.methods:
+                routes_to_remove.append(route)
+            elif hasattr(route, 'methods') and not route.methods:  # Some route types don't have methods
+                # Check if it's a GET route by inspecting the endpoint
+                routes_to_remove.append(route)
+    
+    for route in routes_to_remove:
+        app.routes.remove(route)
+    
     # Add our custom wildfire interface route (overrides default /web)
     @app.get("/web", response_class=HTMLResponse)
     async def wildfire_web_interface():
