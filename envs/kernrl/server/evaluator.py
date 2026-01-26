@@ -209,7 +209,7 @@ class LocalGPUEvaluator:
         benchmark_runs: int = 100,
         # Profiling toggles - all enabled by default
         enable_nsys: bool = True,
-        enable_ncu: bool = True,
+        enable_ncu: bool = False,  # NCU is slow, opt-in
         enable_sanitizer: bool = True,
         enable_torch_profiler: bool = True,
         enable_assembly: bool = True,
@@ -688,28 +688,35 @@ except Exception as e:
             return BenchmarkResult(error=str(e))
 
     def _compute_reward(self, result: EvalResult) -> float:
-        """Compute reward from evaluation result."""
-        reward = 0.0
+        """
+        Compute reward from evaluation result.
 
-        # Compilation: +0.1
-        if result.compilation.success:
-            reward += 0.1
-        else:
-            return reward
+        Reward structure:
+        - Compilation failure: -0.5 (penalty)
+        - Correctness failure: -0.25 (penalty)
+        - Correct but slower than baseline: small negative (speedup - 1.0) * 0.5
+        - Correct and faster: positive reward = min(speedup - 1.0, 2.0)
 
-        # Correctness: +0.3
-        if result.correctness and result.correctness.correct:
-            reward += 0.3
-        else:
-            return reward
+        Key principle: Only positive reward when speedup > 1.0x baseline.
+        Compilation + correctness alone does NOT give positive reward.
+        """
+        # Compilation failure: penalty
+        if not result.compilation.success:
+            return -0.5
 
-        # Speedup > 1.0: +0.3
-        if result.benchmark and result.benchmark.speedup > 1.0:
-            reward += 0.3
+        # Correctness failure: penalty
+        if result.correctness and not result.correctness.correct:
+            return -0.25
 
-            # Bonus for higher speedup (log scale, capped at 32x)
-            import math
-            bonus = min(0.3, 0.3 * math.log2(result.benchmark.speedup) / 5)
-            reward += bonus
+        # Benchmark available: reward based on speedup
+        if result.benchmark and result.benchmark.speedup:
+            speedup = result.benchmark.speedup
+            if speedup > 1.0:
+                # Positive reward only when beating baseline, capped at 2.0
+                return min(speedup - 1.0, 2.0)
+            else:
+                # Small penalty for being slower than baseline
+                return (speedup - 1.0) * 0.5
 
-        return reward
+        # Correct but no benchmark (edge case): no reward
+        return 0.0

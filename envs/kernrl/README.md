@@ -103,12 +103,35 @@ docker run --gpus all -p 8000:8000 kernrl
 
 ## Reward Structure
 
-| Component | Reward | Description |
+Rewards are designed so that **only speedup > 1.0x baseline produces positive reward**.
+Compilation and correctness alone do not give positive reward - they are necessary but not sufficient.
+
+| Condition | Reward | Description |
 |-----------|--------|-------------|
-| Compilation | +0.1 | Code compiles successfully |
-| Correctness | +0.3 | Output matches reference |
-| Beats baseline | +0.3 | Speedup > 1.0x |
-| Speedup bonus | +0.3 | Scales with log2(speedup) |
+| Compilation failure | -0.5 | Penalty for code that doesn't compile |
+| Correctness failure | -0.25 | Penalty for incorrect output |
+| Correct but slower | (speedup - 1.0) * 0.5 | Small negative for being slower than baseline |
+| Correct and faster | min(speedup - 1.0, 2.0) | Positive, capped at 2.0 |
+
+**Examples:**
+- Compile fail: reward = -0.5
+- Compiles, wrong output: reward = -0.25
+- Compiles, correct, 0.8x speed: reward = -0.1
+- Compiles, correct, 1.0x speed: reward = 0.0
+- Compiles, correct, 1.5x speed: reward = 0.5
+- Compiles, correct, 3.0x speed: reward = 2.0 (capped)
+
+## Security Considerations
+
+**Warning:** This environment executes user-submitted kernel code with full Python/CUDA privileges.
+While Docker provides container isolation, there is no sandboxing within the container for:
+- Filesystem access
+- Network requests
+- Resource consumption (GPU memory, CPU)
+- Module imports
+
+This is acceptable for trusted research environments but should be documented as a security consideration.
+For production deployments, consider additional isolation measures.
 
 ## License
 
