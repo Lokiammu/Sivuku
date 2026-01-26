@@ -33,7 +33,7 @@ class ReasoningGymEnv(
         >>> # Create dataset with 10 leg_counting questions
         >>> result = env.reset(
         ...     dataset_name='leg_counting',
-        ...     dataset_config={},
+        ...     dataset_config={"min_animals": 5, "max_animals": 15},
         ...     seed=42,
         ...     size=10
         ... )
@@ -55,7 +55,7 @@ class ReasoningGymEnv(
         >>> try:
         ...     result = client.reset(
         ...         dataset_name='leg_counting',
-        ...         dataset_config={},
+        ...         dataset_config={"min_animals": 5, "max_animals": 15},
         ...         seed=42,
         ...         size=5
         ...     )

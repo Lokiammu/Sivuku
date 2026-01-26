@@ -22,7 +22,7 @@ class TestReasoningGymEnvironment:
         env = ReasoningGymEnvironment()
         obs = env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=5,
         )
@@ -71,7 +71,7 @@ class TestReasoningGymEnvironment:
         # Create initial dataset
         obs1 = env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=5,
         )
@@ -124,7 +124,7 @@ class TestReasoningGymEnvironment:
         env = ReasoningGymEnvironment()
         env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=5,
         )
@@ -145,7 +145,7 @@ class TestReasoningGymEnvironment:
         env = ReasoningGymEnvironment()
         env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=5,
         )
@@ -161,7 +161,7 @@ class TestReasoningGymEnvironment:
         env = ReasoningGymEnvironment()
         env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=5,
         )
@@ -183,7 +183,7 @@ class TestReasoningGymEnvironment:
         # Create small dataset
         env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=2,
         )
@@ -203,7 +203,7 @@ class TestReasoningGymEnvironment:
 
         obs = env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=5,
             episode_id="test-episode",
@@ -219,7 +219,7 @@ class TestReasoningGymEnvironment:
 
         obs = env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=5,
         )
@@ -233,7 +233,7 @@ class TestReasoningGymEnvironment:
         env = ReasoningGymEnvironment()
         env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=5,
         )
@@ -365,7 +365,7 @@ class TestReasoningGymIntegration:
         # Reset with dataset
         obs = env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=5,
         )
@@ -392,7 +392,7 @@ class TestReasoningGymIntegration:
         # Create dataset
         obs1 = env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=10,
         )
@@ -415,7 +415,7 @@ class TestReasoningGymIntegration:
         # Create first dataset
         env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=42,
             size=5,
         )
@@ -423,7 +423,7 @@ class TestReasoningGymIntegration:
         # Create new dataset with different seed
         obs = env.reset(
             dataset_name="leg_counting",
-            dataset_config={},
+            dataset_config={"min_animals": 5, "max_animals": 15},
             seed=99,
             size=5,
         )
