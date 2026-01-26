@@ -255,6 +255,10 @@ RUN pip install --no-cache-dir \
     nltk==3.9.2
 DOCKERFILE_EOF
             ;;
+        "wildfire_env")
+            # Wildfire environment needs no additional dependencies
+            # uvicorn is provided by openenv-base
+            ;;
         "openspiel_env")
             # OpenSpiel requires special C++ build process - replace entire Dockerfile
             cat > "$CURRENT_STAGING_DIR/Dockerfile" << DOCKERFILE_EOF
@@ -285,7 +289,8 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Note: EXPOSE 8000 already set by openenv-base
 
 # Run the FastAPI server (uvicorn installed by openenv-base)
-CMD ["uvicorn", "envs.openspiel_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use python -m uvicorn to ensure it's found in PATH
+CMD ["python", "-m", "uvicorn", "envs.openspiel_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
 DOCKERFILE_EOF
             echo "Created special OpenSpiel Dockerfile with C++ build process"
             echo "OpenSpiel builds can take 10-15 minutes due to C++ compilation"
@@ -305,7 +310,8 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the FastAPI server
-CMD ["uvicorn", "envs.ENV_NAME_PLACEHOLDER.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use python -m uvicorn to ensure it's found in PATH
+CMD ["python", "-m", "uvicorn", "envs.ENV_NAME_PLACEHOLDER.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
 DOCKERFILE_EOF
 
     # Replace placeholder with actual environment name
