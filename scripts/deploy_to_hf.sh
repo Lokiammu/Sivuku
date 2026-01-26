@@ -256,8 +256,10 @@ RUN pip install --no-cache-dir \
 DOCKERFILE_EOF
             ;;
         "wildfire_env")
-            # Wildfire environment needs no additional dependencies
-            # uvicorn is provided by openenv-base
+            cat >> "$CURRENT_STAGING_DIR/Dockerfile" << 'DOCKERFILE_EOF'
+# Install fastmcp (required by openenv.core.env_server.mcp_environment)
+RUN pip install --no-cache-dir fastmcp>=2.0.0
+DOCKERFILE_EOF
             ;;
         "openspiel_env")
             # OpenSpiel requires special C++ build process - replace entire Dockerfile
