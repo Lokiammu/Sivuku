@@ -25,6 +25,8 @@ dependencies = [
     "tomli>=2.3.0",
     "tomli-w>=1.2.0",
     "websockets>=15.0.1",
+    # MCP support
+    "fastmcp>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -77,4 +79,11 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "docker: Tests that require Docker to be running",
+    "network: Tests that require network access (HuggingFace, etc.)",
+    "integration: Integration tests with external resources",
 ]

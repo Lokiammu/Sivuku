@@ -12,13 +12,13 @@ over HTTP and WebSocket endpoints, compatible with EnvClient.
 
 Usage:
     # Development (with auto-reload):
-    uvicorn envs.openspiel_env.server.app:app --reload --host 0.0.0.0 --port 8000
+    uvicorn server.app:app --reload --host 0.0.0.0 --port 8000
 
     # Production:
-    uvicorn envs.openspiel_env.server.app:app --host 0.0.0.0 --port 8000 --workers 4
+    uvicorn server.app:app --host 0.0.0.0 --port 8000 --workers 4
 
     # Or run directly:
-    python -m envs.openspiel_env.server.app
+    uv run --project . server
 
 Environment variables:
     OPENSPIEL_GAME: Game name to serve (default: "catch")
@@ -28,10 +28,17 @@ Environment variables:
 
 import os
 
-from openenv.core.env_server import create_app
-
-from ..models import OpenSpielAction, OpenSpielObservation
-from .openspiel_environment import OpenSpielEnvironment
+# Support both in-repo and standalone imports
+try:
+    # In-repo imports (when running from OpenEnv repository)
+    from openenv.core.env_server.http_server import create_app
+    from ..models import OpenSpielAction, OpenSpielObservation
+    from .openspiel_environment import OpenSpielEnvironment
+except ImportError:
+    # Standalone imports (when environment is standalone with openenv from pip)
+    from openenv.core.env_server.http_server import create_app
+    from models import OpenSpielAction, OpenSpielObservation
+    from server.openspiel_environment import OpenSpielEnvironment
 
 # Get game configuration from environment variables
 game_name = os.getenv("OPENSPIEL_GAME", "catch")
@@ -51,10 +58,31 @@ def create_openspiel_environment():
 
 # Create the FastAPI app with web interface and README integration
 # Pass the factory function instead of an instance for WebSocket session support
-app = create_app(create_openspiel_environment, OpenSpielAction, OpenSpielObservation, env_name="openspiel_env")
+app = create_app(
+    create_openspiel_environment,
+    OpenSpielAction,
+    OpenSpielObservation,
+    env_name="openspiel_env",
+)
+
+
+def main(host: str = "0.0.0.0", port: int = 8000):
+    """
+    Entry point for direct execution via uv run or python -m.
+
+    This function enables running the server without Docker:
+        uv run --project . server
+        uv run --project . server --port 8001
+        python -m openspiel_env.server.app
+
+    Args:
+        host: Host address to bind to (default: "0.0.0.0")
+        port: Port number to listen on (default: 8000)
+    """
+    import uvicorn
+
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    main()

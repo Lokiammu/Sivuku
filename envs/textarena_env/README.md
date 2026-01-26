@@ -127,11 +127,14 @@ The deployed space includes:
 ## Environment Details
 
 ### Action
+
 **TextArenaAction**: Contains a single field
 - `message` (str) - The message/action to send to the game
 
 ### Observation
+
 **TextArenaObservation**: Contains the game state and response
+
 - `prompt` (str) - Game instructions and context
 - `messages` (List[TextArenaMessage]) - Conversation history with the game
 - `current_player_id` (int) - ID of the current player
@@ -141,13 +144,17 @@ The deployed space includes:
 - `done` (bool) - Whether the episode has ended (inherited from Observation)
 
 ### TextArenaMessage
+
 Each message in the conversation has:
+
 - `sender_id` (int) - ID of the message sender
 - `content` (str) - The message content
 - `category` (str) - Message type (e.g., "PROMPT", "MESSAGE")
 
 ### State
+
 **TextArenaState**: Server-side state snapshot
+
 - `episode_id` (str) - Unique identifier for the current episode
 - `step_count` (int) - Number of steps taken in the current episode
 - `env_id` (str) - The TextArena environment ID (e.g., "Wordle-v0")
@@ -159,6 +166,7 @@ Each message in the conversation has:
 - `raw_state` (Dict) - Raw TextArena state snapshot
 
 ### Reward
+
 Rewards are determined by the underlying TextArena game. For example:
 - **Wordle-v0**: Positive reward for winning, includes reward signals for green/yellow letter matches
 
