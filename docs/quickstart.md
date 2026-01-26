@@ -15,11 +15,19 @@ pip install openenv-core
 
 Let's start by using the Echo Environment. This is a simple environment that echoes back messages.
 
+Install the echo environment client package:
+
+```bash
+pip install git+https://huggingface.co/spaces/openenv/echo-env 
+```
+
+Then you can use the environment via its HTTP interface.
+
 ```python
 from echo_env import EchoAction, EchoEnv
 
 # Automatically start container and connect
-client = EchoEnv.from_docker_image("echo-env:latest")
+client = EchoEnv(base_url="https://openenv-echo-env.hf.space")
 
 # Reset the environment
 result = client.reset()
@@ -41,10 +49,10 @@ You can also use environments from Hugging Face. To do this, you can use the `fr
 ```python
 from echo_env import EchoEnv
 
-client = EchoEnv.from_hub("meta-pytorch/echo-env")
+client = EchoEnv.from_hub("openenv/echo_env")
 ```
 
-In the background, the environment will be pulled from Hugging Face and a container will be started on your local machine. 
+In the background, the environment will be pulled from Hugging Face and a container will be started on your local machine.
 
 You can also connect to the remote space on Hugging Face by passing the base URL to the environment class.
 
@@ -64,7 +72,7 @@ from echo_env import EchoEnv
 client = EchoEnv.from_docker_image("registry.hf.space/openenv-echo-env:latest")
 ```
 
-In the background, the environment will be pulled from Docker Hub and a container will be started on your local machine. 
+In the background, the environment will be pulled from Docker Hub and a container will be started on your local machine.
 
 As above, you can also connect to the docker container by passing the base URL to the environment class.
 
@@ -78,6 +86,53 @@ Then you can use the environment via its HTTP interface.
 from echo_env import EchoEnv
 
 client = EchoEnv(base_url="http://localhost:8000")
+```
+
+### Using AutoEnv and AutoAction (Recommended)
+
+The `AutoEnv` and `AutoAction` classes provide a HuggingFace-style auto-discovery API that automatically selects and instantiates the correct environment client and action classes without manual imports.
+
+```python
+from openenv import AutoEnv, AutoAction
+
+# Load environment from installed package
+env = AutoEnv.from_env("echo-env")
+
+# Get the action class
+EchoAction = AutoAction.from_env("echo-env")
+
+# Use them together
+result = env.reset()
+result = env.step(EchoAction(message="Hello!"))
+print(result.observation.echoed_message)  # "Hello!"
+
+env.close()
+```
+
+AutoEnv supports multiple name formats - all of these work:
+
+```python
+env = AutoEnv.from_env("echo")       # Short name
+env = AutoEnv.from_env("echo-env")   # With suffix
+env = AutoEnv.from_env("echo_env")   # Underscore variant
+```
+
+You can also load environments directly from HuggingFace Hub:
+
+```python
+# From Hub repo ID - auto-downloads and installs if needed
+env = AutoEnv.from_env("meta-pytorch/coding-env")
+CodeAction = AutoAction.from_env("meta-pytorch/coding-env")
+
+# If the Space is running, connects directly without local Docker
+# If not, falls back to local Docker mode
+```
+
+To see all available environments:
+
+```python
+AutoEnv.list_environments()
+AutoAction.list_actions()
 ```
 
 ### Using environments from a local directory

@@ -11,7 +11,7 @@ The Snake environment is a multi-agent reinforcement learning environment
 based on marlenv's Snake-v1. Multiple snakes battle on a fixed size grid map.
 """
 
-from dataclasses import dataclass
+from pydantic import Field
 from typing import Any, Dict, List, Optional
 
 # Support both in-repo and standalone imports
@@ -23,7 +23,6 @@ except ImportError:
     from openenv_core.env_server.types import Action, Observation
 
 
-@dataclass(kw_only=True)
 class SnakeAction(Action):
     """
     Action for the Snake environment.
@@ -45,12 +44,11 @@ class SnakeAction(Action):
 
     action: int
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
         """Ensure action is converted to int (handles string inputs from web interface)."""
         self.action = int(self.action)
 
 
-@dataclass(kw_only=True)
 class SnakeObservation(Observation):
     """
     Observation from the Snake environment.
