@@ -1,24 +1,40 @@
 # Support both in-repo and standalone imports
 try:
     # In-repo imports (when running from OpenEnv repository)
-    from openenv.core.http_env_client import HTTPEnvClient
     from openenv.core.client_types import StepResult
+    from openenv.core.env_client import EnvClient
     from .models import WildfireAction, WildfireObservation, WildfireState
 except ImportError:
     # Standalone imports (when environment is standalone with openenv-core from pip)
-    try:
-        from openenv_core.http_env_client import HTTPEnvClient
-    except ImportError:
-        # Fallback to local compatibility shim if package doesn't have it yet
-        from .http_env_client_compat import HTTPEnvClient
     from openenv_core.client_types import StepResult
+    from openenv_core.env_client import EnvClient
     from wildfire_env.models import WildfireAction, WildfireObservation, WildfireState
 
-class WildfireEnv(HTTPEnvClient[WildfireAction, WildfireObservation]):
+
+class WildfireEnv(EnvClient[WildfireAction, WildfireObservation, WildfireState]):
+    """
+    Client for the Wildfire Environment.
+
+    This client maintains a persistent WebSocket connection to the environment
+    server, enabling efficient multi-step interactions with lower latency.
+    Each client instance has its own dedicated environment session on the server.
+
+    Example:
+        >>> # Connect to a running server
+        >>> with WildfireEnv(base_url="http://localhost:8000") as env:
+        ...     result = env.reset()
+        ...     print(render_grid(result.observation))
+        ...
+        ...     result = env.step(WildfireAction(action="water", x=5, y=5))
+        ...     print(render_grid(result.observation))
+    """
+
     def _step_payload(self, action: WildfireAction) -> dict:
+        """Convert WildfireAction to JSON payload for step request."""
         return {"action": action.action, "x": action.x, "y": action.y}
 
     def _parse_result(self, payload: dict) -> StepResult[WildfireObservation]:
+        """Parse server response into StepResult[WildfireObservation]."""
         obs = WildfireObservation(**payload["observation"])
         return StepResult(
             observation=obs,
@@ -27,6 +43,7 @@ class WildfireEnv(HTTPEnvClient[WildfireAction, WildfireObservation]):
         )
 
     def _parse_state(self, payload: dict) -> WildfireState:
+        """Parse server response into WildfireState object."""
         return WildfireState(**payload)
 
 
