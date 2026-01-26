@@ -137,17 +137,22 @@ class JuliaWorkerProcess:
             logger.error(f"Failed to start worker {self.worker_id}: {e}")
             raise
 
-    def execute(self, code: str, timeout: int = 60) -> CodeExecResult:
+    def execute(self, code: str, timeout: Optional[int] = None) -> CodeExecResult:
         """
         Execute Julia code in this worker process.
 
         Args:
             code: Julia code to execute
-            timeout: Maximum execution time in seconds
+            timeout: Maximum execution time in seconds.
+                     If None, reads from JULIA_EXECUTION_TIMEOUT env var (default: 120)
 
         Returns:
             CodeExecResult with stdout, stderr, and exit_code
         """
+        # Read timeout from env var if not explicitly provided
+        if timeout is None:
+            timeout = int(os.getenv("JULIA_EXECUTION_TIMEOUT", "120"))
+
         with self.lock:
             if not self.is_healthy or self.process is None:
                 raise RuntimeError(f"Worker {self.worker_id} is not healthy")
@@ -312,7 +317,7 @@ class JuliaProcessPool:
     def __init__(
         self,
         size: int = 4,
-        timeout: int = 60,
+        timeout: Optional[int] = None,
         julia_path: Optional[str] = None,
         optimization_flags: bool = True,
         auto_recover: bool = True,
@@ -322,7 +327,8 @@ class JuliaProcessPool:
 
         Args:
             size: Number of worker processes to create (default: 4)
-            timeout: Default timeout for code execution in seconds (default: 60)
+            timeout: Default timeout for code execution in seconds.
+                     If None, reads from JULIA_EXECUTION_TIMEOUT env var (default: 120)
             julia_path: Path to Julia executable (auto-detected if None)
             optimization_flags: Enable Julia optimization flags (default: True)
             auto_recover: Automatically restart failed workers (default: True)
@@ -331,6 +337,12 @@ class JuliaProcessPool:
             RuntimeError: If Julia executable is not found
         """
         self.size = size
+        # Read timeout from env var if not explicitly provided
+        if timeout is None:
+            timeout = int(os.getenv("JULIA_EXECUTION_TIMEOUT", "120"))
+            logger.info(f"Pool timeout from JULIA_EXECUTION_TIMEOUT env var: {timeout}s")
+        else:
+            logger.info(f"Pool timeout explicitly set: {timeout}s")
         self.timeout = timeout
         self.optimization_flags = optimization_flags
         self.auto_recover = auto_recover

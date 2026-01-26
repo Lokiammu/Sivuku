@@ -92,7 +92,7 @@ class JuliaExecutor:
 
     def __init__(
         self,
-        timeout: int = 120,
+        timeout: Optional[int] = None,
         max_retries: int = 1,
         use_optimization_flags: bool = True,
         use_process_pool: bool = True,
@@ -101,7 +101,8 @@ class JuliaExecutor:
         Initialize the JuliaExecutor.
 
         Args:
-            timeout: Maximum execution time in seconds (default: 120)
+            timeout: Maximum execution time in seconds. If None, reads from
+                     JULIA_EXECUTION_TIMEOUT env var (default: 120 if not set)
             max_retries: Number of retry attempts on transient failures (default: 1)
             use_optimization_flags: Enable Julia performance flags (default: True)
             use_process_pool: Use process pool if available (default: True)
@@ -109,6 +110,10 @@ class JuliaExecutor:
         Raises:
             RuntimeError: If Julia executable is not found in PATH
         """
+        # Read timeout from env var if not explicitly provided
+        if timeout is None:
+            timeout = int(os.getenv("JULIA_EXECUTION_TIMEOUT", "120"))
+            logger.debug(f"Executor timeout from JULIA_EXECUTION_TIMEOUT env var: {timeout}s")
         self.timeout = timeout
         self.max_retries = max_retries
         self.use_optimization_flags = use_optimization_flags
@@ -213,15 +218,14 @@ class JuliaExecutor:
 
         Args:
             code: Julia code string to execute
-            timeout: Override default timeout (seconds)
+            timeout: Override default timeout (seconds). If None, uses pool's
+                     configured timeout (when using pool) or instance timeout.
 
         Returns:
             CodeExecResult containing stdout, stderr, and exit_code
         """
-        if timeout is None:
-            timeout = self.timeout
-
         # Use process pool if enabled and available
+        # Pass timeout as-is (None means use pool's configured default)
         if self._use_process_pool and JuliaExecutor._shared_pool is not None:
             try:
                 return JuliaExecutor._shared_pool.execute(code, timeout=timeout)
@@ -230,6 +234,10 @@ class JuliaExecutor:
                     f"Process pool execution failed: {e}, falling back to subprocess"
                 )
                 # Fall through to standard execution
+
+        # For subprocess fallback, apply instance default if timeout not specified
+        if timeout is None:
+            timeout = self.timeout
 
         # Check if Julia is available
         if not self.julia_path:
@@ -366,7 +374,7 @@ class JuliaExecutor:
                 logger.debug(f"Could not delete temp file {code_file}: {e}")
 
     @staticmethod
-    def enable_process_pool(size: int = 4, timeout: int = 120) -> bool:
+    def enable_process_pool(size: int = 4, timeout: Optional[int] = None) -> bool:
         """
         Enable the shared Julia process pool for all JuliaExecutor instances.
 
@@ -375,7 +383,8 @@ class JuliaExecutor:
 
         Args:
             size: Number of worker processes to create (default: 4)
-            timeout: Default timeout for code execution in seconds (default: 120)
+            timeout: Default timeout for code execution in seconds.
+                     If None, reads from JULIA_EXECUTION_TIMEOUT env var (default: 120)
 
         Returns:
             True if pool was created successfully, False otherwise
@@ -386,6 +395,10 @@ class JuliaExecutor:
                 "Falling back to subprocess execution."
             )
             return False
+
+        # Read timeout from env var if not explicitly provided
+        if timeout is None:
+            timeout = int(os.getenv("JULIA_EXECUTION_TIMEOUT", "120"))
 
         with JuliaExecutor._pool_lock:
             if JuliaExecutor._shared_pool is not None:
