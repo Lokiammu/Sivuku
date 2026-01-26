@@ -2,21 +2,11 @@
 import os
 from fastapi.responses import HTMLResponse
 
-# Support both in-repo and standalone imports
-try:
-    # In-repo imports (when running from OpenEnv repository)
-    from openenv.core.env_server.http_server import create_app
-    from openenv.core.env_server.web_interface import load_environment_metadata
-    from ..models import WildfireAction, WildfireObservation
-    from .wildfire_environment import WildfireEnvironment
-    from .wildfire_web_interface import get_wildfire_web_interface_html
-except ImportError:
-    # Standalone imports (when environment is standalone with openenv-core from pip)
-    from openenv_core.env_server.http_server import create_app
-    from openenv_core.env_server.web_interface import load_environment_metadata
-    from wildfire_env.models import WildfireAction, WildfireObservation
-    from wildfire_env.server.wildfire_environment import WildfireEnvironment
-    from wildfire_env.server.wildfire_web_interface import get_wildfire_web_interface_html
+from openenv.core.env_server.http_server import create_app
+from openenv.core.env_server.web_interface import load_environment_metadata
+from ..models import WildfireAction, WildfireObservation
+from .wildfire_environment import WildfireEnvironment
+from .wildfire_web_interface import get_wildfire_web_interface_html
 
 W = int(os.getenv("WILDFIRE_WIDTH", "16"))
 H = int(os.getenv("WILDFIRE_HEIGHT", "16"))

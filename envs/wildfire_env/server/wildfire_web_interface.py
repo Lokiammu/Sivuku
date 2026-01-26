@@ -8,15 +8,8 @@ and wildfire-specific features, without modifying the base web_interface.py.
 from typing import Optional
 import json
 
-# Support both in-repo and standalone imports
-try:
-    # In-repo imports (when running from OpenEnv repository)
-    from openenv.core.env_server.types import EnvironmentMetadata
-    from ..models import WildfireAction
-except ImportError:
-    # Standalone imports (when environment is standalone with openenv-core from pip)
-    from openenv_core.env_server.types import EnvironmentMetadata
-    from wildfire_env.models import WildfireAction
+from openenv.core.env_server.types import EnvironmentMetadata
+from ..models import WildfireAction
 
 
 def get_wildfire_web_interface_html(metadata: Optional[EnvironmentMetadata] = None) -> str:

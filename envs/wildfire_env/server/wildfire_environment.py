@@ -3,15 +3,8 @@ import os
 import random
 import uuid
 
-# Support both in-repo and standalone imports
-try:
-    # In-repo imports (when running from OpenEnv repository)
-    from openenv.core.env_server import Environment
-    from ..models import WildfireAction, WildfireObservation, WildfireState
-except ImportError:
-    # Standalone imports (when environment is standalone with openenv-core from pip)
-    from openenv_core.env_server import Environment
-    from wildfire_env.models import WildfireAction, WildfireObservation, WildfireState
+from openenv.core.env_server.interfaces import Environment
+from ..models import WildfireAction, WildfireObservation, WildfireState
 
 # Helpers
 DIRS_8 = {
