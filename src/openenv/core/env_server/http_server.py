@@ -675,7 +675,9 @@ all schema information needed to interact with the environment.
             try:
                 # Create session with dedicated environment
                 session_id, session_env = await self._create_session()
-                logger.info(f"[WS] Session {session_id[:8]} created, env={type(session_env).__name__}")
+                logger.info(
+                    f"[WS] Session {session_id[:8]} created, env={type(session_env).__name__}"
+                )
 
                 while True:
                     # Receive message from client
@@ -728,7 +730,9 @@ all schema information needed to interact with the environment.
                                 msg = WSStepMessage(**message_dict)
                                 action = deserialize_action(msg.data, self.action_cls)
                                 step_start = time.time()
-                                logger.debug(f"[WS] Session {session_id[:8]} step started")
+                                logger.debug(
+                                    f"[WS] Session {session_id[:8]} step started"
+                                )
 
                                 is_async = (
                                     session_env.step_async.__func__
@@ -743,7 +747,9 @@ all schema information needed to interact with the environment.
                                     )
 
                                 step_elapsed = time.time() - step_start
-                                logger.info(f"[WS] Session {session_id[:8]} step completed in {step_elapsed:.2f}s")
+                                logger.info(
+                                    f"[WS] Session {session_id[:8]} step completed in {step_elapsed:.2f}s"
+                                )
 
                                 self._update_session_activity(
                                     session_id, increment_step=True
