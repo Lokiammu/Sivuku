@@ -93,7 +93,7 @@ class JuliaExecutor:
     def __init__(
         self,
         timeout: Optional[int] = None,
-        max_retries: int = 1,
+        max_retries: int = 0,
         use_optimization_flags: bool = True,
         use_process_pool: bool = True,
     ):
@@ -103,7 +103,7 @@ class JuliaExecutor:
         Args:
             timeout: Maximum execution time in seconds. If None, reads from
                      JULIA_EXECUTION_TIMEOUT env var (default: 120 if not set)
-            max_retries: Number of retry attempts on transient failures (default: 1)
+            max_retries: Number of retry attempts on transient failures (default: 0)
             use_optimization_flags: Enable Julia performance flags (default: True)
             use_process_pool: Use process pool if available (default: True)
 

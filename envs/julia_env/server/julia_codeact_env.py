@@ -37,6 +37,63 @@ logger = logging.getLogger("julia_env.codeact")
 _request_counter = 0
 
 
+def _detect_infinite_loop(code: str) -> tuple[bool, str]:
+    """
+    Detect potential infinite loops in Julia code.
+
+    This function scans for `while true` loops without break/return/error statements.
+
+    Args:
+        code: Julia code string to analyze
+
+    Returns:
+        Tuple of (has_infinite_loop: bool, reason: str)
+    """
+    # Remove comments and strings to avoid false positives
+    # Remove single-line comments
+    code_without_comments = re.sub(r'#.*', '', code)
+    # Remove multi-line strings (triple quotes)
+    code_without_comments = re.sub(r'""".*?"""', '', code_without_comments, flags=re.DOTALL)
+    # Remove single-line strings
+    code_without_comments = re.sub(r'"[^"]*"', '', code_without_comments)
+
+    # Find all while true blocks
+    while_true_pattern = r'\bwhile\s+true\b'
+    while_true_matches = list(re.finditer(while_true_pattern, code_without_comments, re.IGNORECASE))
+
+    if not while_true_matches:
+        return False, ""
+
+    # For each while true, check if there's a break/return/error in the same block
+    for match in while_true_matches:
+        start_pos = match.end()
+
+        # Find the end of this while block by counting 'while'/'end' pairs
+        # Simplified heuristic: look for break/return/error before the corresponding 'end'
+        remaining_code = code_without_comments[start_pos:]
+
+        # Extract potential loop body (up to next 'end' keyword)
+        # This is a simplified check - doesn't perfectly handle nested blocks
+        end_match = re.search(r'\bend\b', remaining_code)
+        if end_match:
+            loop_body = remaining_code[:end_match.start()]
+        else:
+            loop_body = remaining_code
+
+        # Check for loop exit mechanisms in this block
+        has_break = re.search(r'\bbreak\b', loop_body) is not None
+        has_return = re.search(r'\breturn\b', loop_body) is not None
+        has_error = re.search(r'\berror\(', loop_body) is not None
+        has_throw = re.search(r'\bthrow\(', loop_body) is not None
+        has_exit = re.search(r'\bexit\(', loop_body) is not None
+
+        if not (has_break or has_return or has_error or has_throw or has_exit):
+            loop_preview = loop_body[:100].strip()
+            return True, f"Infinite loop detected: 'while true' without break/return/error/throw. Preview: {loop_preview}"
+
+    return False, ""
+
+
 class JuliaCodeActEnv(Environment):
     """
     Julia Code Action Environment for executing code and tracking state.
@@ -136,6 +193,43 @@ class JuliaCodeActEnv(Environment):
             combined_code = action.core_code + "\n\n" + action.test_code
         else:
             combined_code = action.core_code
+
+        # Pre-execution check: detect infinite loops to avoid timeout
+        has_infinite_loop, loop_reason = _detect_infinite_loop(action.core_code)
+        if has_infinite_loop:
+            logger.warning(f"[REQ-{request_id}] INFINITE LOOP DETECTED: {loop_reason}")
+
+            # Update environment state
+            self._state.step_count += 1
+            self._state.last_exit_code = 1
+            self._state.last_code_compiles = True  # Code compiles but has infinite loop
+            self._state.total_tests_passed = 0
+            self._state.total_tests_failed = 0
+
+            # Build observation with penalty
+            observation = JuliaObservation(
+                stdout="",
+                stderr=f"Infinite loop detected (pre-execution check): {loop_reason}",
+                exit_code=1,
+                reward=-1.0,  # Penalize infinite loops
+                metadata={
+                    "core_code": action.core_code,
+                    "test_code": action.test_code or "",
+                    "infinite_loop_detected": True,
+                    "infinite_loop_reason": loop_reason,
+                },
+                tests_passed=0,
+                tests_failed=0,
+                code_compiles=True,  # Code would compile, but not run
+            )
+
+            logger.info(
+                f"[REQ-{request_id}] RESULT: infinite_loop=True, "
+                f"tests_passed=0, tests_failed=0, reward=-1.00"
+            )
+
+            observation = self._apply_transform(observation)
+            return observation
 
         try:
             full_result = self._executor.run(combined_code, timeout=timeout)
