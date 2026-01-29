@@ -111,5 +111,5 @@ class MazeEnv(EnvClient[MazeAction, MazeObservation, MazeState]):
             done=payload.get("done", False),
             current_position=payload.get("current_position", []),
             exit_cell=payload.get("exit_cell", []),
-            status = payload.get("status", "playing"),
+            status=payload.get("status", "playing"),
         )

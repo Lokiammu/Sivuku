@@ -53,4 +53,4 @@ class MazeState(State):
     done: bool = False
     current_position: List[int] = Field(default_factory=list)
     exit_cell: List[int] = Field(default_factory=list)
-    status : str = "playing"  # e.g., "playing", "win", "lose"
+    status: str = "playing"  # e.g., "playing", "win", "lose"
