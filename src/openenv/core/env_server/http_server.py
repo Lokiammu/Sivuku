@@ -319,15 +319,32 @@ class HTTPEnvServer:
             session_id: The session ID to destroy
         """
         async with self._session_lock:
-            if session_id in self._sessions:
-                env = self._sessions.pop(session_id)
-                env.close()
-
-            if session_id in self._session_executors:
-                executor = self._session_executors.pop(session_id)
-                executor.shutdown(wait=False)
-
+            env = self._sessions.pop(session_id, None)
+            executor = self._session_executors.pop(session_id, None)
             self._session_info.pop(session_id, None)
+
+        # Run close() in the same executor where the env was created
+        # This is required for thread-sensitive libraries like Playwright/greenlet
+        if env is not None:
+            if executor is not None:
+                try:
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(executor, env.close)
+                except Exception:
+                    # If executor close fails, try direct close as fallback
+                    try:
+                        env.close()
+                    except Exception:
+                        pass  # Best effort cleanup
+            else:
+                try:
+                    env.close()
+                except Exception:
+                    pass  # Best effort cleanup
+
+        # Shutdown executor after close is done
+        if executor is not None:
+            executor.shutdown(wait=False)
 
     def _update_session_activity(
         self, session_id: str, increment_step: bool = False
