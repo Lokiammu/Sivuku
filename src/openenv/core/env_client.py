@@ -165,10 +165,15 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
                     else "localhost,127.0.0.1"
                 )
 
+        extra_headers = {}
+        if self._provider and hasattr(self._provider, "get_connect_headers"):
+            extra_headers = self._provider.get_connect_headers()
+
         try:
             self._ws = await ws_connect(
                 self._ws_url,
                 open_timeout=self._connect_timeout,
+                additional_headers=extra_headers,
             )
         except Exception as e:
             raise ConnectionError(f"Failed to connect to {self._ws_url}: {e}") from e

@@ -88,6 +88,10 @@ class ContainerProvider(ABC):
         """
         pass
 
+    def get_connect_headers(self) -> Dict[str, str]:
+        """Return extra headers for the WebSocket connection. Default: none."""
+        return {}
+
 
 class LocalDockerProvider(ContainerProvider):
     """
