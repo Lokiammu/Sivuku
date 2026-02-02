@@ -288,17 +288,26 @@ class HTTPEnvServer:
             session_id = str(uuid.uuid4())
             current_time = time.time()
 
+            # Create executor FIRST, then create environment IN the executor
+            # This is critical for thread-sensitive libraries like Playwright/greenlet
+            # that require all operations to run in the same thread where the object was created
+            executor = ThreadPoolExecutor(max_workers=1)
+            self._session_executors[session_id] = executor
+
             try:
-                env = self._env_factory()
+                # Create environment in the executor thread
+                loop = asyncio.get_event_loop()
+                env = await loop.run_in_executor(executor, self._env_factory)
             except Exception as e:
+                # Clean up executor on failure
+                executor.shutdown(wait=False)
+                del self._session_executors[session_id]
                 factory_name = getattr(
                     self._env_factory, "__name__", str(self._env_factory)
                 )
                 raise EnvironmentFactoryError(factory_name) from e
 
             self._sessions[session_id] = env
-
-            self._session_executors[session_id] = ThreadPoolExecutor(max_workers=1)
 
             # Track session metadata
             self._session_info[session_id] = SessionInfo(
