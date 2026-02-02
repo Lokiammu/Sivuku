@@ -234,26 +234,30 @@ All environments must define `self.rubric` in their constructor. The framework v
 
 | Method | Description |
 |--------|-------------|
-| `forward(action, observation) -> float` | Implement this. Compute reward. |
-| `__call__(action, observation) -> float` | Sync evaluation with hooks. |
-| `evaluate(action, observation) -> float` | Async evaluation via thread pool. |
-| `register_forward_hook(fn)` | Called after `forward()`. Signature: `(rubric, action, obs, result)` |
-| `register_forward_pre_hook(fn)` | Called before `forward()`. Signature: `(rubric, action, obs)` |
+| `forward(action, observation) -> float` | Implement this. Can be sync or async. Compute reward. |
+| `__call__(action, observation)` | Evaluation with hooks. Auto-detects async `forward()` and awaits. |
+| `register_forward_hook(fn)` | Called after `forward()`. Can be sync or async. |
+| `register_forward_pre_hook(fn)` | Called before `forward()`. Can be sync or async. |
 | `children()` / `named_children()` | Iterate immediate child rubrics. |
 | `rubrics()` / `named_rubrics()` | Iterate all descendant rubrics. |
 | `get_rubric(path: str)` | Access nested rubric by dot-separated path (e.g., `"code.syntax"`). |
+| `reset()` | Reset any internal state (sync). Override in subclasses. |
 | `state_dict()` / `load_state_dict(d)` | Serialize/deserialize configuration. |
+
+**Note on async support**: Rubrics support both sync and async `forward()` implementations. The base class auto-detects which variant is used and handles both. Sync rubrics remain fully backward compatible. Async rubrics can make LLM calls, use MCP tools, or perform I/O without blocking.
 
 ### Container Rubrics
 
 | Container | Behavior |
 |-----------|----------|
-| `Sequential(*rubrics)` | Run in order; stop and return 0 if any returns 0 |
-| `Gate(rubric, threshold=1.0)` | Return 0 if score < threshold |
-| `WeightedSum(rubrics, weights)` | Weighted combination |
+| `Sequential(*rubrics)` | Run in order; stop and return 0 if any returns 0 (sequential await for async) |
+| `Gate(rubric, threshold=1.0)` | Return 0 if score < threshold (awaits async child) |
+| `WeightedSum(rubrics, weights)` | Weighted combination (parallel await via `asyncio.gather()` for async) |
 | `RubricList(rubrics)` | Container for dynamic lists (no aggregation) |
 | `RubricDict(rubrics: Dict[str, Rubric])` | Container for named rubrics with keyed access |
 | `LLMJudge(prompt_template, endpoint)` | Call LLM via MCP for evaluation |
+
+**Note on async containers**: All containers auto-detect async children and handle them appropriately. `Sequential` and `Gate` await children sequentially (preserving fail-fast semantics). `WeightedSum` executes all children in parallel using `asyncio.gather()` for maximum throughput.
 
 ---
 
@@ -267,9 +271,15 @@ We considered having `Criterion` for leaf evaluators and `Rubric` for composites
 
 A declarative format would enable non-programmers to define rubrics and allow static validation. However, interesting rubrics involve LLM calls, sandboxed execution, database queries, and complex branching logic. These don't fit declarative formats well. Python code is more expressive and debuggable. The ecosystem (TRL, OpenRLHF, veRL) has converged on code-based rewards.
 
-**Async forward() everywhere**
+**Sync forward() with async wrapper (original approach)**
 
-We considered making `forward()` async by default, which would enable natural parallelism within a single rubric. However, this forces all rubric authors to understand async/await, even for trivial synchronous checks like `ast.parse()`. Our approach—sync `forward()` with async `evaluate()` wrapper—keeps rubric authoring simple while enabling batch-level parallelism in training loops.
+We initially considered keeping `forward()` sync with an async `evaluate()` wrapper. However, with the async-first client API (PR #343), we chose to make rubrics async-compatible by default:
+
+- `forward()` can be either sync or async—the base class detects which and handles both
+- Sync rubrics still work unchanged (backward compatible)
+- Async rubrics (e.g., LLM judges, MCP tool calls) are now natural
+- Container rubrics like `WeightedSum` automatically parallelize async children using `asyncio.gather()`
+- The sync `evaluate()` wrapper is no longer needed since the async path is built into `__call__()`
 
 **Magic proxy types for automatic parallelism**
 
@@ -287,9 +297,339 @@ LLM judges and other rubrics need to call external services. For now, rubrics ca
 
 Currently, exceptions in `forward()` propagate to the caller. Rubric authors should handle expected errors (network timeouts, invalid inputs) internally. We may add optional error handling in the base class (e.g., return 0.0 on exception with logging) based on user feedback.
 
-**Thread pool sizing**
+**Concurrency limits**
 
-The `evaluate_batch()` helper accepts an optional `max_workers` parameter to configure thread pool size. The default is 32 workers.
+For rubrics that make external API calls (LLM judges, database queries), consider implementing rate limiting or connection pooling inside the rubric. The framework does not impose concurrency limits—async rubrics can execute as many concurrent calls as the event loop allows.
+
+---
+
+## Delayed Rewards
+
+The per-step `Rubric.forward(action, observation) -> float` API handles immediate rewards well, but many environments require delayed rewards where the score depends on future events:
+
+- **Cursor Plan Mode**: Reward for writing a plan depends on later execution success
+- **Codenames**: Spymaster's clue quality depends on Operative's subsequent guesses
+- **Chess**: Win/loss only known at game end, needs discounting back to earlier moves
+
+### Self-Accumulating TrajectoryRubric
+
+Since OpenEnv doesn't batch (one env = one trajectory), the rubric itself can accumulate the trajectory internally. No separate trajectory buffer is needed.
+
+**The pattern**:
+1. `TrajectoryRubric.__call__(action, obs)` records step internally
+2. Returns `0.0` (or configurable intermediate reward) until `obs.done=True`
+3. On done, computes final score from accumulated trajectory
+4. `reset()` clears the internal buffer
+5. Composes naturally with `Sequential`, `RubricDict`, etc.
+
+### Memory Model: CPU-Only Trajectories
+
+**Constraint**: Trajectories must not consume GPU memory.
+
+**Design**: `TrajectoryRubric` stores observations in CPU memory only. Environments with GPU tensors in observations must detach/move to CPU before returning from `step()`.
+
+**Future extension**: If CPU memory becomes problematic at scale, a reference-based approach could store `(episode_id, step_index)` tuples referencing external replay buffers.
+
+### TrajectoryRubric Base Class
+
+```python
+from abc import abstractmethod
+from typing import List, Tuple, Any
+
+
+class TrajectoryRubric(Rubric):
+    """Abstract base for rubrics that score based on full trajectories.
+
+    Subclasses implement:
+    - score_trajectory(): Compute final score from trajectory
+    - compute_step_rewards(): Define credit assignment strategy
+
+    The __call__ method accumulates steps and returns rewards according
+    to the subclass's implementation.
+
+    IMPORTANT: Trajectories are stored in CPU memory to avoid GPU pressure.
+    Environments with GPU tensors in observations must move them to CPU
+    before returning from step().
+
+    Known limitation: Very long episodes (thousands of steps) may consume
+    significant CPU memory. For such cases, consider streaming rubrics.
+    """
+
+    def __init__(self, intermediate_reward: float = 0.0):
+        super().__init__()
+        self.intermediate_reward = intermediate_reward
+        self._trajectory: List[Tuple[Any, Observation]] = []
+
+    def __call__(self, action, observation) -> float:
+        """Accumulate step and return reward.
+
+        Returns intermediate_reward until done, then computes trajectory score.
+        """
+        self._trajectory.append((action, observation))
+
+        if getattr(observation, 'done', False):
+            return self.score_trajectory(self._trajectory)
+        else:
+            return self.intermediate_reward
+
+    @abstractmethod
+    def score_trajectory(self, trajectory: List[Tuple[Any, Observation]]) -> float:
+        """Score the complete trajectory. Return 0.0-1.0.
+
+        Called when observation.done=True.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def compute_step_rewards(self) -> List[float]:
+        """Compute per-step rewards from the accumulated trajectory.
+
+        Returns: List of rewards, one per step.
+        Define your credit assignment strategy here.
+        """
+        raise NotImplementedError
+
+    def reset(self):
+        """Clear accumulated trajectory. Call on env.reset()."""
+        self._trajectory = []
+
+    @property
+    def trajectory(self) -> List[Tuple[Any, Observation]]:
+        """Current trajectory (read-only copy)."""
+        return list(self._trajectory)
+```
+
+### ExponentialDiscountingTrajectoryRubric
+
+Concrete implementation with standard gamma-based discounting:
+
+```python
+class ExponentialDiscountingTrajectoryRubric(TrajectoryRubric):
+    """TrajectoryRubric with exponential discounting for credit assignment.
+
+    Per-step reward: r_t = gamma^(T-1-t) * R_final
+
+    With gamma=0.99, later steps get higher reward (they're "closer" to the outcome).
+    With gamma=1.0, all steps get equal reward.
+
+    Usage:
+        rubric = ChessWinLossRubric(gamma=0.99)
+        reward = rubric(action, obs)  # Returns 0.0 until done, then final score
+        step_rewards = rubric.compute_step_rewards()  # Get discounted per-step rewards
+    """
+
+    def __init__(self, gamma: float = 0.99, intermediate_reward: float = 0.0):
+        super().__init__(intermediate_reward=intermediate_reward)
+        self.gamma = gamma
+
+    def compute_step_rewards(self) -> List[float]:
+        """Apply exponential discounting from final reward."""
+        if not self._trajectory:
+            return []
+
+        final_score = self.score_trajectory(self._trajectory)
+        T = len(self._trajectory)
+        return [final_score * (self.gamma ** (T - 1 - t)) for t in range(T)]
+```
+
+### Composition with Existing Containers
+
+TrajectoryRubric extends Rubric, so it composes naturally:
+
+```python
+# Terminal game with format check first
+rubric = Sequential(
+    FormatRubric(),           # Per-step: check action format
+    ChessWinLossRubric(),     # Trajectory: score at game end
+)
+
+# Multi-game environment
+rubric = RubricDict({
+    "chess": ChessWinLossRubric(gamma=0.99),
+    "codenames": CodenamesRubric(gamma=0.95),
+})
+
+# Weighted combination of per-step and trajectory
+rubric = WeightedSum(
+    [ClueQualityRubric(), GameOutcomeRubric()],
+    weights=[0.3, 0.7],
+)
+```
+
+### Example: Chess with Discounting
+
+```python
+class ChessWinLossRubric(ExponentialDiscountingTrajectoryRubric):
+    """Score chess game based on outcome with temporal discounting."""
+
+    def __init__(self, gamma: float = 0.99):
+        super().__init__(gamma=gamma, intermediate_reward=0.0)
+
+    def score_trajectory(self, trajectory: List[Tuple[Any, Observation]]) -> float:
+        """Score based on game outcome."""
+        if not trajectory:
+            return 0.0
+
+        _, final_obs = trajectory[-1]  # Unpack (action, observation)
+        outcome = getattr(final_obs, 'metadata', {}).get('winner')
+
+        if outcome == 'agent':
+            return 1.0
+        elif outcome == 'opponent':
+            return 0.0
+        else:
+            return 0.5  # Draw
+```
+
+### Example: Cursor Plan Mode
+
+```python
+class PlanExecutionRubric(TrajectoryRubric):
+    """Score based on whether plan led to successful execution.
+
+    Custom credit assignment: full reward goes to the plan step,
+    zero to execution steps (since execution just follows the plan).
+    """
+
+    def __init__(self):
+        super().__init__(intermediate_reward=0.0)
+
+    def score_trajectory(self, trajectory: List[Tuple[Any, Observation]]) -> float:
+        """Score = execution success rate."""
+        if len(trajectory) < 2:
+            return 0.0
+
+        # Find execution steps after plan
+        plan_idx = None
+        for i, (action, obs) in enumerate(trajectory):
+            if getattr(action, 'metadata', {}).get('type') == 'plan':
+                plan_idx = i
+
+        if plan_idx is None:
+            return 0.0
+
+        # Score based on test results after plan
+        execution_steps = trajectory[plan_idx + 1:]
+        if not execution_steps:
+            return 0.0
+
+        _, final_obs = execution_steps[-1]
+        tests_passed = final_obs.metadata.get('tests_passed', 0)
+        tests_total = final_obs.metadata.get('tests_total', 1)
+
+        return tests_passed / tests_total if tests_total > 0 else 0.0
+
+    def compute_step_rewards(self) -> List[float]:
+        """Assign full reward to plan step, zero to execution."""
+        final_score = self.score_trajectory(self._trajectory)
+        rewards = [0.0] * len(self._trajectory)
+
+        for i, (action, obs) in enumerate(self._trajectory):
+            if getattr(action, 'metadata', {}).get('type') == 'plan':
+                rewards[i] = final_score
+
+        return rewards
+```
+
+### Example: Codenames (Mixed Per-Step + Trajectory)
+
+```python
+class CodenamesRubric(Rubric):
+    """Combine per-clue quality with game outcome."""
+
+    def __init__(self):
+        super().__init__()
+        self.clue_quality = ClueQualityRubric()    # Per-step
+        self.game_outcome = GameWinRubric()         # Trajectory
+        self.clue_scores: List[float] = []
+
+    def __call__(self, action, observation) -> float:
+        # Score clue quality per-step
+        if getattr(action, 'metadata', {}).get('type') == 'give_clue':
+            score = self.clue_quality(action, observation)
+            self.clue_scores.append(score)
+
+        # Delegate to trajectory rubric (it accumulates internally)
+        outcome_reward = self.game_outcome(action, observation)
+
+        if observation.done:
+            # Combine: 30% clue quality, 70% game outcome
+            clue_avg = sum(self.clue_scores) / len(self.clue_scores) if self.clue_scores else 0.0
+            return 0.3 * clue_avg + 0.7 * outcome_reward
+        else:
+            return 0.0
+
+    def reset(self):
+        self.clue_scores = []
+        self.game_outcome.reset()
+
+
+class GameWinRubric(ExponentialDiscountingTrajectoryRubric):
+    """Score based on win/loss outcome."""
+
+    def score_trajectory(self, trajectory: List[Tuple[Any, Observation]]) -> float:
+        if not trajectory:
+            return 0.0
+        _, final_obs = trajectory[-1]
+        if final_obs.metadata.get('outcome') == 'win':
+            return 1.0
+        elif final_obs.metadata.get('outcome') == 'loss':
+            return 0.0
+        return 0.5
+```
+
+### Environment Integration
+
+```python
+class ChessEnvironment(Environment[ChessAction, ChessObservation, ChessState]):
+    """Chess environment with trajectory-based scoring."""
+
+    def __init__(self):
+        super().__init__()
+        self.rubric = ChessWinLossRubric(gamma=0.99)
+
+    def reset(self, seed=None, episode_id=None, **kwargs) -> ChessObservation:
+        self._state = ChessState(episode_id=episode_id or str(uuid4()))
+        self.rubric.reset()  # Clear rubric's trajectory
+        return self._make_observation()
+
+    def step(self, action: ChessAction) -> ChessObservation:
+        obs = self._apply_move(action)
+
+        # Rubric handles trajectory accumulation internally
+        obs.reward = self.rubric(action, obs)
+
+        return obs
+```
+
+**Note**: The environment just calls `self.rubric(action, obs)` on every step. The rubric handles:
+- Accumulating trajectory internally
+- Returning 0.0 until done
+- Computing final reward when done
+
+### Training Loop: Retrieving Per-Step Rewards
+
+For training systems that need per-step rewards for credit assignment:
+
+```python
+obs = env.reset()
+while True:
+    action = agent.act(obs)
+    obs = env.step(action)
+
+    if obs.done:
+        # Get per-step rewards (discounting depends on rubric implementation)
+        step_rewards = env.rubric.compute_step_rewards()
+
+        # step_rewards[i] corresponds to trajectory step i
+        # For ExponentialDiscountingTrajectoryRubric with gamma=0.99:
+        # later moves get higher reward (closer to outcome)
+        for (action, obs), reward in zip(env.rubric.trajectory, step_rewards):
+            # Use for gradient computation...
+            pass
+
+        break
+```
 
 ---
 
@@ -316,7 +656,18 @@ This RFC will be implemented in stacked PRs:
 - Migrate `textarena_env` from `RewardProvider` to `Rubric`
 - Update any other environments using custom reward patterns
 
-### PR 4: EnvPool (Future)
+### PR 4: Trajectory Rubrics
+
+- `TrajectoryRubric` base class in `src/openenv/core/rubrics/trajectory.py`
+- `ExponentialDiscountingTrajectoryRubric` concrete implementation
+- Unit tests for trajectory accumulation, discounting, and reset behavior
+
+### PR 5: Trajectory Rubric Examples
+
+- Add trajectory rubric to an existing game environment (e.g., `connect4_env` or `openspiel_env`)
+- Demonstrate integration with environment reset/step cycle
+
+### PR 6: EnvPool (Future)
 
 - Batch orchestration across stacked environments
 - `step_batch()` helper for parallel execution
