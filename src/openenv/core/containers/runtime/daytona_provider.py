@@ -18,10 +18,9 @@ from typing import Any, Callable, Dict, Optional
 
 from .providers import ContainerProvider
 
-# Default server command template.  Daytona sandboxes use Docker images for
-# the filesystem but do NOT execute the image's CMD/ENTRYPOINT, so the
-# provider must start the server process explicitly.
-_DEFAULT_CMD = "uvicorn {module}:app --host 0.0.0.0 --port 8000"
+# Daytona sandboxes use Docker images for the filesystem but do NOT execute
+# the image's CMD/ENTRYPOINT.  The provider discovers the server command from
+# ``openenv.yaml`` inside the sandbox and starts it via ``process.exec``.
 
 
 class DaytonaProvider(ContainerProvider):
@@ -32,6 +31,12 @@ class DaytonaProvider(ContainerProvider):
     packages, copied files) but do **not** automatically run the image's
     CMD.  The provider starts the server process via
     ``sandbox.process.exec`` after creation.
+
+    The server command is resolved in order:
+
+    1. Explicit ``cmd`` from the constructor or ``**kwargs``.
+    2. Auto-discovered from ``openenv.yaml`` inside the sandbox.
+    3. ``ValueError`` if neither is available.
 
     Example:
         >>> provider = DaytonaProvider(api_key="your-key")
@@ -61,8 +66,8 @@ class DaytonaProvider(ContainerProvider):
             target: Daytona target region (e.g. "us").
             on_snapshot_create_logs: Callback for snapshot build log lines.
             cmd: Shell command to start the server inside the sandbox.
-                If ``None``, auto-detected from the ``image`` argument
-                (see ``start_container``).
+                If ``None``, auto-discovered from ``openenv.yaml`` inside
+                the sandbox after creation.
         """
         from daytona import Daytona, DaytonaConfig
 
@@ -83,33 +88,76 @@ class DaytonaProvider(ContainerProvider):
         self._preview_url: Optional[str] = None
         self._preview_token: Optional[str] = None
 
-    @staticmethod
-    def _guess_server_module(image: str) -> str:
-        """Derive the uvicorn module path from a Docker image name.
+    def _discover_server_cmd(self, sandbox: Any, port: int = 8000) -> str:
+        """Discover the server command from ``openenv.yaml`` inside *sandbox*.
 
-        Convention: an image whose name contains ``<name>_env`` or
-        ``<name>-env`` maps to ``envs.<name>_env.server.app``.
+        Finds the file, reads the ``app`` field, and constructs a command
+        of the form ``cd <env_root> && uvicorn <app> --host 0.0.0.0 --port <port>``.
 
-        Falls back to ``server.app`` (works for echo_env-style layouts
-        where the server directory is at the repo root).
+        Raises:
+            ValueError: If ``openenv.yaml`` is not found or lacks an ``app`` field.
         """
-        # Strip registry prefix and tag  e.g. "lovrepesut/openenv-connect4:latest"
-        basename = image.split("/")[-1].split(":")[0]
+        yaml_path = self._find_openenv_yaml(sandbox)
+        if yaml_path is None:
+            raise ValueError(
+                "Could not find openenv.yaml inside the sandbox. "
+                "Pass an explicit cmd= to DaytonaProvider or start_container()."
+            )
 
-        # Strip common prefixes like "openenv-"
-        for prefix in ("openenv-", "openenv_"):
-            if basename.startswith(prefix):
-                basename = basename[len(prefix) :]
-                break
+        cat_resp = sandbox.process.exec(f"cat {yaml_path}", timeout=10)
+        content = cat_resp.result if hasattr(cat_resp, "result") else str(cat_resp)
+        app = self._parse_app_field(content)
+        if app is None:
+            raise ValueError(
+                f"openenv.yaml at {yaml_path} does not contain an 'app' field. "
+                "Pass an explicit cmd= to DaytonaProvider or start_container()."
+            )
 
-        # Normalise to underscore
-        env_name = basename.replace("-", "_")
+        # The directory containing openenv.yaml is the env root
+        env_root = yaml_path.rsplit("/", 1)[0]
+        return f"cd {env_root} && uvicorn {app} --host 0.0.0.0 --port {port}"
 
-        # Ensure it ends with _env
-        if not env_name.endswith("_env"):
-            env_name = f"{env_name}_env"
+    def _find_openenv_yaml(self, sandbox: Any) -> Optional[str]:
+        """Locate ``openenv.yaml`` inside the sandbox.
 
-        return f"envs.{env_name}.server.app"
+        Tries the modern layout path ``/app/env/openenv.yaml`` first,
+        then falls back to a ``find`` command for the old layout.
+        """
+        # Fast path: modern Dockerfile layout
+        resp = sandbox.process.exec(
+            "test -f /app/env/openenv.yaml && echo found", timeout=10
+        )
+        out = resp.result if hasattr(resp, "result") else str(resp)
+        if "found" in (out or ""):
+            return "/app/env/openenv.yaml"
+
+        # Fallback: search for it (redirect stderr so error messages
+        # like "No such file or directory" don't get mistaken for paths).
+        resp = sandbox.process.exec(
+            "find /app -name openenv.yaml -maxdepth 4 -print -quit 2>/dev/null",
+            timeout=10,
+        )
+        path = (resp.result if hasattr(resp, "result") else str(resp) or "").strip()
+        if path and path.startswith("/"):
+            return path
+
+        return None
+
+    @staticmethod
+    def _parse_app_field(yaml_content: str) -> Optional[str]:
+        """Extract the ``app`` value from raw openenv.yaml content.
+
+        Uses simple line-by-line parsing to avoid a PyYAML dependency.
+        """
+        for line in yaml_content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("app:"):
+                value = stripped[len("app:") :].strip()
+                # Strip optional quotes
+                if len(value) >= 2 and value[0] in ('"', "'") and value[-1] == value[0]:
+                    value = value[1:-1]
+                return value if value else None
+        return None
 
     def start_container(
         self,
@@ -128,7 +176,7 @@ class DaytonaProvider(ContainerProvider):
 
         1. Explicit ``cmd`` passed to the constructor.
         2. ``cmd`` key in ``**kwargs`` (popped before forwarding).
-        3. Auto-detected from the image name using OpenEnv conventions.
+        3. Auto-discovered from ``openenv.yaml`` inside the sandbox.
 
         Args:
             image: Docker image name (e.g. "echo-env:latest") or
@@ -148,11 +196,9 @@ class DaytonaProvider(ContainerProvider):
                 "The Daytona preview proxy routes to port 8000 inside the sandbox."
             )
 
-        # Resolve the server command
+        # Resolve the server command (may be None; discovery happens after
+        # sandbox creation when we can inspect the filesystem).
         cmd = kwargs.pop("cmd", None) or self._cmd
-        if cmd is None:
-            module = self._guess_server_module(image)
-            cmd = _DEFAULT_CMD.format(module=module)
 
         # Build creation params
         create_kwargs: Dict[str, Any] = {}
@@ -185,10 +231,16 @@ class DaytonaProvider(ContainerProvider):
 
         self._sandbox = self._daytona.create(params, **extra)
 
+        # Discover server command from openenv.yaml if not explicitly set.
+        if cmd is None:
+            cmd = self._discover_server_cmd(self._sandbox)
+
         # Start the server process.  Daytona sandboxes do NOT run the
         # Docker image CMD, so we exec it ourselves in the background.
+        # Wrap in bash -c so compound commands (cd ... && uvicorn ...)
+        # are handled correctly by nohup.
         self._sandbox.process.exec(
-            f"nohup {cmd} > /tmp/openenv-server.log 2>&1 &",
+            f'nohup bash -c "{cmd}" > /tmp/openenv-server.log 2>&1 &',
             timeout=10,
         )
 
