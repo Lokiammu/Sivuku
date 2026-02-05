@@ -89,6 +89,9 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
         base_url: str,
         connect_timeout_s: float = 10.0,
         message_timeout_s: float = 60.0,
+        max_message_size_mb: float = 100.0,
+        ping_interval_s: Optional[float] = 300.0,
+        ping_timeout_s: Optional[float] = 300.0,
         provider: Optional["ContainerProvider | RuntimeProvider"] = None,
         mode: Optional[str] = None,
     ):
@@ -100,6 +103,13 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
                      Will be converted to ws:// if http:// is provided.
             connect_timeout_s: Timeout for establishing WebSocket connection
             message_timeout_s: Timeout for receiving responses to messages
+            max_message_size_mb: Maximum WebSocket message size in megabytes.
+                                Default 100MB to handle large observations (screenshots, DOM, etc.)
+            ping_interval_s: Interval between WebSocket ping frames (seconds).
+                            Default 300s (5 minutes) to prevent timeout errors during
+                            long-running operations like token generation. Set to None to disable.
+            ping_timeout_s: Timeout waiting for pong response (seconds).
+                           Default 300s (5 minutes). Set to None to disable timeout.
             provider: Optional container/runtime provider for lifecycle management.
                      Can be a ContainerProvider (Docker) or RuntimeProvider (UV).
             mode: Communication mode: 'simulation' for Gym-style API (default) or
@@ -128,6 +138,9 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
         self._ws_url = f"{ws_url}/ws"
         self._connect_timeout = connect_timeout_s
         self._message_timeout = message_timeout_s
+        self._max_message_size = int(max_message_size_mb * 1024 * 1024)  # Convert MB to bytes
+        self._ping_interval = ping_interval_s
+        self._ping_timeout = ping_timeout_s
         self._provider = provider
         self._ws: Optional[ClientConnection] = None
 
@@ -169,6 +182,9 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
             self._ws = await ws_connect(
                 self._ws_url,
                 open_timeout=self._connect_timeout,
+                max_size=self._max_message_size,
+                ping_interval=self._ping_interval,
+                ping_timeout=self._ping_timeout,
             )
         except Exception as e:
             raise ConnectionError(f"Failed to connect to {self._ws_url}: {e}") from e

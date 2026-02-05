@@ -65,11 +65,13 @@ def main(host: str = "0.0.0.0", port: int = 8000):
 
     For production deployments, consider using uvicorn directly with
     multiple workers:
-        uvicorn __ENV_NAME__.server.app:app --workers 4
+        uvicorn __ENV_NAME__.server.app:app --workers 4 --ws-ping-interval 300 --ws-ping-timeout 300
     """
     import uvicorn
 
-    uvicorn.run(app, host=host, port=port)
+    # Set WebSocket ping interval/timeout to 5 minutes to prevent timeout errors
+    # during long-running operations (e.g., token generation during training)
+    uvicorn.run(app, host=host, port=port, ws_ping_interval=300, ws_ping_timeout=300)
 
 
 if __name__ == "__main__":
