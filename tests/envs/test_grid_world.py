@@ -10,6 +10,7 @@ import pytest
 from envs.grid_world_env.client import GridWorldEnv
 from envs.grid_world_env.models import MoveAction, GridWorldAction
 
+
 def test_grid_world_flow():
     """
     Test the full flow of the Grid World environment using the WebSocket client.
@@ -25,7 +26,7 @@ def test_grid_world_flow():
     # FIX: Use GridWorldAction directly, not client.action_model
     action_up = GridWorldAction(action=MoveAction.UP)
     assert action_up.action == "UP"
-    
+
     action_right = GridWorldAction(action=MoveAction.RIGHT)
     assert action_right.action == "RIGHT"
 
