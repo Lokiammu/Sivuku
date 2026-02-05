@@ -79,13 +79,11 @@ def main(host: str = "0.0.0.0", port: int = 8000):
 
     For production deployments, consider using uvicorn directly with
     multiple workers:
-        uvicorn textarena_env.server.app:app --workers 4 --ws-ping-interval 300 --ws-ping-timeout 300
+        uvicorn textarena_env.server.app:app --workers 4
     """
     import uvicorn
 
-    # Set WebSocket ping interval/timeout to 5 minutes to prevent timeout errors
-    # during long-running operations (e.g., token generation during training)
-    uvicorn.run(app, host=host, port=port, ws_ping_interval=300, ws_ping_timeout=300)
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
