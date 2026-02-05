@@ -30,22 +30,34 @@ pip install git+https://huggingface.co/spaces/openenv/echo_env
 Then use the environment:
 
 ```python
+import asyncio
 from echo_env import EchoAction, EchoEnv
 
-# Connect to a running Space
-client = EchoEnv(base_url="https://openenv-echo-env.hf.space")
+async def main():
+    # Connect to a running Space (async context manager)
+    async with EchoEnv(base_url="https://openenv-echo-env.hf.space") as client:
+        # Reset the environment
+        result = await client.reset()
+        print(result.observation.echoed_message)  # "Echo environment ready!"
 
-# Reset the environment
-result = client.reset()
-print(result.observation.echoed_message)  # "Echo environment ready!"
+        # Send messages
+        result = await client.step(EchoAction(message="Hello, World!"))
+        print(result.observation.echoed_message)  # "Hello, World!"
+        print(result.reward)  # 1.3 (based on message length)
 
-# Send messages
-result = client.step(EchoAction(message="Hello, World!"))
-print(result.observation.echoed_message)  # "Hello, World!"
-print(result.reward)  # 1.3 (based on message length)
+asyncio.run(main())
+```
 
-# Cleanup
-client.close()
+**Synchronous usage** is also supported via the `.sync()` wrapper:
+
+```python
+from echo_env import EchoAction, EchoEnv
+
+# Use .sync() for synchronous context manager
+with EchoEnv(base_url="https://openenv-echo-env.hf.space").sync() as client:
+    result = client.reset()
+    result = client.step(EchoAction(message="Hello, World!"))
+    print(result.observation.echoed_message)
 ```
 
 For a detailed quick start, check out the [docs page](https://meta-pytorch.org/OpenEnv/quickstart/).
@@ -140,6 +152,8 @@ Base class for implementing environment logic:
 
 #### 3. EnvClient (Client-Side)
 Base class for environment communication:
+- **Async by default**: Use `async with` and `await` for all operations
+- **Sync wrapper**: Call `.sync()` to get a `SyncEnvClient` for synchronous usage
 - Handles WebSocket connections to environment server
 - Contains a utility to spin up a docker container locally for the corresponding environment
 - Type-safe action/observation parsing
@@ -222,9 +236,21 @@ See [`envs/README.md`](envs/README.md) for a complete guide on building environm
 To use an environment:
 1. Install the client: `pip install git+https://huggingface.co/spaces/openenv/echo-env`
 2. Import: `from echo_env import EchoAction, EchoEnv`
-3. Create client: `client = EchoEnv(base_url="https://openenv-echo-env.hf.space")`
-4. Interact: `client.reset()`, `client.step(action)`, `client.state()`
-5. Cleanup: `client.close()`
+3. Use async (recommended) or sync API:
+
+**Async (recommended):**
+```python
+async with EchoEnv(base_url="...") as client:
+    result = await client.reset()
+    result = await client.step(action)
+```
+
+**Sync (via `.sync()` wrapper):**
+```python
+with EchoEnv(base_url="...").sync() as client:
+    result = client.reset()
+    result = client.step(action)
+```
 
 See example scripts in `examples/` directory.
 
@@ -255,14 +281,56 @@ For detailed options: `openenv init --help` and `openenv push --help`.
 3. **Container Isolation**: Each environment runs in its own container
 4. **Simple APIs**: Minimal, intuitive interfaces
 
+## Development
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/meta-pytorch/OpenEnv.git
+cd OpenEnv
+
+# Install core package in editable mode
+pip install -e .
+# Or using uv (faster)
+uv pip install -e .
+```
+
+### Running Tests
+
+OpenEnv uses a modular dependency structure: the core package is minimal, and each environment has its own dependencies. This means some tests require environment-specific packages.
+
+```bash
+# Install pytest (required for running tests)
+uv pip install pytest
+
+# Run all tests (skips tests requiring uninstalled dependencies)
+PYTHONPATH=src:envs uv run pytest tests/ -v --tb=short
+
+# Run a specific test file
+PYTHONPATH=src:envs uv run pytest tests/envs/test_echo_environment.py -v
+```
+
+**To run environment-specific tests**, install that environment's dependencies:
+
+```bash
+# Example: Install coding_env with dev dependencies (includes smolagents + pytest)
+uv pip install -e "envs/coding_env[dev]"
+
+# Then run coding_env tests
+PYTHONPATH=src:envs uv run pytest tests/envs/test_python_codeact_rewards.py -v
+```
+
+Tests will be automatically skipped if their required dependencies aren't installed.
+
 ## Requirements
 
-- Python 3.11+
+- Python 3.10+
 - Docker Desktop or Docker Engine
 - FastAPI >= 0.104.0
 - Uvicorn >= 0.24.0
 - Requests >= 2.25.0
-- smolagents (for coding environment)
+- Environment-specific dependencies (e.g., smolagents for coding_env)
 
 ## Supported RL Tools
 The goal of this project is to support a broad set of open and closed tools to help standardize the agentic RL community. If you have a project that supports OpenEnv environments, please put up a PR to add your tool name along with a link to your documentation.
@@ -307,7 +375,7 @@ See: [`envs/coding_env/README.md`](envs/coding_env/README.md)
 ## Community Support & Acknowledgments
 This is an open and community-centric project. If you would like to add your name here, please put up a pull request and tag @jspisak for review. Ty!!
 
-Supporters include: Meta-PyTorch, Hugging Face, [Patronus AI](https://patronus.ai), [Surge AI](https://surgehq.ai), [LastMile AI](https://www.lastmileai.dev), Unsloth AI, Reflection AI, vLLM, SkyRL (UC-Berkeley), LightningAI, Axolotl AI, Stanford Scaling Intelligence Lab, Mithril, [OpenMined](https://openmined.org/), [Fleet AI](https://fleetai.com), [Halluminate](https://halluminate.ai/), [Turing](https://www.turing.com/), [Scale AI](https://scale.com/) ..
+Supporters include: Meta-PyTorch, Hugging Face, [Scaler AI Labs](https://scalerailabs.com), [Patronus AI](https://patronus.ai), [Surge AI](https://surgehq.ai), [LastMile AI](https://www.lastmileai.dev), Unsloth AI, Reflection AI, vLLM, SkyRL (UC-Berkeley), LightningAI, Axolotl AI, Stanford Scaling Intelligence Lab, Mithril, [OpenMined](https://openmined.org/), [Fleet AI](https://fleetai.com), [Halluminate](https://halluminate.ai/), [Turing](https://www.turing.com/), [Scale AI](https://scale.com/) ..
 
 And we'd also like to acknowledge the team at Farama Foundation as the OpenEnv API was heavily inspired by the work you all have done on Gymnasium. Cheers!
 

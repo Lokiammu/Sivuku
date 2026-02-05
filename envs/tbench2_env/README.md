@@ -40,6 +40,58 @@ print(result.reward, result.done)
 env.close()
 ```
 
+## Building the Docker Image
+
+Before using the environment, build the Docker image:
+
+```bash
+# From project root
+docker build -t tbench2-env:latest -f envs/tbench2_env/server/Dockerfile .
+```
+
+## Environment Details
+
+### Action
+**Tbench2Action**: Controls interaction with the TB2 task session
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `action_type` | str | `"exec"` | Action to perform (`exec`, `write`, `view`, `wait`, `kill`, `write_file`, `evaluate`, `close`) |
+| `command` | str | `""` | Shell command or input to send |
+| `session_id` | str \| None | `None` | Session ID for streaming processes |
+| `block` | bool | `True` | Whether to block until command completes |
+| `wait_seconds` | float \| None | `None` | Time to wait (for `wait` action) |
+| `file_path` | str | `""` | File path (for `write_file` action) |
+| `content` | str | `""` | Content to write (for `write_file` action) |
+
+### Observation
+**Tbench2Observation**: Contains the environment response
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `instruction` | str | Task instruction/prompt from the TB2 task |
+| `output` | str | Command output (stdout/stderr) |
+| `success` | bool | Whether the action succeeded |
+| `error` | str | Error message if action failed |
+| `task_id` | str | Current task identifier |
+| `task_path` | str | Path to the task directory |
+| `session_id` | str \| None | Session ID for streaming processes |
+| `action_type` | str | The action type that produced this observation |
+| `info` | dict | Additional metadata |
+
+### State
+**Tbench2State**: Server-side state for the task session
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `task_id` | str | Current task identifier |
+| `task_path` | str | Path to the task directory |
+| `session_id` | str | Active session ID |
+| `terminal_ready` | bool | Whether the terminal is ready for commands |
+| `last_action_type` | str | Last action type executed |
+| `last_command` | str | Last command executed |
+| `last_output` | str | Output from last command |
+
 ## Execution Modes
 
 ### Local Mode (Default)
