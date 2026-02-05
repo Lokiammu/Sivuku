@@ -35,14 +35,20 @@ RUN git clone https://github.com/google-deepmind/open_spiel.git .
 RUN ./install.sh
 
 # Install Python dependencies
-RUN pip3 install --no-cache-dir --upgrade setuptools testresources importlib_metadata
+# First upgrade pip and setuptools, then install other packages
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip3 install --no-cache-dir --upgrade pbr testresources importlib_metadata
 RUN pip3 install --no-cache-dir --upgrade -r requirements.txt cmake
 
 # Build OpenSpiel with Python 3.11
 # Use the exact same Python executable as the base image
+# Disable gin_rummy to speed up build (complex game, not needed for basic usage)
 RUN mkdir -p build
 WORKDIR /repo/build
-RUN cmake -DPython3_EXECUTABLE=/usr/local/bin/python3 -DCMAKE_CXX_COMPILER=$(which clang++) ../open_spiel
+RUN cmake -DPython3_EXECUTABLE=/usr/local/bin/python3 \
+    -DCMAKE_CXX_COMPILER=$(which clang++) \
+    -DOPEN_SPIEL_BUILD_WITH_GIN_RUMMY=OFF \
+    ../open_spiel
 RUN make -j$(nproc) pyspiel
 
 # Install OpenSpiel Python requirements

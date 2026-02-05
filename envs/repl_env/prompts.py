@@ -358,19 +358,32 @@ def extract_code_blocks(text: str, language: str = "python") -> List[str]:
     return all_matches
 
 
-def format_observation(obs) -> str:
-    """Format a REPLObservation into observation text for the LLM.
+def format_observations(observations) -> str:
+    """Format REPL observations into observation text for the LLM.
 
     Args:
-        obs: The REPLObservation from env.step()
+        observations: List of REPL observations from env.step()
 
     Returns:
         Formatted observation string
     """
-    output = obs.result.stdout.strip() if obs.result.stdout else "(no output)"
-
-    if obs.result.success:
-        return f"Code output:\n{output}"
-    else:
-        error = obs.result.stderr or obs.result.exception or "Unknown error"
-        return f"Code output:\n{output}\n\nERROR: {error}\nFix the error. Remember: 'context' is already defined."
+    formatted = []
+    for i, observation in enumerate(observations, 1):
+        output = (
+            observation.result.stdout.strip()
+            if observation.result.stdout
+            else "(no output)"
+        )
+        if observation.result.success:
+            formatted.append(f"Code block {i} output:\n{output}")
+        else:
+            error = (
+                observation.result.stderr
+                or observation.result.exception
+                or "Unknown error"
+            )
+            formatted.append(
+                f"Code block {i} output:\n{output}\n\nERROR: {error}\n"
+                f"Fix the error in code block {i}. Remember: 'context' is already defined."
+            )
+    return "\n\n".join(formatted)

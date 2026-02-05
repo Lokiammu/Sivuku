@@ -1,6 +1,6 @@
 # Building Your Own Environment with OpenEnv
 
-This guide walks you through creating a custom environment using the `OpenEnv` framework and the `openenv` CLI. 
+This guide walks you through creating a custom environment using the `OpenEnv` framework and the `openenv` CLI.
 
 The CLI handles scaffolding, builds, validation, and deployment so you can stay focused on environment logic.
 
@@ -15,7 +15,7 @@ A typical workflow looks like:
 5. Use the CLI (`openenv build`, `openenv validate`, `openenv push`) to package and share your work.
 
 !!! note
-    These integrations are handled automatically by the `openenv` CLI when you run `openenv init`. 
+    These integrations are handled automatically by the `openenv` CLI when you run `openenv init`.
 
 ### Prerequisites
 
@@ -37,7 +37,7 @@ openenv init my_env
 openenv init my_env --output-dir /Users/you/envs
 ```
 
-The command creates a fully-typed template with `openenv.yaml`, `pyproject.toml`, `uv.lock`, Docker assets, and stub implementations. If you're working inside this repo, move the generated folder under `envs/`. 
+The command creates a fully-typed template with `openenv.yaml`, `pyproject.toml`, `uv.lock`, Docker assets, and stub implementations. If you're working inside this repo, move the generated folder under `envs/`.
 
 Typical layout:
 
@@ -373,6 +373,50 @@ try:
 finally:
     client.close()
 ```
+
+## Troubleshooting
+
+### WebSocket Connection Closed During RL Training
+
+**Symptom:** When training with high token generation or long-running operations, you may see:
+
+```
+websockets.exceptions.ConnectionClosedError: keepalive ping timeout
+```
+
+**Cause:** Uvicorn's default WebSocket ping timeout is 20 seconds. During heavy workloads (e.g., LLM token generation), the client may not respond to pings in time, causing the server to close the connection.
+
+**Solution:** Increase the WebSocket ping interval and timeout in your Dockerfile:
+
+```dockerfile
+# Before (default - 20 second timeout)
+CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port 8000"]
+
+# After (5 minute timeout)
+CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port 8000 --ws-ping-interval 300 --ws-ping-timeout 300"]
+```
+
+After modifying the Dockerfile, rebuild and redeploy:
+
+```bash
+openenv build
+openenv push
+```
+
+**Available options:**
+
+| Parameter | Description | Default | Recommended for RL |
+|-----------|-------------|---------|-------------------|
+| `--ws-ping-interval` | Seconds between server pings | 20 | 300 (5 min) |
+| `--ws-ping-timeout` | Seconds to wait for pong response | 20 | 300 (5 min) |
+
+!!! tip
+    For local development without Docker, pass the same flags directly to uvicorn:
+    ```bash
+    uvicorn server.app:app --host 0.0.0.0 --port 8000 --ws-ping-interval 300 --ws-ping-timeout 300
+    ```
+
+---
 
 ## Nice work! You've now built and used your own OpenEnv environment.
 

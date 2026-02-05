@@ -197,7 +197,11 @@ class WebInterfaceManager:
         that cannot be called directly from an async context.
         """
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(self._executor, lambda: func(*args, **kwargs))
+        # Use default arguments to capture values at lambda definition time
+        # to avoid closure issues with late binding
+        return await loop.run_in_executor(
+            self._executor, lambda f=func, a=args, kw=kwargs: f(*a, **kw)
+        )
 
     async def connect_websocket(self, websocket: WebSocket):
         """Connect a new WebSocket client."""
