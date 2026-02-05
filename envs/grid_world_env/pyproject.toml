@@ -11,9 +11,7 @@ authors = [
     {name = "Yuv Raj Pant", email = "yuvrajpant5@gmail.com"},
 ]
 dependencies = [
-    # Validator requires 'openenv', not 'openenv-core'
-    # openenv-core[core]>=0.2.1@v0.2.1
-    "openenv>=0.2.0",
+    "openenv-core[core]>=0.2.1",
     "gymnasium",
     "numpy",
     # Server dependencies copied from echo_env
