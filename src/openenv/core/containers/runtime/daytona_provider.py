@@ -105,7 +105,7 @@ class DaytonaProvider(ContainerProvider):
                 "Pass an explicit cmd= to DaytonaProvider or start_container()."
             )
 
-        cat_resp = sandbox.process.exec(f"cat {yaml_path}", timeout=10)
+        cat_resp = sandbox.process.exec(f"cat {shlex.quote(yaml_path)}", timeout=10)
         content = cat_resp.result if hasattr(cat_resp, "result") else str(cat_resp)
         app = self._parse_app_field(content)
         if app is None:
