@@ -12,7 +12,7 @@ authors = [
 ]
 dependencies = [
     # Validator requires 'openenv', not 'openenv-core'
-    # openenv-core @ git+https://github.com/meta-pytorch/OpenEnv.git@main
+    # openenv-core @ git+https://github.com/meta-pytorch/OpenEnv.git@v0.2.1
     "openenv>=0.2.0",
     "gymnasium",
     "numpy",
