@@ -57,6 +57,7 @@ class DaytonaProvider(ContainerProvider):
         target: Optional[str] = None,
         on_snapshot_create_logs: Optional[Callable[[str], None]] = None,
         cmd: Optional[str] = None,
+        create_timeout: float = 300,
     ):
         """
         Args:
@@ -67,6 +68,8 @@ class DaytonaProvider(ContainerProvider):
             target: Daytona target region (e.g. "us").
             on_snapshot_create_logs: Callback for snapshot build log lines.
             cmd: Shell command to start the server inside the sandbox.
+            create_timeout: Seconds to wait for sandbox creation (default 300).
+                Heavy images (e.g. with Playwright/Chromium) may need more.
                 If ``None``, auto-discovered from ``openenv.yaml`` inside
                 the sandbox after creation.
         """
@@ -85,6 +88,7 @@ class DaytonaProvider(ContainerProvider):
         self._auto_stop_interval = auto_stop_interval
         self._on_snapshot_create_logs = on_snapshot_create_logs
         self._cmd = cmd
+        self._create_timeout = create_timeout
         self._sandbox: Any = None
         self._preview_url: Optional[str] = None
         self._preview_token: Optional[str] = None
@@ -364,7 +368,9 @@ class DaytonaProvider(ContainerProvider):
         if self._on_snapshot_create_logs is not None:
             extra["on_snapshot_create_logs"] = self._on_snapshot_create_logs
 
-        self._sandbox = self._daytona.create(params, **extra)
+        self._sandbox = self._daytona.create(
+            params, timeout=self._create_timeout, **extra
+        )
 
         try:
             # Discover server command from openenv.yaml if not explicitly set.
