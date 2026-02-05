@@ -288,26 +288,17 @@ class HTTPEnvServer:
             session_id = str(uuid.uuid4())
             current_time = time.time()
 
-            # Create executor FIRST, then create environment IN the executor
-            # This is critical for thread-sensitive libraries like Playwright/greenlet
-            # that require all operations to run in the same thread where the object was created
-            executor = ThreadPoolExecutor(max_workers=1)
-            self._session_executors[session_id] = executor
-
             try:
-                # Create environment in the executor thread
-                loop = asyncio.get_event_loop()
-                env = await loop.run_in_executor(executor, self._env_factory)
+                env = self._env_factory()
             except Exception as e:
-                # Clean up executor on failure
-                executor.shutdown(wait=False)
-                del self._session_executors[session_id]
                 factory_name = getattr(
                     self._env_factory, "__name__", str(self._env_factory)
                 )
                 raise EnvironmentFactoryError(factory_name) from e
 
             self._sessions[session_id] = env
+
+            self._session_executors[session_id] = ThreadPoolExecutor(max_workers=1)
 
             # Track session metadata
             self._session_info[session_id] = SessionInfo(
@@ -328,21 +319,15 @@ class HTTPEnvServer:
             session_id: The session ID to destroy
         """
         async with self._session_lock:
-            env = self._sessions.pop(session_id, None)
-            executor = self._session_executors.pop(session_id, None)
+            if session_id in self._sessions:
+                env = self._sessions.pop(session_id)
+                env.close()
+
+            if session_id in self._session_executors:
+                executor = self._session_executors.pop(session_id)
+                executor.shutdown(wait=False)
+
             self._session_info.pop(session_id, None)
-
-        # Close env in the same executor thread where it was created
-        # (required for thread-sensitive libraries like Playwright/greenlet)
-        if env is not None and executor is not None:
-            try:
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(executor, env.close)
-            except Exception:
-                pass  # Best effort cleanup
-
-        if executor is not None:
-            executor.shutdown(wait=False)
 
     def _update_session_activity(
         self, session_id: str, increment_step: bool = False
