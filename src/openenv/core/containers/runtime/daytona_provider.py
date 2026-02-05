@@ -366,24 +366,28 @@ class DaytonaProvider(ContainerProvider):
 
         self._sandbox = self._daytona.create(params, **extra)
 
-        # Discover server command from openenv.yaml if not explicitly set.
-        if cmd is None:
-            cmd = self._discover_server_cmd(self._sandbox)
+        try:
+            # Discover server command from openenv.yaml if not explicitly set.
+            if cmd is None:
+                cmd = self._discover_server_cmd(self._sandbox)
 
-        # Start the server process.  Daytona sandboxes do NOT run the
-        # Docker image CMD, so we exec it ourselves in the background.
-        # Wrap in bash -c so compound commands (cd ... && uvicorn ...)
-        # are handled correctly by nohup.
-        escaped_cmd = shlex.quote(cmd)
-        self._sandbox.process.exec(
-            f"nohup bash -c {escaped_cmd} > /tmp/openenv-server.log 2>&1 &",
-            timeout=10,
-        )
+            # Start the server process.  Daytona sandboxes do NOT run the
+            # Docker image CMD, so we exec it ourselves in the background.
+            # Wrap in bash -c so compound commands (cd ... && uvicorn ...)
+            # are handled correctly by nohup.
+            escaped_cmd = shlex.quote(cmd)
+            self._sandbox.process.exec(
+                f"nohup bash -c {escaped_cmd} > /tmp/openenv-server.log 2>&1 &",
+                timeout=10,
+            )
 
-        # Get preview link for port 8000
-        preview_info = self._sandbox.get_preview_link(8000)
-        self._preview_url = preview_info.url
-        self._preview_token = preview_info.token
+            # Get preview link for port 8000
+            preview_info = self._sandbox.get_preview_link(8000)
+            self._preview_url = preview_info.url
+            self._preview_token = preview_info.token
+        except Exception:
+            self.stop_container()
+            raise
 
         return self._preview_url
 
