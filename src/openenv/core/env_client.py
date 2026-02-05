@@ -165,9 +165,7 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
                     else "localhost,127.0.0.1"
                 )
 
-        extra_headers = {}
-        if self._provider and hasattr(self._provider, "get_connect_headers"):
-            extra_headers = self._provider.get_connect_headers()
+        extra_headers = self._provider.get_connect_headers() if self._provider else {}
 
         try:
             self._ws = await ws_connect(

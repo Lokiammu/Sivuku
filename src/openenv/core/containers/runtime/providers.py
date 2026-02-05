@@ -656,6 +656,10 @@ class RuntimeProvider(ABC):
         """
         pass
 
+    def get_connect_headers(self) -> Dict[str, str]:
+        """Return extra headers for the WebSocket connection. Default: none."""
+        return {}
+
     def __enter__(self) -> "RuntimeProvider":
         """
         Enter the runtime provider.
