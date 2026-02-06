@@ -12,6 +12,7 @@ Requires the ``daytona`` SDK: ``pip install daytona>=0.10``
 
 from __future__ import annotations
 
+import json
 import os
 import shlex
 import time
@@ -37,7 +38,8 @@ class DaytonaProvider(ContainerProvider):
 
     1. Explicit ``cmd`` from the constructor or ``**kwargs``.
     2. Auto-discovered from ``openenv.yaml`` inside the sandbox.
-    3. ``ValueError`` if neither is available.
+    3. ``CMD`` parsed from the Dockerfile (when built via ``image_from_dockerfile``).
+    4. ``ValueError`` if none of the above are available.
 
     Example:
         >>> provider = DaytonaProvider(api_key="your-key")
@@ -97,7 +99,7 @@ class DaytonaProvider(ContainerProvider):
         """Discover the server command from ``openenv.yaml`` inside *sandbox*.
 
         Finds the file, reads the ``app`` field, and constructs a command
-        of the form ``cd <env_root> && uvicorn <app> --host 0.0.0.0 --port <port>``.
+        of the form ``cd <env_root> && python -m uvicorn <app> --host 0.0.0.0 --port <port>``.
 
         Raises:
             ValueError: If ``openenv.yaml`` is not found or lacks an ``app`` field.
@@ -122,7 +124,7 @@ class DaytonaProvider(ContainerProvider):
         env_root = yaml_path.rsplit("/", 1)[0]
         return (
             f"cd {shlex.quote(env_root)} && "
-            f"uvicorn {shlex.quote(app)} --host 0.0.0.0 --port {port}"
+            f"python -m uvicorn {shlex.quote(app)} --host 0.0.0.0 --port {port}"
         )
 
     def _find_openenv_yaml(self, sandbox: Any) -> Optional[str]:
@@ -172,6 +174,46 @@ class DaytonaProvider(ContainerProvider):
             value = value.strip()
             return value if value else None
         return None
+
+    @staticmethod
+    def _parse_dockerfile_cmd(dockerfile_content: str) -> Optional[str]:
+        """Extract the server command from the last ``CMD`` in a Dockerfile.
+
+        Handles exec form (``CMD ["prog", "arg"]``) and shell form
+        (``CMD prog arg``).  When a Dockerfile has multiple ``CMD``
+        instructions (e.g. multi-stage builds), the last one wins — same
+        semantics as Docker itself.  Lines where ``CMD`` appears inside a
+        comment are ignored.
+
+        Returns:
+            The command as a single string, or ``None`` if no ``CMD`` found.
+        """
+        import re
+
+        last_cmd: Optional[str] = None
+        for line in dockerfile_content.splitlines():
+            stripped = line.strip()
+            # Skip comments
+            if stripped.startswith("#"):
+                continue
+            match = re.match(r"CMD\s+(.+)", stripped, flags=re.IGNORECASE)
+            if match:
+                last_cmd = match.group(1).strip()
+
+        if last_cmd is None:
+            return None
+
+        # Exec form: CMD ["executable", "param1", ...]
+        if last_cmd.startswith("["):
+            try:
+                parts = json.loads(last_cmd)
+                if isinstance(parts, list) and all(isinstance(p, str) for p in parts):
+                    return " ".join(parts)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # Shell form: CMD executable param1 ...
+        return last_cmd if last_cmd else None
 
     @staticmethod
     def strip_buildkit_syntax(dockerfile_content: str) -> str:
@@ -248,7 +290,10 @@ class DaytonaProvider(ContainerProvider):
         """Build a Daytona ``Image`` from a local Dockerfile.
 
         BuildKit ``--mount`` flags are automatically stripped before the
-        Dockerfile is passed to the Daytona SDK.
+        Dockerfile is passed to the Daytona SDK.  The Dockerfile's ``CMD``
+        instruction (if present) is parsed and attached to the returned
+        ``Image`` so that ``start_container`` can use it as a fallback
+        server command.
 
         Args:
             dockerfile_path: Path to the Dockerfile on disk.
@@ -285,6 +330,10 @@ class DaytonaProvider(ContainerProvider):
         content = src.read_text()
         stripped = cls.strip_buildkit_syntax(content)
 
+        # Parse CMD from the original Dockerfile so start_container can
+        # use it as a fallback when openenv.yaml is unavailable.
+        parsed_cmd = cls._parse_dockerfile_cmd(content)
+
         # Write stripped content to a temp file in the context directory.
         # Safe to delete immediately: from_dockerfile reads the file eagerly
         # into Image._dockerfile (a string), never re-reads the path.
@@ -292,9 +341,15 @@ class DaytonaProvider(ContainerProvider):
         tmp_path = ctx / tmp_name
         try:
             tmp_path.write_text(stripped)
-            return Image.from_dockerfile(str(tmp_path))
+            image = Image.from_dockerfile(str(tmp_path))
         finally:
             tmp_path.unlink(missing_ok=True)
+
+        # Attach the parsed CMD so start_container can discover it.
+        if parsed_cmd is not None:
+            image._openenv_server_cmd = parsed_cmd
+
+        return image
 
     def start_container(
         self,
@@ -314,6 +369,8 @@ class DaytonaProvider(ContainerProvider):
         1. Explicit ``cmd`` passed to the constructor.
         2. ``cmd`` key in ``**kwargs`` (popped before forwarding).
         3. Auto-discovered from ``openenv.yaml`` inside the sandbox.
+        4. ``CMD`` parsed from the Dockerfile (when *image* came from
+           ``image_from_dockerfile``).
 
         Args:
             image: Docker image name (e.g. "echo-env:latest"),
@@ -375,7 +432,15 @@ class DaytonaProvider(ContainerProvider):
         try:
             # Discover server command from openenv.yaml if not explicitly set.
             if cmd is None:
-                cmd = self._discover_server_cmd(self._sandbox)
+                try:
+                    cmd = self._discover_server_cmd(self._sandbox)
+                except ValueError:
+                    # Fall back to CMD parsed from Dockerfile (if available).
+                    dockerfile_cmd = getattr(image, "_openenv_server_cmd", None)
+                    if dockerfile_cmd:
+                        cmd = dockerfile_cmd
+                    else:
+                        raise
 
             # Start the server process.  Daytona sandboxes do NOT run the
             # Docker image CMD, so we exec it ourselves in the background.
