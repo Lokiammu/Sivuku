@@ -44,7 +44,7 @@ asyncio.run(main())
 For **synchronous usage**, use the `.sync()` wrapper:
 
 ```python
-from echo_env import EchoEnv
+from echo_env import EchoAction, EchoEnv
 
 with EchoEnv(base_url="https://openenv-echo-env.hf.space").sync() as client:
     result = client.reset()
@@ -137,18 +137,6 @@ with env.sync() as client:
     result = client.reset()
     result = client.step(EchoAction(message="Hello!"))
     print(result.observation.echoed_message)  # "Hello!"
-```
-
-Note: Some environments like `echo-env` use MCP tools instead of actions. For those, use the tool-calling API:
-
-```python
-from echo_env import EchoEnv
-
-env = EchoEnv.from_hub("openenv/echo-env")
-env.reset()
-result = env.call_tool("echo_message", message="Hello!")
-print(result)  # "Hello!"
-env.close()
 ```
 
 AutoEnv supports multiple name formats - all of these work:
