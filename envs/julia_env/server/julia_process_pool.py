@@ -36,21 +36,13 @@ import subprocess
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from .julia_executor import CodeExecResult
+
 # Use julia_env hierarchy to inherit handlers from app.py's setup_logging()
 logger = logging.getLogger("julia_env.pool")
-
-
-@dataclass
-class CodeExecResult:
-    """Result of code execution."""
-
-    stdout: str
-    stderr: str
-    exit_code: int
 
 
 class JuliaWorkerProcess:
@@ -188,7 +180,9 @@ class JuliaWorkerProcess:
 
                             if not line:
                                 # EOF - process died
-                                result_container["error"] = "Worker process died unexpectedly"
+                                result_container["error"] = (
+                                    "Worker process died unexpectedly"
+                                )
                                 return
 
                             line = line.rstrip("\n")
@@ -223,7 +217,9 @@ class JuliaWorkerProcess:
                         result_container["completed"] = True
 
                     except Exception as e:
-                        result_container["error"] = f"Error reading from worker: {str(e)}"
+                        result_container["error"] = (
+                            f"Error reading from worker: {str(e)}"
+                        )
 
                 # Start reader thread
                 reader_thread = threading.Thread(target=read_output, daemon=True)
@@ -234,7 +230,9 @@ class JuliaWorkerProcess:
 
                 if reader_thread.is_alive():
                     # Timeout - kill the process
-                    logger.error(f"Worker {self.worker_id} execution timed out after {timeout}s")
+                    logger.error(
+                        f"Worker {self.worker_id} execution timed out after {timeout}s"
+                    )
                     self.is_healthy = False
                     self._kill_process()
                     return CodeExecResult(
@@ -245,7 +243,9 @@ class JuliaWorkerProcess:
 
                 # Check for errors
                 if result_container["error"]:
-                    logger.error(f"Worker {self.worker_id}: {result_container['error']}")
+                    logger.error(
+                        f"Worker {self.worker_id}: {result_container['error']}"
+                    )
                     self.is_healthy = False
                     return CodeExecResult(
                         stdout="".join(result_container["stdout_lines"]),
@@ -274,12 +274,17 @@ class JuliaWorkerProcess:
             try:
                 self.process.terminate()
                 self.process.wait(timeout=2.0)
-            except Exception:
+            except Exception as e:
+                logger.debug(
+                    f"Worker {self.worker_id} terminate failed: {e}, forcing kill"
+                )
                 try:
                     self.process.kill()
                     self.process.wait(timeout=1.0)
-                except Exception:
-                    pass
+                except Exception as kill_error:
+                    logger.debug(
+                        f"Worker {self.worker_id} kill also failed: {kill_error}"
+                    )
 
     def shutdown(self) -> None:
         """Shutdown the worker process gracefully."""
@@ -340,7 +345,9 @@ class JuliaProcessPool:
         # Read timeout from env var if not explicitly provided
         if timeout is None:
             timeout = int(os.getenv("JULIA_EXECUTION_TIMEOUT", "120"))
-            logger.info(f"Pool timeout from JULIA_EXECUTION_TIMEOUT env var: {timeout}s")
+            logger.info(
+                f"Pool timeout from JULIA_EXECUTION_TIMEOUT env var: {timeout}s"
+            )
         else:
             logger.info(f"Pool timeout explicitly set: {timeout}s")
         self.timeout = timeout
@@ -469,9 +476,7 @@ class JuliaProcessPool:
         Returns:
             The recovered worker (new instance) or the original if recovery fails
         """
-        logger.warning(
-            f"Worker {worker.worker_id} is unhealthy, attempting recovery"
-        )
+        logger.warning(f"Worker {worker.worker_id} is unhealthy, attempting recovery")
         try:
             worker.shutdown()
             new_worker = JuliaWorkerProcess(
@@ -485,9 +490,7 @@ class JuliaProcessPool:
             logger.info(f"Worker {new_worker.worker_id} recovered successfully")
             return new_worker
         except Exception as e:
-            logger.error(
-                f"Failed to recover worker {worker.worker_id}: {e}"
-            )
+            logger.error(f"Failed to recover worker {worker.worker_id}: {e}")
             # Return original worker - it will be retried next time
             return worker
 

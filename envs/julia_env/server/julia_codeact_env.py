@@ -11,6 +11,7 @@ This module provides a server-side environment implementation for executing
 Julia code actions using JuliaExecutor.
 """
 
+import itertools
 import logging
 import re
 import time
@@ -33,8 +34,8 @@ except ImportError:
 # Get logger for this module (inherits from julia_env logger)
 logger = logging.getLogger("julia_env.codeact")
 
-# Request counter for tracking
-_request_counter = 0
+# Thread-safe request counter for tracking
+_request_counter = itertools.count(1)
 
 
 def _detect_infinite_loop(code: str) -> tuple[bool, str]:
@@ -51,15 +52,19 @@ def _detect_infinite_loop(code: str) -> tuple[bool, str]:
     """
     # Remove comments and strings to avoid false positives
     # Remove single-line comments
-    code_without_comments = re.sub(r'#.*', '', code)
+    code_without_comments = re.sub(r"#.*", "", code)
     # Remove multi-line strings (triple quotes)
-    code_without_comments = re.sub(r'""".*?"""', '', code_without_comments, flags=re.DOTALL)
+    code_without_comments = re.sub(
+        r'""".*?"""', "", code_without_comments, flags=re.DOTALL
+    )
     # Remove single-line strings
-    code_without_comments = re.sub(r'"[^"]*"', '', code_without_comments)
+    code_without_comments = re.sub(r'"[^"]*"', "", code_without_comments)
 
     # Find all while true blocks
-    while_true_pattern = r'\bwhile\s+true\b'
-    while_true_matches = list(re.finditer(while_true_pattern, code_without_comments, re.IGNORECASE))
+    while_true_pattern = r"\bwhile\s+true\b"
+    while_true_matches = list(
+        re.finditer(while_true_pattern, code_without_comments, re.IGNORECASE)
+    )
 
     if not while_true_matches:
         return False, ""
@@ -74,22 +79,25 @@ def _detect_infinite_loop(code: str) -> tuple[bool, str]:
 
         # Extract potential loop body (up to next 'end' keyword)
         # This is a simplified check - doesn't perfectly handle nested blocks
-        end_match = re.search(r'\bend\b', remaining_code)
+        end_match = re.search(r"\bend\b", remaining_code)
         if end_match:
-            loop_body = remaining_code[:end_match.start()]
+            loop_body = remaining_code[: end_match.start()]
         else:
             loop_body = remaining_code
 
         # Check for loop exit mechanisms in this block
-        has_break = re.search(r'\bbreak\b', loop_body) is not None
-        has_return = re.search(r'\breturn\b', loop_body) is not None
-        has_error = re.search(r'\berror\(', loop_body) is not None
-        has_throw = re.search(r'\bthrow\(', loop_body) is not None
-        has_exit = re.search(r'\bexit\(', loop_body) is not None
+        has_break = re.search(r"\bbreak\b", loop_body) is not None
+        has_return = re.search(r"\breturn\b", loop_body) is not None
+        has_error = re.search(r"\berror\(", loop_body) is not None
+        has_throw = re.search(r"\bthrow\(", loop_body) is not None
+        has_exit = re.search(r"\bexit\(", loop_body) is not None
 
         if not (has_break or has_return or has_error or has_throw or has_exit):
             loop_preview = loop_body[:100].strip()
-            return True, f"Infinite loop detected: 'while true' without break/return/error/throw. Preview: {loop_preview}"
+            return (
+                True,
+                f"Infinite loop detected: 'while true' without break/return/error/throw. Preview: {loop_preview}",
+            )
 
     return False, ""
 
@@ -167,9 +175,7 @@ class JuliaCodeActEnv(Environment):
             **kwargs: Optional parameters including:
                 - timeout: Execution timeout in seconds (default: 120)
         """
-        global _request_counter
-        _request_counter += 1
-        request_id = _request_counter
+        request_id = next(_request_counter)
 
         if not isinstance(action, JuliaAction):
             logger.error(f"[REQ-{request_id}] Invalid action type: {type(action)}")
@@ -179,12 +185,24 @@ class JuliaCodeActEnv(Environment):
         timeout = kwargs.get("timeout")
 
         # Log request details
-        code_preview = action.core_code[:200] + "..." if len(action.core_code) > 200 else action.core_code
+        code_preview = (
+            action.core_code[:200] + "..."
+            if len(action.core_code) > 200
+            else action.core_code
+        )
         logger.info(f"[REQ-{request_id}] === NEW EXECUTION REQUEST ===")
-        logger.info(f"[REQ-{request_id}] Session: {self._state.episode_id}, Step: {self._state.step_count}")
-        logger.info(f"[REQ-{request_id}] Code length: {len(action.core_code)} chars, Test length: {len(action.test_code or '')} chars")
+        logger.info(
+            f"[REQ-{request_id}] Session: {self._state.episode_id}, Step: {self._state.step_count}"
+        )
+        logger.info(
+            f"[REQ-{request_id}] Code length: {len(action.core_code)} chars, Test length: {len(action.test_code or '')} chars"
+        )
         logger.debug(f"[REQ-{request_id}] Code preview: {code_preview}")
-        logger.info(f"[REQ-{request_id}] Timeout: {timeout}s" if timeout else f"[REQ-{request_id}] Timeout: default")
+        logger.info(
+            f"[REQ-{request_id}] Timeout: {timeout}s"
+            if timeout
+            else f"[REQ-{request_id}] Timeout: default"
+        )
 
         start_time = time.time()
 
@@ -235,16 +253,24 @@ class JuliaCodeActEnv(Environment):
             full_result = self._executor.run(combined_code, timeout=timeout)
             execution_time = time.time() - start_time
 
-            logger.info(f"[REQ-{request_id}] Execution completed in {execution_time:.2f}s, exit_code={full_result.exit_code}")
+            logger.info(
+                f"[REQ-{request_id}] Execution completed in {execution_time:.2f}s, exit_code={full_result.exit_code}"
+            )
 
             # Log stderr if present (often contains errors or test output)
             if full_result.stderr:
-                stderr_preview = full_result.stderr[:500] + "..." if len(full_result.stderr) > 500 else full_result.stderr
+                stderr_preview = (
+                    full_result.stderr[:500] + "..."
+                    if len(full_result.stderr) > 500
+                    else full_result.stderr
+                )
                 logger.debug(f"[REQ-{request_id}] Stderr: {stderr_preview}")
 
         except Exception as e:
             execution_time = time.time() - start_time
-            logger.error(f"[REQ-{request_id}] EXECUTION FAILED after {execution_time:.2f}s: {e}")
+            logger.error(
+                f"[REQ-{request_id}] EXECUTION FAILED after {execution_time:.2f}s: {e}"
+            )
             raise
 
         # Parse test results from execution output

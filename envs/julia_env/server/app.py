@@ -39,6 +39,8 @@ import atexit
 import logging
 import os
 import sys
+import tempfile
+import time as time_module
 from logging.handlers import RotatingFileHandler
 
 # Support both in-repo and standalone imports
@@ -58,7 +60,9 @@ except ImportError:
 # Configuration from environment variables
 MAX_WORKERS = int(os.getenv("JULIA_MAX_WORKERS", "8"))
 EXECUTION_TIMEOUT = int(os.getenv("JULIA_EXECUTION_TIMEOUT", "120"))
-LOG_FILE = os.getenv("JULIA_LOG_FILE", "/tmp/julia_env.log")
+LOG_FILE = os.getenv(
+    "JULIA_LOG_FILE", os.path.join(tempfile.gettempdir(), "julia_env.log")
+)
 LOG_LEVEL = os.getenv("JULIA_LOG_LEVEL", "INFO")
 
 
@@ -92,7 +96,7 @@ def setup_logging():
         julia_logger.addHandler(file_handler)
         openenv_logger.addHandler(file_handler)
     except Exception as e:
-        print(f"Warning: Could not create log file {LOG_FILE}: {e}")
+        logger.warning(f"Could not create log file {LOG_FILE}: {e}")
 
     # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
@@ -131,7 +135,9 @@ def initialize_julia_pool():
         logger.warning("Julia process pool not available, using subprocess mode")
 
     logger.info("Julia Environment Server initialized successfully")
-    print(f"Julia Environment Server started on port {port} with {MAX_WORKERS} concurrent workers")
+    logger.info(
+        f"Julia Environment Server started on port {port} with {MAX_WORKERS} concurrent workers"
+    )
 
 
 def shutdown_julia_pool():
@@ -139,7 +145,7 @@ def shutdown_julia_pool():
     logger.info("Shutting down Julia Environment Server...")
     JuliaExecutor.shutdown_pool()
     logger.info("Julia process pool shutdown complete")
-    print("Julia Environment Server shutdown complete")
+    logger.info("Julia Environment Server shutdown complete")
 
 
 # Initialize the pool at module load time
@@ -161,9 +167,9 @@ app = create_app(
 
 
 # Add request logging middleware
-import time as time_module
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Log all incoming HTTP requests for debugging."""
@@ -181,16 +187,14 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         elapsed = time_module.time() - start_time
-        logger.debug(f"HTTP Response: {request.method} {path} -> {response.status_code} ({elapsed:.2f}s)")
+        logger.debug(
+            f"HTTP Response: {request.method} {path} -> {response.status_code} ({elapsed:.2f}s)"
+        )
 
         return response
 
+
 app.add_middleware(RequestLoggingMiddleware)
-
-
-# Track active WebSocket connections
-_active_ws_connections = 0
-_total_ws_connections = 0
 
 
 # Add custom health endpoint with pool metrics
@@ -202,8 +206,6 @@ async def pool_status():
         "timeout": EXECUTION_TIMEOUT,
         "pool_enabled": JuliaExecutor.is_pool_enabled(),
         "pool_metrics": JuliaExecutor.get_pool_metrics(),
-        "active_ws_connections": _active_ws_connections,
-        "total_ws_connections": _total_ws_connections,
     }
 
 

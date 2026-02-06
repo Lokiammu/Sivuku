@@ -39,8 +39,8 @@ class JuliaSafetyTransform(Transform):
             r"ccall\(",
             r"Base\.exit",
             r"Base\.kill",
-            r"rm\(",      # file deletion
-            r"download\(" # downloading
+            r"rm\(",  # file deletion
+            r"download\(",  # downloading
         ]
 
     def __call__(self, observation):
@@ -50,7 +50,11 @@ class JuliaSafetyTransform(Transform):
 
         # Extract executed code from metadata (core_code + test_code)
         if observation.metadata:
-            code = observation.metadata.get("core_code", "") + "\n" + observation.metadata.get("test_code", "")
+            code = (
+                observation.metadata.get("core_code", "")
+                + "\n"
+                + observation.metadata.get("test_code", "")
+            )
         else:
             code = ""
 

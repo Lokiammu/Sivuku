@@ -1,8 +1,8 @@
 ---
 title: Julia Environment Server
 emoji: 🔬
-colorFrom: '#9558B2'
-colorTo: '#389826'
+colorFrom: purple
+colorTo: green
 sdk: docker
 pinned: false
 app_port: 8000

@@ -113,7 +113,9 @@ class JuliaExecutor:
         # Read timeout from env var if not explicitly provided
         if timeout is None:
             timeout = int(os.getenv("JULIA_EXECUTION_TIMEOUT", "120"))
-            logger.debug(f"Executor timeout from JULIA_EXECUTION_TIMEOUT env var: {timeout}s")
+            logger.debug(
+                f"Executor timeout from JULIA_EXECUTION_TIMEOUT env var: {timeout}s"
+            )
         self.timeout = timeout
         self.max_retries = max_retries
         self.use_optimization_flags = use_optimization_flags
@@ -407,7 +409,9 @@ class JuliaExecutor:
 
             try:
                 logger.info(f"Enabling Julia process pool with {size} workers")
-                JuliaExecutor._shared_pool = JuliaProcessPool(size=size, timeout=timeout)
+                JuliaExecutor._shared_pool = JuliaProcessPool(
+                    size=size, timeout=timeout
+                )
                 JuliaExecutor._pool_size = size
                 JuliaExecutor._pool_timeout = timeout
                 logger.info("Julia process pool enabled successfully")
