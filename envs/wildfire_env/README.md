@@ -75,10 +75,10 @@ This makes WildfireEnv a **fast, controllable**, and **open benchmark** for appl
 
 ```bash
 # Build base image (first time only)
-docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+docker build -t openenv-base:latest -f src/openenv/core/containers/images/Dockerfile .
 
 # Build wildfire environment
-docker build -t wildfire-env:latest -f src/envs/wildfire_env/server/Dockerfile .
+docker build -t wildfire-env:latest -f envs/wildfire_env/server/Dockerfile .
 
 # Run container
 docker run -p 8000:8000 -e ENABLE_WEB_INTERFACE=true wildfire-env:latest
@@ -422,8 +422,8 @@ docker run -p 8000:8000 \
 
 ```bash
 # Build and run with custom configuration
-docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
-docker build -t wildfire-env:latest -f src/envs/wildfire_env/server/Dockerfile .
+docker build -t openenv-base:latest -f src/openenv/core/containers/images/Dockerfile .
+docker build -t wildfire-env:latest -f envs/wildfire_env/server/Dockerfile .
 docker run -p 8000:8000 \
   -e ENABLE_WEB_INTERFACE=true \
   -e WILDFIRE_WIDTH=64 \
@@ -441,10 +441,10 @@ docker run -p 8000:8000 \
 **Manual setup:**
 ```bash
 # Build base image (first time only)
-docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+docker build -t openenv-base:latest -f src/openenv/core/containers/images/Dockerfile .
 
 # Build wildfire environment
-docker build -t wildfire-env:latest -f src/envs/wildfire_env/server/Dockerfile .
+docker build -t wildfire-env:latest -f envs/wildfire_env/server/Dockerfile .
 
 # Run container
 docker run -p 8000:8000 -e ENABLE_WEB_INTERFACE=true wildfire-env:latest
@@ -459,7 +459,7 @@ This approach:
 **Alternative: Using build_docker.sh script:**
 ```bash
 # Build base image (first time only)
-docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+docker build -t openenv-base:latest -f src/openenv/core/containers/images/Dockerfile .
 
 # Build wildfire environment using the script
 cd src/envs/wildfire_env/server
@@ -820,10 +820,10 @@ The Wildfire Environment includes a **custom web interface** with visual grid di
 
 ```bash
 # Build base image (first time only)
-docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+docker build -t openenv-base:latest -f src/openenv/core/containers/images/Dockerfile .
 
 # Build wildfire environment
-docker build -t wildfire-env:latest -f src/envs/wildfire_env/server/Dockerfile .
+docker build -t wildfire-env:latest -f envs/wildfire_env/server/Dockerfile .
 
 # Run container
 docker run -p 8000:8000 -e ENABLE_WEB_INTERFACE=true wildfire-env:latest
@@ -957,10 +957,10 @@ cell_value = obs.grid[index]
 **Solution:**
 ```bash
 # Build base image first
-docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+docker build -t openenv-base:latest -f src/openenv/core/containers/images/Dockerfile .
 
 # Then build wildfire image
-docker build -t wildfire-env:latest -f src/envs/wildfire_env/server/Dockerfile .
+docker build -t wildfire-env:latest -f envs/wildfire_env/server/Dockerfile .
 ```
 
 ### Debugging Tips

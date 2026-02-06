@@ -80,6 +80,7 @@ print(f"Correct: {result.observation.correctness_pass}")
 uvicorn kernrl.server.app:app --reload --host 0.0.0.0 --port 8000
 
 # Docker (GPU required)
+cd envs/kernrl
 docker build -t kernrl -f server/Dockerfile .
 docker run --gpus all -p 8000:8000 kernrl
 ```
