@@ -13,7 +13,6 @@ These tests verify:
 3. WebSocket MCP tools/list and tools/call endpoints
 """
 
-import asyncio
 import json
 from typing import Any, Optional
 
@@ -26,7 +25,6 @@ from openenv.core.env_server.mcp_types import (
     CallToolObservation,
     ListToolsAction,
     ListToolsObservation,
-    Tool,
 )
 from openenv.core.env_server.types import Action, Observation, State
 
@@ -201,6 +199,18 @@ class TestEchoEnvironmentMCP:
         assert obs.tool_name == "nonexistent_tool"
         assert obs.error is not None
 
+    def test_echo_environment_reset_returns_observation(self):
+        """Test EchoEnvironment.reset() returns an Observation."""
+        from echo_env.server.echo_environment import EchoEnvironment
+
+        env = EchoEnvironment()
+        obs = env.reset()
+
+        # Verify observation type (now just Observation, not EchoObservation)
+        assert isinstance(obs, Observation)
+        assert obs.done is False
+        assert obs.metadata.get("status") == "ready"
+
 
 # =============================================================================
 # MCPEnvironment with FastMCP Tests
@@ -286,13 +296,16 @@ class TestWebSocketMCP:
     def app(self):
         """Create a FastAPI app with EchoEnvironment for WebSocket testing."""
         from echo_env.server.echo_environment import EchoEnvironment
-        from echo_env.models import EchoAction, EchoObservation
+        from openenv.core.env_server.mcp_types import (
+            CallToolAction,
+            CallToolObservation,
+        )
         from openenv.core.env_server.http_server import create_fastapi_app
 
         return create_fastapi_app(
             env=EchoEnvironment,
-            action_cls=EchoAction,
-            observation_cls=EchoObservation,
+            action_cls=CallToolAction,
+            observation_cls=CallToolObservation,
         )
 
     def test_websocket_tools_list(self, app):
