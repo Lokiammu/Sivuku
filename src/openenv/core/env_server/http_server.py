@@ -16,15 +16,11 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
-import logging
 import os
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, Optional, Type
-
-# Logger for WebSocket activity - uses openenv hierarchy
-logger = logging.getLogger("openenv.http_server")
 
 from fastapi import (
     Body,
@@ -617,9 +613,6 @@ class HTTPEnvServer:
             try:
                 # Create session with dedicated environment
                 session_id, session_env = await self._create_session()
-                logger.info(
-                    f"[WS] Session {session_id[:8]} created, env={type(session_env).__name__}"
-                )
 
                 while True:
                     # Receive message from client
@@ -684,7 +677,6 @@ class HTTPEnvServer:
                 await websocket.send_text(error_resp.model_dump_json())
             finally:
                 if session_id:
-                    logger.info(f"[WS] Session {session_id[:8]} closing")
                     await self._destroy_session(session_id)
                 try:
                     await websocket.close()
@@ -1053,9 +1045,6 @@ all schema information needed to interact with the environment.
             try:
                 # Create session with dedicated environment
                 session_id, session_env = await self._create_session()
-                logger.info(
-                    f"[WS] Session {session_id[:8]} created, env={type(session_env).__name__}"
-                )
 
                 while True:
                     # Receive message from client
@@ -1107,10 +1096,6 @@ all schema information needed to interact with the environment.
                             case "step":
                                 msg = WSStepMessage(**message_dict)
                                 action = deserialize_action(msg.data, self.action_cls)
-                                step_start = time.time()
-                                logger.debug(
-                                    f"[WS] Session {session_id[:8]} step started"
-                                )
 
                                 is_async = (
                                     session_env.step_async.__func__
@@ -1123,11 +1108,6 @@ all schema information needed to interact with the environment.
                                     observation = await self._run_in_session_executor(
                                         session_id, session_env.step, action
                                     )
-
-                                step_elapsed = time.time() - step_start
-                                logger.info(
-                                    f"[WS] Session {session_id[:8]} step completed in {step_elapsed:.2f}s"
-                                )
 
                                 self._update_session_activity(
                                     session_id, increment_step=True
@@ -1223,7 +1203,6 @@ all schema information needed to interact with the environment.
                 await websocket.send_text(error_resp.model_dump_json())
             finally:
                 if session_id:
-                    logger.info(f"[WS] Session {session_id[:8]} closing")
                     await self._destroy_session(session_id)
                 try:
                     await websocket.close()

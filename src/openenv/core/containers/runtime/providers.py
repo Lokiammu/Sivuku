@@ -141,9 +141,7 @@ class LocalDockerProvider(ContainerProvider):
             image: Docker image name
             port: Port to expose (if None, finds available port)
             env_vars: Environment variables for the container
-            **kwargs: Additional Docker run options:
-                - volumes: Dict[str, str] mapping host_path -> container_path
-                - memory_gb: Memory limit in GB
+            **kwargs: Additional Docker run options
 
         Returns:
             Base URL to connect to the container
@@ -154,9 +152,6 @@ class LocalDockerProvider(ContainerProvider):
         # Find available port if not specified
         if port is None:
             port = self._find_available_port()
-
-        # Store port for external access
-        self._port = port
 
         # Generate container name
         self._container_name = self._generate_container_name(image)
@@ -171,16 +166,6 @@ class LocalDockerProvider(ContainerProvider):
             "-p",
             f"{port}:8000",  # Map port
         ]
-
-        # Add volume mounts
-        volumes = kwargs.get("volumes", {})
-        for host_path, container_path in volumes.items():
-            cmd.extend(["-v", f"{host_path}:{container_path}"])
-
-        # Add memory limit
-        memory_gb = kwargs.get("memory_gb")
-        if memory_gb:
-            cmd.extend(["--memory", f"{memory_gb}g"])
 
         # Add environment variables
         if env_vars:
