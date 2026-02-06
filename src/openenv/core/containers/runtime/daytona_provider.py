@@ -216,28 +216,6 @@ class DaytonaProvider(ContainerProvider):
         return last_cmd if last_cmd else None
 
     @staticmethod
-    def _parse_dockerfile_workdir(dockerfile_content: str) -> Optional[str]:
-        """Extract the last ``WORKDIR`` from a Dockerfile.
-
-        Daytona sandboxes do not honour Docker's WORKDIR when running
-        commands via ``process.exec``.  By parsing it we can ``cd`` into
-        the correct directory before starting the server, which also
-        ensures Python's CWD-based ``sys.path`` entry matches what a
-        normal ``docker run`` would provide.
-        """
-        import re
-
-        last_workdir: Optional[str] = None
-        for line in dockerfile_content.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("#"):
-                continue
-            match = re.match(r"WORKDIR\s+(\S+)", stripped, flags=re.IGNORECASE)
-            if match:
-                last_workdir = match.group(1)
-        return last_workdir
-
-    @staticmethod
     def strip_buildkit_syntax(dockerfile_content: str) -> str:
         """Remove BuildKit ``--mount=...`` flags from ``RUN`` instructions.
 
@@ -352,10 +330,9 @@ class DaytonaProvider(ContainerProvider):
         content = src.read_text()
         stripped = cls.strip_buildkit_syntax(content)
 
-        # Parse CMD and WORKDIR from the original Dockerfile so
-        # start_container can use them as fallbacks.
+        # Parse CMD from the original Dockerfile so start_container can
+        # use it as a fallback when openenv.yaml is unavailable.
         parsed_cmd = cls._parse_dockerfile_cmd(content)
-        parsed_workdir = cls._parse_dockerfile_workdir(content)
 
         # Write stripped content to a temp file in the context directory.
         # Safe to delete immediately: from_dockerfile reads the file eagerly
@@ -368,11 +345,9 @@ class DaytonaProvider(ContainerProvider):
         finally:
             tmp_path.unlink(missing_ok=True)
 
-        # Attach parsed metadata so start_container can discover them.
+        # Attach the parsed CMD so start_container can discover it.
         if parsed_cmd is not None:
             image._openenv_server_cmd = parsed_cmd
-        if parsed_workdir is not None:
-            image._openenv_workdir = parsed_workdir
 
         return image
 
@@ -463,15 +438,7 @@ class DaytonaProvider(ContainerProvider):
                     # Fall back to CMD parsed from Dockerfile (if available).
                     dockerfile_cmd = getattr(image, "_openenv_server_cmd", None)
                     if dockerfile_cmd:
-                        # Daytona process.exec doesn't honour Docker
-                        # WORKDIR, so cd into it before running the CMD.
-                        # This ensures Python's CWD-based sys.path entry
-                        # matches what a normal ``docker run`` provides.
-                        workdir = getattr(image, "_openenv_workdir", None)
-                        if workdir:
-                            cmd = f"cd {shlex.quote(workdir)} && {dockerfile_cmd}"
-                        else:
-                            cmd = dockerfile_cmd
+                        cmd = dockerfile_cmd
                     else:
                         raise
 
