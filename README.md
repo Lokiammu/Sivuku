@@ -252,8 +252,6 @@ with EchoEnv(base_url="...").sync() as client:
     result = client.step(action)
 ```
 
-Note: Some environments use MCP tools (like echo-env), while others use action-based APIs. See the [quickstart guide](docs/quickstart.md) for examples of both patterns.
-
 See example scripts in `examples/` directory.
 
 ## CLI Commands
