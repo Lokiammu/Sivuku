@@ -7,13 +7,13 @@ import shutil
 import subprocess
 from importlib import resources
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional, Tuple
+from typing import Annotated, Dict, List, Tuple
 
 import typer
 
 from .._cli_utils import console
 
-# Commands are registered in __main__.py
+app = typer.Typer(help="Initialize a new OpenEnv environment")
 
 
 def _snake_to_pascal(snake_str: str) -> str:
@@ -393,6 +393,7 @@ def _generate_uv_lock(env_dir: Path) -> bool:
         return False
 
 
+@app.command()
 def init(
     env_name: Annotated[
         str,
@@ -401,7 +402,7 @@ def init(
         ),
     ],
     output_dir: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--output-dir",
             "-o",
