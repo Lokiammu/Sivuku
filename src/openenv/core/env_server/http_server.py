@@ -303,28 +303,28 @@ class HTTPEnvServer:
             session_id = str(uuid.uuid4())
             current_time = time.time()
 
-            # Create executor FIRST, then create environment IN the executor
-            # This is critical for thread-sensitive libraries like Playwright/greenlet
-            # that require all operations to run in the same thread where the object was created
+            # Create executor and reserve slot so capacity is not exceeded while
+            # we create the env outside the lock (avoids blocking other sessions)
             executor = ThreadPoolExecutor(max_workers=1)
             self._session_executors[session_id] = executor
+            self._sessions[session_id] = None  # placeholder until env is ready
 
-            try:
-                # Create environment in the executor thread
-                loop = asyncio.get_event_loop()
-                env = await loop.run_in_executor(executor, self._env_factory)
-            except Exception as e:
-                # Clean up executor on failure
+        try:
+            # Create environment in the executor thread (outside lock)
+            loop = asyncio.get_event_loop()
+            env = await loop.run_in_executor(executor, self._env_factory)
+        except Exception as e:
+            async with self._session_lock:
                 executor.shutdown(wait=False)
-                del self._session_executors[session_id]
-                factory_name = getattr(
-                    self._env_factory, "__name__", str(self._env_factory)
-                )
-                raise EnvironmentFactoryError(factory_name) from e
+                self._session_executors.pop(session_id, None)
+                self._sessions.pop(session_id, None)
+            factory_name = getattr(
+                self._env_factory, "__name__", str(self._env_factory)
+            )
+            raise EnvironmentFactoryError(factory_name) from e
 
+        async with self._session_lock:
             self._sessions[session_id] = env
-
-            # Track session metadata
             self._session_info[session_id] = SessionInfo(
                 session_id=session_id,
                 created_at=current_time,
@@ -333,7 +333,7 @@ class HTTPEnvServer:
                 environment_type=type(env).__name__,
             )
 
-            return session_id, env
+        return session_id, env
 
     async def _destroy_session(self, session_id: str) -> None:
         """
