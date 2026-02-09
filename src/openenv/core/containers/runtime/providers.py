@@ -88,10 +88,6 @@ class ContainerProvider(ABC):
         """
         pass
 
-    def get_connect_headers(self) -> Dict[str, str]:
-        """Return extra headers for the WebSocket connection. Default: none."""
-        return {}
-
 
 class LocalDockerProvider(ContainerProvider):
     """
@@ -655,10 +651,6 @@ class RuntimeProvider(ABC):
         Wait for the runtime to be ready to accept requests.
         """
         pass
-
-    def get_connect_headers(self) -> Dict[str, str]:
-        """Return extra headers for the WebSocket connection. Default: none."""
-        return {}
 
     def __enter__(self) -> "RuntimeProvider":
         """

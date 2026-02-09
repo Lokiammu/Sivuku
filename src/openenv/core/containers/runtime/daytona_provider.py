@@ -93,7 +93,6 @@ class DaytonaProvider(ContainerProvider):
         self._create_timeout = create_timeout
         self._sandbox: Any = None
         self._preview_url: Optional[str] = None
-        self._preview_token: Optional[str] = None
 
     def _discover_server_cmd(self, sandbox: Any, port: int = 8000) -> str:
         """Discover the server command from ``openenv.yaml`` inside *sandbox*.
@@ -298,10 +297,11 @@ class DaytonaProvider(ContainerProvider):
         Args:
             dockerfile_path: Path to the Dockerfile on disk.
             context_dir: Build context directory.  Defaults to the
-                Dockerfile's parent directory.  When different from the
-                parent, a temporary copy of the (stripped) Dockerfile is
-                written into *context_dir* and cleaned up after the
-                ``Image`` is created.
+                Dockerfile's grandparent directory, matching the
+                ``openenv init`` convention where Dockerfiles live in
+                ``<env>/server/Dockerfile`` and the build context is
+                ``<env>/``.  Pass explicitly for non-standard layouts
+                (e.g. ``context_dir="."`` for repo-root contexts).
 
         Returns:
             A ``daytona.Image`` instance ready to pass to
@@ -309,14 +309,17 @@ class DaytonaProvider(ContainerProvider):
 
         Raises:
             FileNotFoundError: If *dockerfile_path* does not exist.
-            ValueError: If *context_dir* is given but does not exist.
+            ValueError: If *context_dir* is given but does not exist,
+                or if COPY sources in the Dockerfile cannot be found
+                under the resolved context directory.
         """
         import pathlib
+        import re
         import uuid
 
         from daytona import Image
 
-        src = pathlib.Path(dockerfile_path)
+        src = pathlib.Path(dockerfile_path).resolve()
         if not src.is_file():
             raise FileNotFoundError(f"Dockerfile not found: {dockerfile_path}")
 
@@ -325,10 +328,31 @@ class DaytonaProvider(ContainerProvider):
             if not ctx.is_dir():
                 raise ValueError(f"context_dir does not exist: {context_dir}")
         else:
-            ctx = src.parent
+            # Default: grandparent of the Dockerfile, matching the
+            # openenv init layout (<env>/server/Dockerfile -> <env>/).
+            ctx = src.parent.parent
 
         content = src.read_text()
         stripped = cls.strip_buildkit_syntax(content)
+
+        # Validate that COPY sources exist under the context directory.
+        # This catches mismatches early (e.g. a Dockerfile expecting repo
+        # root as context when we defaulted to the env directory).
+        for line in stripped.splitlines():
+            m = re.match(r"^\s*COPY\s+(?!--from=)(\S+)\s+", line, re.IGNORECASE)
+            if not m:
+                continue
+            copy_src = m.group(1)
+            if copy_src.startswith("/"):
+                continue
+            resolved = ctx / copy_src
+            if not resolved.exists() and not any(ctx.glob(copy_src)):
+                raise ValueError(
+                    f"Dockerfile COPY source '{copy_src}' not found "
+                    f"under context_dir '{ctx}'. This Dockerfile may "
+                    f"expect a different build context (e.g. the repo "
+                    f"root). Pass context_dir explicitly."
+                )
 
         # Parse CMD from the original Dockerfile so start_container can
         # use it as a fallback when openenv.yaml is unavailable.
@@ -452,10 +476,12 @@ class DaytonaProvider(ContainerProvider):
                 timeout=10,
             )
 
-            # Get preview link for port 8000
-            preview_info = self._sandbox.get_preview_link(8000)
-            self._preview_url = preview_info.url
-            self._preview_token = preview_info.token
+            # Get a signed preview URL for port 8000.  The token is
+            # embedded in the URL itself so no extra headers are needed.
+            signed = self._sandbox.create_signed_preview_url(
+                8000, expires_in_seconds=86400
+            )
+            self._preview_url = signed.url
         except Exception:
             self.stop_container()
             raise
@@ -472,7 +498,6 @@ class DaytonaProvider(ContainerProvider):
         finally:
             self._sandbox = None
             self._preview_url = None
-            self._preview_token = None
 
     def wait_for_ready(self, base_url: str, timeout_s: float = 120.0) -> None:
         """
@@ -491,12 +516,11 @@ class DaytonaProvider(ContainerProvider):
         import requests
 
         health_url = f"{base_url}/health"
-        headers = self.get_connect_headers()
 
         deadline = time.time() + timeout_s
         while time.time() < deadline:
             try:
-                response = requests.get(health_url, timeout=5.0, headers=headers)
+                response = requests.get(health_url, timeout=5.0)
                 if response.status_code == 200:
                     return
             except requests.RequestException:
@@ -507,8 +531,3 @@ class DaytonaProvider(ContainerProvider):
             f"Daytona sandbox at {base_url} did not become ready within {timeout_s}s"
         )
 
-    def get_connect_headers(self) -> Dict[str, str]:
-        """Return the Daytona preview token header when the sandbox is private."""
-        if not self._public and self._preview_token:
-            return {"x-daytona-preview-token": self._preview_token}
-        return {}
