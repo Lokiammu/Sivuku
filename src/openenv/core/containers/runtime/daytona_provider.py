@@ -129,7 +129,7 @@ class DaytonaProvider(ContainerProvider):
         # Fallback: search for it (redirect stderr so error messages
         # like "No such file or directory" don't get mistaken for paths).
         resp = sandbox.process.exec(
-            "find /app -name openenv.yaml -maxdepth 4 -print -quit 2>/dev/null",
+            "find /app -maxdepth 4 -name openenv.yaml -print -quit 2>/dev/null",
             timeout=10,
         )
         path = (resp.result if hasattr(resp, "result") else str(resp) or "").strip()
