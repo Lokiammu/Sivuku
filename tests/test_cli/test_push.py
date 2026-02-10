@@ -654,3 +654,34 @@ def test_push_handles_base_image_not_found_in_dockerfile(tmp_path: Path) -> None
 
         # Should still work (adds FROM at beginning)
         assert mock_api.upload_folder.called
+
+
+def test_push_create_pr_calls_upload_folder_with_create_pr(tmp_path: Path) -> None:
+    """Test that push --create-pr passes create_pr=True to upload_folder and skips create_repo."""
+    _create_test_openenv_env(tmp_path)
+
+    with (
+        patch("openenv.cli.commands.push.whoami") as mock_whoami,
+        patch("openenv.cli.commands.push.login") as mock_login,
+        patch("openenv.cli.commands.push.HfApi") as mock_hf_api_class,
+    ):
+        mock_whoami.return_value = {"name": "testuser"}
+        mock_login.return_value = None
+        mock_api = MagicMock()
+        mock_hf_api_class.return_value = mock_api
+
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(str(tmp_path))
+            result = runner.invoke(
+                app, ["push", "--repo-id", "my-org/my-env", "--create-pr"]
+            )
+        finally:
+            os.chdir(old_cwd)
+
+        assert result.exit_code == 0
+        mock_api.upload_folder.assert_called_once()
+        call_kwargs = mock_api.upload_folder.call_args[1]
+        assert call_kwargs.get("create_pr") is True
+        # When create_pr we do not create the repo (target repo must exist)
+        mock_api.create_repo.assert_not_called()
