@@ -2,7 +2,7 @@
 """Minimal example for the TB2 OpenEnv runner (Daytona mode).
 
 Usage:
-    PYTHONPATH=src:envs uv run python examples/daytona_tbench2.py
+    PYTHONPATH=src:envs uv run python examples/daytona_tbench2_simple.py
 
 Requires:
     DAYTONA_API_KEY environment variable.

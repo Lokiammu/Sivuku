@@ -5,8 +5,8 @@ Shows how Daytona scales horizontally — each sandbox is an isolated
 container, so we can spin up many in parallel.
 
 Usage:
-    PYTHONPATH=src:envs uv run python examples/daytona_concurrent.py
-    PYTHONPATH=src:envs uv run python examples/daytona_concurrent.py --n 20
+    PYTHONPATH=src:envs uv run python examples/daytona_tbench2_concurrent.py
+    PYTHONPATH=src:envs uv run python examples/daytona_tbench2_concurrent.py --n 20
 
 Requires:
     DAYTONA_API_KEY environment variable.
