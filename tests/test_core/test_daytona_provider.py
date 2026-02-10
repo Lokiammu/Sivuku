@@ -50,8 +50,6 @@ def _install_fake_daytona():
                     return (
                         "spec_version: 1\nname: test\napp: server.app:app\nport: 8000\n"
                     )
-                if "kill -0" in cmd:
-                    return "RUNNING"
                 return ""
 
             sandbox.process.exec = MagicMock(side_effect=_default_exec)
@@ -123,7 +121,7 @@ def public_provider():
 
 @pytest.fixture(autouse=True)
 def _fast_provider_sleep():
-    """Avoid real startup sleeps from DaytonaProvider.start_container()."""
+    """Avoid real sleeps in DaytonaProvider (start_container and wait_for_ready)."""
     with patch("openenv.core.containers.runtime.daytona_provider.time.sleep"):
         yield
 
@@ -833,7 +831,7 @@ class TestStartContainerWithDockerfilePrefix:
 # ---------------------------------------------------------------------------
 class TestServerCrashDetection:
     def test_dead_process_raises_with_log(self):
-        """start_container raises RuntimeError with log when server dies immediately."""
+        """wait_for_ready raises RuntimeError with log when server process is dead."""
         p = DaytonaProvider(api_key="k", cmd="python -m broken_server")
 
         def _exec(cmd, **kw):
@@ -852,12 +850,16 @@ class TestServerCrashDetection:
 
         p._daytona.create = patched_create
 
-        with pytest.raises(RuntimeError, match="Server process died") as exc_info:
-            p.start_container("img:latest")
+        import requests
+
+        url = p.start_container("img:latest")
+        with patch("requests.get", side_effect=requests.ConnectionError("refused")):
+            with pytest.raises(RuntimeError, match="Server process died") as exc_info:
+                p.wait_for_ready(url)
         assert "broken_server" in str(exc_info.value)
 
     def test_dead_process_cleans_up_sandbox(self):
-        """Sandbox is deleted when server crashes immediately."""
+        """Sandbox can be cleaned up after wait_for_ready detects a crash."""
         p = DaytonaProvider(api_key="k", cmd="python -m broken")
 
         def _exec(cmd, **kw):
@@ -876,8 +878,15 @@ class TestServerCrashDetection:
 
         p._daytona.create = patched_create
 
-        with pytest.raises(RuntimeError):
-            p.start_container("img:latest")
+        import requests
+
+        url = p.start_container("img:latest")
+        assert p._sandbox is not None
+        with patch("requests.get", side_effect=requests.ConnectionError("refused")):
+            with pytest.raises(RuntimeError):
+                p.wait_for_ready(url)
+        # Caller is responsible for cleanup
+        p.stop_container()
         assert p._sandbox is None
 
 
@@ -900,8 +909,6 @@ class TestDockerfileCmdFallback:
                 return ""
             if cmd.startswith("find /app"):
                 return ""
-            if "kill -0" in cmd:
-                return "RUNNING"
             return ""
 
         original_create = p._daytona.create
