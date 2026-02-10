@@ -130,7 +130,9 @@ def _fast_provider_sleep():
 
 def _assert_exec_called_with_fragment(sandbox, expected_fragment: str) -> str:
     """Assert sandbox.process.exec was called with a command containing a fragment."""
-    commands = [call.args[0] for call in sandbox.process.exec.call_args_list if call.args]
+    commands = [
+        call.args[0] for call in sandbox.process.exec.call_args_list if call.args
+    ]
     assert any(expected_fragment in cmd for cmd in commands), (
         f"Expected process.exec command containing: {expected_fragment!r}\n"
         f"Observed commands: {commands}"
@@ -279,9 +281,7 @@ class TestRefreshPreviewUrl:
         # Reset the mock so we can distinguish the refresh call
         new_signed = MagicMock()
         new_signed.url = "https://8000-refreshed.proxy.daytona.works"
-        provider._sandbox.create_signed_preview_url = MagicMock(
-            return_value=new_signed
-        )
+        provider._sandbox.create_signed_preview_url = MagicMock(return_value=new_signed)
         url = provider.refresh_preview_url()
         assert url == "https://8000-refreshed.proxy.daytona.works"
         provider._sandbox.create_signed_preview_url.assert_called_once_with(
@@ -293,9 +293,7 @@ class TestRefreshPreviewUrl:
         provider.start_container("echo-env:latest")
         new_signed = MagicMock()
         new_signed.url = "https://8000-refreshed.proxy.daytona.works"
-        provider._sandbox.create_signed_preview_url = MagicMock(
-            return_value=new_signed
-        )
+        provider._sandbox.create_signed_preview_url = MagicMock(return_value=new_signed)
         provider.refresh_preview_url()
         assert provider._preview_url == "https://8000-refreshed.proxy.daytona.works"
 
@@ -332,7 +330,6 @@ class TestWaitForReady:
         with patch("requests.get", side_effect=requests.ConnectionError("nope")):
             with pytest.raises(TimeoutError, match="did not become ready"):
                 provider.wait_for_ready(url, timeout_s=0.1)
-
 
 
 # ---------------------------------------------------------------------------
@@ -521,7 +518,10 @@ class TestParseDockerfileCmd:
 
     def test_exec_form(self):
         content = 'FROM python:3.11\nCMD ["uvicorn", "app:app", "--port", "8000"]\n'
-        assert DaytonaProvider._parse_dockerfile_cmd(content) == "uvicorn app:app --port 8000"
+        assert (
+            DaytonaProvider._parse_dockerfile_cmd(content)
+            == "uvicorn app:app --port 8000"
+        )
 
     def test_last_cmd_wins(self):
         content = "FROM python:3.11\nCMD first\nCMD second\n"

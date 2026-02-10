@@ -20,6 +20,7 @@ from typing import Any, Callable, Dict, Optional
 
 from .providers import ContainerProvider
 
+
 class DaytonaProvider(ContainerProvider):
     """
     Container provider that runs environments in Daytona cloud sandboxes.
@@ -360,7 +361,7 @@ class DaytonaProvider(ContainerProvider):
 
     def start_container(
         self,
-        image: "str | daytona.Image",
+        image: str | Any,
         port: Optional[int] = None,
         env_vars: Optional[Dict[str, str]] = None,
         **kwargs: Any,
@@ -473,9 +474,7 @@ class DaytonaProvider(ContainerProvider):
                 )
                 log = log_resp.result if hasattr(log_resp, "result") else ""
                 raise RuntimeError(
-                    f"Server process died immediately.\n"
-                    f"Command: {cmd}\n"
-                    f"Log:\n{log}"
+                    f"Server process died immediately.\nCommand: {cmd}\nLog:\n{log}"
                 )
 
             # Get a signed preview URL for port 8000.  The token is
@@ -499,9 +498,7 @@ class DaytonaProvider(ContainerProvider):
         """
         if self._sandbox is None:
             raise RuntimeError("No active sandbox to refresh URL for.")
-        signed = self._sandbox.create_signed_preview_url(
-            8000, expires_in_seconds=86400
-        )
+        signed = self._sandbox.create_signed_preview_url(8000, expires_in_seconds=86400)
         self._preview_url = signed.url
         return self._preview_url
 
@@ -547,4 +544,3 @@ class DaytonaProvider(ContainerProvider):
         raise TimeoutError(
             f"Daytona sandbox at {base_url} did not become ready within {timeout_s}s"
         )
-
