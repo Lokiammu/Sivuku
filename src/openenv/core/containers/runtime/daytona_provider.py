@@ -18,6 +18,8 @@ import shlex
 import time
 from typing import Any, Callable, Dict, Optional
 
+import yaml
+
 from .providers import ContainerProvider
 
 
@@ -144,8 +146,6 @@ class DaytonaProvider(ContainerProvider):
 
         Uses PyYAML to handle comments, quotes, and nested keys correctly.
         """
-        import yaml
-
         try:
             data = yaml.safe_load(yaml_content) or {}
         except Exception:
