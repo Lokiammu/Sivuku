@@ -299,18 +299,32 @@ def _upload_to_hf_space(
     staging_dir: Path,
     api: HfApi,
     private: bool = False,
+    create_pr: bool = False,
+    commit_message: str | None = None,
 ) -> None:
     """Upload files to Hugging Face Space."""
-    console.print(f"[bold cyan]Uploading files to {repo_id}...[/bold cyan]")
+    if create_pr:
+        console.print(
+            f"[bold cyan]Uploading files to {repo_id} (will open a Pull Request)...[/bold cyan]"
+        )
+    else:
+        console.print(f"[bold cyan]Uploading files to {repo_id}...[/bold cyan]")
+
+    upload_kwargs: dict = {
+        "folder_path": str(staging_dir),
+        "repo_id": repo_id,
+        "repo_type": "space",
+        "ignore_patterns": [".git", "__pycache__", "*.pyc"],
+        "create_pr": create_pr,
+    }
+    if commit_message:
+        upload_kwargs["commit_message"] = commit_message
 
     try:
-        api.upload_folder(
-            folder_path=str(staging_dir),
-            repo_id=repo_id,
-            repo_type="space",
-            ignore_patterns=[".git", "__pycache__", "*.pyc"],
-        )
+        result = api.upload_folder(**upload_kwargs)
         console.print("[bold green]✓[/bold green] Upload completed successfully")
+        if create_pr and result is not None and hasattr(result, "pr_url"):
+            console.print(f"[bold]Pull request:[/bold] {result.pr_url}")
         console.print(
             f"[bold]Space URL:[/bold] https://huggingface.co/spaces/{repo_id}"
         )
@@ -371,6 +385,13 @@ def push(
             help="Deploy the space as private",
         ),
     ] = False,
+    create_pr: Annotated[
+        bool,
+        typer.Option(
+            "--create-pr",
+            help="Create a Pull Request instead of pushing to the default branch",
+        ),
+    ] = False,
 ) -> None:
     """
     Push an OpenEnv environment to Hugging Face Spaces or a custom Docker registry.
@@ -387,6 +408,10 @@ def push(
         # Push to HuggingFace Spaces from current directory (web interface enabled)
         $ cd my_env
         $ openenv push
+
+        # Push to HuggingFace repo and open a Pull Request
+        $ openenv push my-org/my-env --create-pr
+        $ openenv push --repo-id my-org/my-env --create-pr
 
         # Push to HuggingFace without web interface
         $ openenv push --no-interface
@@ -531,11 +556,19 @@ def push(
             enable_interface=enable_interface,
         )
 
-        # Create/verify space
-        _create_hf_space(repo_id, api, private=private)
+        # Create/verify space (no-op if exists; needed when pushing to own new repo)
+        if not create_pr:
+            _create_hf_space(repo_id, api, private=private)
+        # When create_pr we rely on upload_folder to create branch and PR
 
         # Upload files
-        _upload_to_hf_space(repo_id, staging_dir, api, private=private)
+        _upload_to_hf_space(
+            repo_id,
+            staging_dir,
+            api,
+            private=private,
+            create_pr=create_pr,
+        )
 
         console.print("\n[bold green]✓ Deployment complete![/bold green]")
         console.print(f"Visit your space at: https://huggingface.co/spaces/{repo_id}")
