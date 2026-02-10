@@ -1246,7 +1246,7 @@ def create_app(
     )
 
     if enable_web:
-        # Import web interface only when needed
+        # Gradio-based web UI (gradio is a core dependency)
         from .web_interface import create_web_interface_app
 
         return create_web_interface_app(
