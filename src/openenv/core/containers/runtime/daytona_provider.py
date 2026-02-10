@@ -448,12 +448,35 @@ class DaytonaProvider(ContainerProvider):
                         raise
 
             # Wrap in bash -c so compound commands (cd ... && uvicorn ...)
-            # are handled correctly by nohup.
+            # are handled correctly by nohup.  Write PID so we can check
+            # if the process crashed immediately.
             escaped_cmd = shlex.quote(cmd)
             self._sandbox.process.exec(
-                f"nohup bash -c {escaped_cmd} > /tmp/openenv-server.log 2>&1 &",
+                f"nohup bash -c {escaped_cmd} > /tmp/openenv-server.log 2>&1 &"
+                " echo $! > /tmp/openenv-server.pid",
                 timeout=10,
             )
+
+            # Quick sanity check: did the server process survive startup?
+            # Catches immediate crashes (bad command, missing module) so
+            # the user gets a useful error instead of a 120s health timeout.
+            time.sleep(2)
+            resp = self._sandbox.process.exec(
+                "kill -0 $(cat /tmp/openenv-server.pid) 2>/dev/null"
+                " && echo RUNNING || echo DEAD",
+                timeout=10,
+            )
+            out = resp.result if hasattr(resp, "result") else str(resp)
+            if "DEAD" in (out or ""):
+                log_resp = self._sandbox.process.exec(
+                    "cat /tmp/openenv-server.log 2>/dev/null", timeout=10
+                )
+                log = log_resp.result if hasattr(log_resp, "result") else ""
+                raise RuntimeError(
+                    f"Server process died immediately.\n"
+                    f"Command: {cmd}\n"
+                    f"Log:\n{log}"
+                )
 
             # Get a signed preview URL for port 8000.  The token is
             # embedded in the URL itself so no extra headers are needed.
