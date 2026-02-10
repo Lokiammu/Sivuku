@@ -1,3 +1,15 @@
+---
+title: Calendar Environment Server
+emoji: 📅
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+app_port: 8004
+base_path: /docs
+tags:
+  - openenv
+---
 # Calendar Environment
 
 This environment exposes a Calendar Gym tools through the OpenEnv reset/step/state interface. The server runs a FastAPI app that serves the OpenEnv endpoints.
@@ -7,7 +19,7 @@ This environment exposes a Calendar Gym tools through the OpenEnv reset/step/sta
 ### Docker (Recommended)
 
 ```bash
-cd envs/calendar_env/server
+cd envs/calendar_env
 docker build -t calendar-env:latest .
 docker run --rm -p 8004:8004 calendar-env:latest
 curl http://localhost:8004/health
@@ -22,8 +34,7 @@ cd envs/calendar_env
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cd server
-uvicorn main:app --host 0.0.0.0 --port 8004 --reload
+uvicorn server.app:app --host 0.0.0.0 --port 8004
 ```
 
 ## Client Setup
