@@ -60,8 +60,6 @@ class DaytonaProvider(ContainerProvider):
             cmd: Shell command to start the server inside the sandbox.
             create_timeout: Seconds to wait for sandbox creation (default 300).
                 Heavy images (e.g. with Playwright/Chromium) may need more.
-                If ``None``, auto-discovered from ``openenv.yaml`` inside
-                the sandbox after creation.
         """
         from daytona import Daytona, DaytonaConfig
 
