@@ -47,6 +47,8 @@ def test_fork_calls_duplicate_space_with_from_id() -> None:
         call_kwargs = mock_api.duplicate_space.call_args[1]
         assert call_kwargs["from_id"] == "owner/source-space"
         assert call_kwargs["private"] is False
+        # HF API requires hardware; default to free cpu-basic when not specified
+        assert call_kwargs["hardware"] == "cpu-basic"
 
 
 def test_fork_passes_private_and_to_id() -> None:

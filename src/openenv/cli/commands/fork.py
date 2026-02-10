@@ -160,8 +160,8 @@ def fork(
         dup_kwargs["secrets"] = [
             {"key": k, "value": v} for k, v in (_parse_key_value(x) for x in set_secret)
         ]
-    if hardware is not None:
-        dup_kwargs["hardware"] = hardware
+    # HF API requires hardware when duplicating; default to free cpu-basic
+    dup_kwargs["hardware"] = hardware if hardware is not None else "cpu-basic"
     if repo_id is not None:
         if "/" not in repo_id or repo_id.count("/") != 1:
             raise typer.BadParameter(
