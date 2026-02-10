@@ -13,10 +13,12 @@ from .providers import (
     LocalDockerProvider,
     RuntimeProvider,
 )
+from .daytona_provider import DaytonaProvider
 from .uv_provider import UVProvider
 
 __all__ = [
     "ContainerProvider",
+    "DaytonaProvider",
     "DockerSwarmProvider",
     "LocalDockerProvider",
     "KubernetesProvider",
