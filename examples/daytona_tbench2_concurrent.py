@@ -16,7 +16,7 @@ import argparse
 import asyncio
 import time
 
-from openenv.core.containers.runtime import DaytonaProvider
+from openenv.core.containers.runtime.daytona_provider import DaytonaProvider
 from tbench2_env import Tbench2Action, Tbench2Env
 
 

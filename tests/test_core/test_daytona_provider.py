@@ -101,7 +101,7 @@ def _install_fake_daytona():
 _fake_daytona = _install_fake_daytona()
 
 # Now safe to import the provider
-from openenv.core.containers.runtime import DaytonaProvider
+from openenv.core.containers.runtime.daytona_provider import DaytonaProvider
 
 
 # ---------------------------------------------------------------------------
