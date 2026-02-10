@@ -467,6 +467,21 @@ class DaytonaProvider(ContainerProvider):
 
         return self._preview_url
 
+    def refresh_preview_url(self) -> str:
+        """Get a fresh signed preview URL (valid for 24h).
+
+        Daytona signed URLs expire after at most 24 hours.  Call this to
+        get a new one for long-running sessions.  The returned URL points
+        to the same sandbox — clients will need to reconnect using it.
+        """
+        if self._sandbox is None:
+            raise RuntimeError("No active sandbox to refresh URL for.")
+        signed = self._sandbox.create_signed_preview_url(
+            8000, expires_in_seconds=86400
+        )
+        self._preview_url = signed.url
+        return self._preview_url
+
     def stop_container(self) -> None:
         """Delete the Daytona sandbox."""
         if self._sandbox is None:
