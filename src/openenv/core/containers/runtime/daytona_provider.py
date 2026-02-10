@@ -20,32 +20,15 @@ from typing import Any, Callable, Dict, Optional
 
 from .providers import ContainerProvider
 
-# Daytona sandboxes use Docker images for the filesystem but do NOT execute
-# the image's CMD/ENTRYPOINT.  The provider discovers the server command from
-# ``openenv.yaml`` inside the sandbox and starts it via ``process.exec``.
-
-
 class DaytonaProvider(ContainerProvider):
     """
     Container provider that runs environments in Daytona cloud sandboxes.
 
-    Daytona sandboxes use Docker images for the filesystem (installed
-    packages, copied files) but do **not** automatically run the image's
-    CMD.  The provider starts the server process via
-    ``sandbox.process.exec`` after creation.
-
-    The server command is resolved in order:
-
-    1. Explicit ``cmd`` from the constructor or ``**kwargs``.
-    2. Auto-discovered from ``openenv.yaml`` inside the sandbox.
-    3. ``CMD`` parsed from the Dockerfile (when built via ``image_from_dockerfile``).
-    4. ``ValueError`` if none of the above are available.
-
     Example:
         >>> provider = DaytonaProvider(api_key="your-key")
-        >>> base_url = provider.start_container("lovrepesut/openenv-connect4:latest")
+        >>> image = DaytonaProvider.image_from_dockerfile("envs/echo_env/server/Dockerfile")
+        >>> base_url = provider.start_container(image)
         >>> provider.wait_for_ready(base_url)
-        >>> # Use environment via base_url
         >>> provider.stop_container()
     """
 
@@ -180,7 +163,7 @@ class DaytonaProvider(ContainerProvider):
 
         Handles exec form (``CMD ["prog", "arg"]``) and shell form
         (``CMD prog arg``).  When a Dockerfile has multiple ``CMD``
-        instructions (e.g. multi-stage builds), the last one wins — same
+        instructions (e.g. multi-stage builds), the last one wins - same
         semantics as Docker itself.  Lines where ``CMD`` appears inside a
         comment are ignored.
 
@@ -385,10 +368,8 @@ class DaytonaProvider(ContainerProvider):
         """
         Create a Daytona sandbox from a Docker image, snapshot, or Image object.
 
-        After sandbox creation the provider starts the server process
-        (Daytona sandboxes do not execute the image CMD automatically).
-
-        The command is resolved in order:
+        Daytona does not execute the image's CMD (known bug — ENTRYPOINT
+        runs, CMD does not).  The server command is resolved in order:
 
         1. Explicit ``cmd`` passed to the constructor.
         2. ``cmd`` key in ``**kwargs`` (popped before forwarding).
@@ -466,8 +447,6 @@ class DaytonaProvider(ContainerProvider):
                     else:
                         raise
 
-            # Start the server process.  Daytona sandboxes do NOT run the
-            # Docker image CMD, so we exec it ourselves in the background.
             # Wrap in bash -c so compound commands (cd ... && uvicorn ...)
             # are handled correctly by nohup.
             escaped_cmd = shlex.quote(cmd)
