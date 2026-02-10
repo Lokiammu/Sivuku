@@ -128,6 +128,14 @@ def _fast_provider_sleep():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _clean_dockerfile_registry():
+    """Clear the Dockerfile registry between tests."""
+    DaytonaProvider._dockerfile_registry.clear()
+    yield
+    DaytonaProvider._dockerfile_registry.clear()
+
+
 def _assert_exec_called_with_fragment(sandbox, expected_fragment: str) -> str:
     """Assert sandbox.process.exec was called with a command containing a fragment."""
     commands = [
@@ -651,31 +659,35 @@ class TestStripBuildkitSyntax:
 # Tests: image_from_dockerfile
 # ---------------------------------------------------------------------------
 class TestImageFromDockerfile:
-    def test_basic_usage(self, tmp_path):
-        """A simple Dockerfile produces an Image object."""
+    def test_returns_dockerfile_uri(self, tmp_path):
+        """Returns a 'dockerfile:' prefixed string with absolute path."""
         df = tmp_path / "Dockerfile"
         df.write_text("FROM python:3.11\nRUN pip install flask\n")
-        img = DaytonaProvider.image_from_dockerfile(str(df))
-        assert img is not None
-        assert hasattr(img, "dockerfile_path")
+        result = DaytonaProvider.image_from_dockerfile(str(df))
+        assert isinstance(result, str)
+        assert result.startswith("dockerfile:")
+        assert result == f"dockerfile:{df.resolve()}"
 
-    def test_buildkit_stripped(self, tmp_path):
-        """BuildKit --mount syntax is stripped before passing to Image."""
+    def test_buildkit_stripped_in_registry(self, tmp_path):
+        """BuildKit --mount syntax is stripped in the stored registry entry."""
         df = tmp_path / "Dockerfile"
         df.write_text(
             "FROM python:3.11\nRUN --mount=type=cache,target=/x pip install flask\n"
         )
-        img = DaytonaProvider.image_from_dockerfile(str(df))
-        # The fake Image captures file content at call time (before cleanup)
-        assert "--mount=" not in img._content
-        assert "pip install flask" in img._content
+        result = DaytonaProvider.image_from_dockerfile(str(df))
+        key = result[len("dockerfile:") :]
+        stripped = DaytonaProvider._dockerfile_registry[key]["stripped_content"]
+        assert "--mount=" not in stripped
+        assert "pip install flask" in stripped
 
     def test_context_dir_same_as_parent(self, tmp_path):
         """Explicit context_dir pointing to Dockerfile's parent works."""
         df = tmp_path / "Dockerfile"
         df.write_text("FROM python:3.11\n")
-        img = DaytonaProvider.image_from_dockerfile(str(df), context_dir=str(tmp_path))
-        assert img is not None
+        result = DaytonaProvider.image_from_dockerfile(
+            str(df), context_dir=str(tmp_path)
+        )
+        assert result.startswith("dockerfile:")
 
     def test_context_dir_different(self, tmp_path):
         """Dockerfile in a subdirectory, context_dir is the parent."""
@@ -683,8 +695,22 @@ class TestImageFromDockerfile:
         server.mkdir()
         df = server / "Dockerfile"
         df.write_text("FROM python:3.11\nCOPY . /app\n")
-        img = DaytonaProvider.image_from_dockerfile(str(df), context_dir=str(tmp_path))
-        assert img is not None
+        result = DaytonaProvider.image_from_dockerfile(
+            str(df), context_dir=str(tmp_path)
+        )
+        assert result.startswith("dockerfile:")
+
+    def test_context_dir_stored_in_registry(self, tmp_path):
+        """The resolved context_dir is stored in the registry."""
+        server = tmp_path / "server"
+        server.mkdir()
+        df = server / "Dockerfile"
+        df.write_text("FROM python:3.11\nCOPY . /app\n")
+        result = DaytonaProvider.image_from_dockerfile(
+            str(df), context_dir=str(tmp_path)
+        )
+        key = result[len("dockerfile:") :]
+        assert DaytonaProvider._dockerfile_registry[key]["context_dir"] == str(tmp_path)
 
     def test_file_not_found(self, tmp_path):
         """Nonexistent Dockerfile raises FileNotFoundError."""
@@ -698,15 +724,15 @@ class TestImageFromDockerfile:
         with pytest.raises(ValueError, match="context_dir"):
             DaytonaProvider.image_from_dockerfile(str(df), context_dir="/no/such/dir")
 
-    def test_cleanup_on_success(self, tmp_path):
-        """After the call, no temp .dockerfile files remain in context_dir."""
+    def test_no_temp_files_created(self, tmp_path):
+        """image_from_dockerfile does not create temp files (Image is built later)."""
         df = tmp_path / "Dockerfile"
         df.write_text(
             "FROM python:3.11\nRUN --mount=type=cache,target=/x pip install\n"
         )
         DaytonaProvider.image_from_dockerfile(str(df), context_dir=str(tmp_path))
         leftover = list(tmp_path.glob("*.dockerfile"))
-        assert leftover == [], f"Temp files not cleaned up: {leftover}"
+        assert leftover == [], f"Unexpected temp files: {leftover}"
 
     def test_copy_source_not_found_raises(self, tmp_path):
         """COPY source missing under context_dir raises ValueError."""
@@ -717,38 +743,38 @@ class TestImageFromDockerfile:
         with pytest.raises(ValueError, match="COPY source.*not found"):
             DaytonaProvider.image_from_dockerfile(str(df), context_dir=str(tmp_path))
 
-    def test_cmd_attached_to_image(self, tmp_path):
-        """Parsed CMD is attached as _openenv_server_cmd on the Image."""
+    def test_cmd_stored_in_registry(self, tmp_path):
+        """Parsed CMD is stored as server_cmd in the registry."""
         df = tmp_path / "Dockerfile"
         df.write_text("FROM python:3.11\nCMD uvicorn app:app --port 8000\n")
-        img = DaytonaProvider.image_from_dockerfile(str(df))
-        assert img._openenv_server_cmd == "uvicorn app:app --port 8000"
+        result = DaytonaProvider.image_from_dockerfile(str(df))
+        key = result[len("dockerfile:") :]
+        assert (
+            DaytonaProvider._dockerfile_registry[key]["server_cmd"]
+            == "uvicorn app:app --port 8000"
+        )
 
-    def test_no_cmd_means_no_attribute(self, tmp_path):
-        """Without CMD in Dockerfile, _openenv_server_cmd is not set."""
+    def test_no_cmd_means_none_in_registry(self, tmp_path):
+        """Without CMD in Dockerfile, server_cmd is None in the registry."""
         df = tmp_path / "Dockerfile"
         df.write_text("FROM python:3.11\nRUN pip install flask\n")
-        img = DaytonaProvider.image_from_dockerfile(str(df))
-        assert not hasattr(img, "_openenv_server_cmd")
+        result = DaytonaProvider.image_from_dockerfile(str(df))
+        key = result[len("dockerfile:") :]
+        assert DaytonaProvider._dockerfile_registry[key]["server_cmd"] is None
 
 
 # ---------------------------------------------------------------------------
-# Tests: start_container with Image objects
+# Tests: start_container with "dockerfile:" prefix
 # ---------------------------------------------------------------------------
-class TestStartContainerWithImage:
-    def test_image_object_uses_image_params(self, provider):
-        """Passing an Image object uses CreateSandboxFromImageParams."""
-        img = _fake_daytona.Image()
-        provider.start_container(img, cmd="python serve.py")
+class TestStartContainerWithDockerfilePrefix:
+    def test_dockerfile_prefix_uses_image_params(self, provider, tmp_path):
+        """A 'dockerfile:' string uses CreateSandboxFromImageParams."""
+        df = tmp_path / "Dockerfile"
+        df.write_text("FROM python:3.11\n")
+        image = DaytonaProvider.image_from_dockerfile(str(df))
+        provider.start_container(image, cmd="python serve.py")
         params, _ = provider._daytona._created[0]
         assert isinstance(params, _fake_daytona.CreateSandboxFromImageParams)
-        assert params.image is img
-
-    def test_image_object_no_attribute_error(self, provider):
-        """Image object doesn't crash on the str-only startswith check."""
-        img = _fake_daytona.Image()
-        # Should not raise AttributeError
-        provider.start_container(img, cmd="python serve.py")
 
     def test_string_image_still_works(self, provider):
         """Backward compat: plain string images still work."""
@@ -761,24 +787,45 @@ class TestStartContainerWithImage:
         params, _ = provider._daytona._created[0]
         assert isinstance(params, _fake_daytona.CreateSandboxFromSnapshotParams)
 
-    def test_image_object_with_resources(self):
-        """Image + resources are both forwarded."""
+    def test_dockerfile_prefix_with_resources(self, tmp_path):
+        """dockerfile: + resources are both forwarded."""
+        df = tmp_path / "Dockerfile"
+        df.write_text("FROM python:3.11\n")
+        image = DaytonaProvider.image_from_dockerfile(str(df))
         resources = _fake_daytona.Resources(cpu=4, memory=8)
         p = DaytonaProvider(api_key="k", resources=resources)
-        img = _fake_daytona.Image()
-        p.start_container(img, cmd="python serve.py")
+        p.start_container(image, cmd="python serve.py")
         params, _ = p._daytona._created[0]
-        assert params.image is img
         assert params.resources is resources
 
-    def test_image_object_cmd_discovery(self):
-        """Image triggers same openenv.yaml auto-discovery."""
+    def test_dockerfile_prefix_cmd_discovery(self, tmp_path):
+        """dockerfile: triggers same openenv.yaml auto-discovery."""
+        df = tmp_path / "Dockerfile"
+        df.write_text("FROM python:3.11\n")
+        image = DaytonaProvider.image_from_dockerfile(str(df))
         p = DaytonaProvider(api_key="k")
-        img = _fake_daytona.Image()
-        p.start_container(img)
+        p.start_container(image)
         _assert_exec_called_with_fragment(
             p._sandbox, "cd /app/env && python -m uvicorn server.app:app"
         )
+
+    def test_dockerfile_prefix_without_registry_raises(self, provider):
+        """Passing 'dockerfile:...' without calling image_from_dockerfile raises."""
+        with pytest.raises(ValueError, match="No registered Dockerfile metadata"):
+            provider.start_container("dockerfile:/no/such/path")
+
+    def test_temp_files_cleaned_after_start(self, provider, tmp_path):
+        """Temp .dockerfile files created during start are cleaned up."""
+        df = tmp_path / "Dockerfile"
+        df.write_text(
+            "FROM python:3.11\nRUN --mount=type=cache,target=/x pip install\n"
+        )
+        image = DaytonaProvider.image_from_dockerfile(
+            str(df), context_dir=str(tmp_path)
+        )
+        provider.start_container(image, cmd="python serve.py")
+        leftover = list(tmp_path.glob("*.dockerfile"))
+        assert leftover == [], f"Temp files not cleaned up: {leftover}"
 
 
 # ---------------------------------------------------------------------------
@@ -838,8 +885,13 @@ class TestServerCrashDetection:
 # Tests: Dockerfile CMD fallback when openenv.yaml is missing
 # ---------------------------------------------------------------------------
 class TestDockerfileCmdFallback:
-    def test_fallback_to_dockerfile_cmd(self):
-        """When openenv.yaml is missing, falls back to Dockerfile CMD on the image."""
+    def test_fallback_to_dockerfile_cmd(self, tmp_path):
+        """When openenv.yaml is missing, falls back to CMD parsed from Dockerfile."""
+        df = tmp_path / "Dockerfile"
+        df.write_text(
+            "FROM python:3.11\nCMD uvicorn myapp:app --host 0.0.0.0 --port 8000\n"
+        )
+        image = DaytonaProvider.image_from_dockerfile(str(df))
         p = DaytonaProvider(api_key="k")
 
         def _exec(cmd, **kw):
@@ -861,14 +913,15 @@ class TestDockerfileCmdFallback:
 
         p._daytona.create = patched_create
 
-        img = _fake_daytona.Image()
-        img._openenv_server_cmd = "uvicorn myapp:app --host 0.0.0.0 --port 8000"
-        url = p.start_container(img)
+        url = p.start_container(image)
         assert url.startswith("https://")
         _assert_exec_called_with_fragment(p._sandbox, "uvicorn myapp:app")
 
-    def test_no_yaml_no_dockerfile_cmd_raises(self):
+    def test_no_yaml_no_dockerfile_cmd_raises(self, tmp_path):
         """When neither openenv.yaml nor Dockerfile CMD is available, raises."""
+        df = tmp_path / "Dockerfile"
+        df.write_text("FROM python:3.11\nRUN pip install flask\n")
+        image = DaytonaProvider.image_from_dockerfile(str(df))
         p = DaytonaProvider(api_key="k")
 
         def _exec(cmd, **kw):
@@ -883,6 +936,5 @@ class TestDockerfileCmdFallback:
 
         p._daytona.create = patched_create
 
-        img = _fake_daytona.Image()  # no _openenv_server_cmd
         with pytest.raises(ValueError, match="Could not find openenv.yaml"):
-            p.start_container(img)
+            p.start_container(image)

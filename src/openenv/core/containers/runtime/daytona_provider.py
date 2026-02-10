@@ -33,6 +33,8 @@ class DaytonaProvider(ContainerProvider):
         >>> provider.stop_container()
     """
 
+    _dockerfile_registry: Dict[str, Dict[str, Any]] = {}
+
     def __init__(
         self,
         *,
@@ -269,14 +271,14 @@ class DaytonaProvider(ContainerProvider):
         cls,
         dockerfile_path: str,
         context_dir: str | None = None,
-    ) -> Any:
-        """Build a Daytona ``Image`` from a local Dockerfile.
+    ) -> str:
+        """Validate a Dockerfile and return a ``dockerfile:`` URI for
+        :meth:`start_container`.
 
-        BuildKit ``--mount`` flags are automatically stripped before the
-        Dockerfile is passed to the Daytona SDK.  The Dockerfile's ``CMD``
-        instruction (if present) is parsed and attached to the returned
-        ``Image`` so that ``start_container`` can use it as a fallback
-        server command.
+        Eagerly validates the Dockerfile (existence, COPY sources,
+        BuildKit stripping) and stores the processed content in an
+        internal registry.  The actual ``daytona.Image`` is created
+        later inside ``start_container``.
 
         Args:
             dockerfile_path: Path to the Dockerfile on disk.
@@ -288,7 +290,7 @@ class DaytonaProvider(ContainerProvider):
                 (e.g. ``context_dir="."`` for repo-root contexts).
 
         Returns:
-            A ``daytona.Image`` instance ready to pass to
+            A ``"dockerfile:<abs_path>"`` string to pass to
             ``start_container``.
 
         Raises:
@@ -299,9 +301,6 @@ class DaytonaProvider(ContainerProvider):
         """
         import pathlib
         import re
-        import uuid
-
-        from daytona import Image
 
         src = pathlib.Path(dockerfile_path).resolve()
         if not src.is_file():
@@ -342,32 +341,23 @@ class DaytonaProvider(ContainerProvider):
         # use it as a fallback when openenv.yaml is unavailable.
         parsed_cmd = cls._parse_dockerfile_cmd(content)
 
-        # Write stripped content to a temp file in the context directory.
-        # Safe to delete immediately: from_dockerfile reads the file eagerly
-        # into Image._dockerfile (a string), never re-reads the path.
-        tmp_name = f".daytona-{uuid.uuid4().hex[:8]}.dockerfile"
-        tmp_path = ctx / tmp_name
-        try:
-            tmp_path.write_text(stripped)
-            image = Image.from_dockerfile(str(tmp_path))
-        finally:
-            tmp_path.unlink(missing_ok=True)
+        cls._dockerfile_registry[str(src)] = {
+            "stripped_content": stripped,
+            "context_dir": str(ctx),
+            "server_cmd": parsed_cmd,
+        }
 
-        # Attach the parsed CMD so start_container can discover it.
-        if parsed_cmd is not None:
-            image._openenv_server_cmd = parsed_cmd
-
-        return image
+        return f"dockerfile:{src}"
 
     def start_container(
         self,
-        image: str | Any,
+        image: str,
         port: Optional[int] = None,
         env_vars: Optional[Dict[str, str]] = None,
         **kwargs: Any,
     ) -> str:
         """
-        Create a Daytona sandbox from a Docker image, snapshot, or Image object.
+        Create a Daytona sandbox from a Docker image or snapshot.
 
         Daytona does not execute the image's CMD (known bug — ENTRYPOINT
         runs, CMD does not).  The server command is resolved in order:
@@ -379,10 +369,10 @@ class DaytonaProvider(ContainerProvider):
            ``image_from_dockerfile``).
 
         Args:
-            image: Docker image name (e.g. "echo-env:latest"),
-                   "snapshot:<name>" to create from a pre-built snapshot,
-                   or a ``daytona.Image`` object (e.g. from
-                   ``image_from_dockerfile``).
+            image: Docker image name (e.g. ``"echo-env:latest"``),
+                   ``"snapshot:<name>"`` to create from a pre-built snapshot,
+                   or ``"dockerfile:<path>"`` returned by
+                   :meth:`image_from_dockerfile`.
             port: Must be ``None`` or ``8000``. Daytona exposes port 8000
                   via its preview proxy; other ports raise ``ValueError``.
             env_vars: Environment variables forwarded to the sandbox.
@@ -402,6 +392,9 @@ class DaytonaProvider(ContainerProvider):
         # sandbox creation when we can inspect the filesystem).
         cmd = kwargs.pop("cmd", None) or self._cmd
 
+        # CMD parsed from Dockerfile (populated for "dockerfile:" images).
+        parsed_cmd: Optional[str] = None
+
         # Build creation params
         create_kwargs: Dict[str, Any] = {}
         if env_vars:
@@ -411,17 +404,50 @@ class DaytonaProvider(ContainerProvider):
         if self._auto_stop_interval != 15:
             create_kwargs["auto_stop_interval"] = self._auto_stop_interval
 
-        if isinstance(image, str) and image.startswith("snapshot:"):
+        if image.startswith("snapshot:"):
             from daytona import CreateSandboxFromSnapshotParams
 
             snapshot_name = image[len("snapshot:") :]
             params = CreateSandboxFromSnapshotParams(
                 snapshot=snapshot_name, **create_kwargs
             )
+        elif image.startswith("dockerfile:"):
+            from daytona import CreateSandboxFromImageParams, Image
+
+            dockerfile_path = image[len("dockerfile:") :]
+            meta = self._dockerfile_registry.get(dockerfile_path)
+            if meta is None:
+                raise ValueError(
+                    f"No registered Dockerfile metadata for {dockerfile_path}. "
+                    "Call DaytonaProvider.image_from_dockerfile() first."
+                )
+
+            parsed_cmd = meta.get("server_cmd")
+
+            # Build the daytona Image from the pre-stripped content.
+            import pathlib
+            import uuid
+
+            ctx = pathlib.Path(meta["context_dir"])
+            tmp_name = f".daytona-{uuid.uuid4().hex[:8]}.dockerfile"
+            tmp_path = ctx / tmp_name
+            try:
+                tmp_path.write_text(meta["stripped_content"])
+                daytona_image = Image.from_dockerfile(str(tmp_path))
+            finally:
+                tmp_path.unlink(missing_ok=True)
+
+            img_kwargs: Dict[str, Any] = {
+                "image": daytona_image,
+                **create_kwargs,
+            }
+            if self._resources is not None:
+                img_kwargs["resources"] = self._resources
+            params = CreateSandboxFromImageParams(**img_kwargs)
         else:
             from daytona import CreateSandboxFromImageParams
 
-            img_kwargs: Dict[str, Any] = {"image": image, **create_kwargs}
+            img_kwargs = {"image": image, **create_kwargs}
             if self._resources is not None:
                 img_kwargs["resources"] = self._resources
             params = CreateSandboxFromImageParams(**img_kwargs)
@@ -442,9 +468,8 @@ class DaytonaProvider(ContainerProvider):
                     cmd = self._discover_server_cmd(self._sandbox)
                 except ValueError:
                     # Fall back to CMD parsed from Dockerfile (if available).
-                    dockerfile_cmd = getattr(image, "_openenv_server_cmd", None)
-                    if dockerfile_cmd:
-                        cmd = dockerfile_cmd
+                    if parsed_cmd:
+                        cmd = parsed_cmd
                     else:
                         raise
 
