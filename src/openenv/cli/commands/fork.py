@@ -112,6 +112,7 @@ def fork(
     set_secret: Annotated[
         list[str],
         typer.Option(
+            "--set-secret",
             "--secret",
             "-s",
             help="Set Space secret. Can be repeated. Format: KEY=VALUE",

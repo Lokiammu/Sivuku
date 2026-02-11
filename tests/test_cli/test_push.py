@@ -777,6 +777,10 @@ def test_push_fails_when_exclude_file_missing(tmp_path: Path) -> None:
 
         assert result.exit_code != 0
         assert "exclude file" in result.output.lower()
+
+
+def test_push_create_pr_sets_upload_flag_and_skips_create_repo(tmp_path: Path) -> None:
+    """Test that --create-pr uploads with PR mode and skips repo creation."""
     _create_test_openenv_env(tmp_path)
 
     with (
@@ -804,5 +808,3 @@ def test_push_fails_when_exclude_file_missing(tmp_path: Path) -> None:
         assert call_kwargs.get("create_pr") is True
         # When create_pr we do not create the repo (target repo must exist)
         mock_api.create_repo.assert_not_called()
-        assert result.exit_code != 0
-        assert "exclude file" in result.output.lower()
