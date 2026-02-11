@@ -15,7 +15,9 @@ from huggingface_hub import HfApi, login, whoami
 
 from .._cli_utils import console
 
-app = typer.Typer(help="Fork (duplicate) an OpenEnv environment on Hugging Face to your account")
+app = typer.Typer(
+    help="Fork (duplicate) an OpenEnv environment on Hugging Face to your account"
+)
 
 
 def _parse_key_value(s: str) -> tuple[str, str]:
@@ -145,7 +147,7 @@ def fork(
             f"Invalid source Space ID: {source_space!r}. Expected format: 'owner/space-name'"
         )
 
-    username = _ensure_hf_authenticated()
+    _ensure_hf_authenticated()
     api = HfApi()
 
     # Build kwargs for duplicate_space (only pass what we have)
@@ -189,5 +191,7 @@ def fork(
     else:
         new_repo_id = getattr(result, "repo_id", str(result))
 
-    console.print(f"[bold green]✓[/bold green] Space forked successfully")
-    console.print(f"[bold]Space URL:[/bold] https://huggingface.co/spaces/{new_repo_id}")
+    console.print("[bold green]✓[/bold green] Space forked successfully")
+    console.print(
+        f"[bold]Space URL:[/bold] https://huggingface.co/spaces/{new_repo_id}"
+    )

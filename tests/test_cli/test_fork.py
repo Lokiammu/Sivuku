@@ -37,7 +37,9 @@ def test_fork_calls_duplicate_space_with_from_id() -> None:
     ):
         mock_whoami.return_value = {"name": "testuser"}
         mock_api = MagicMock()
-        mock_api.duplicate_space.return_value = "https://huggingface.co/spaces/testuser/source-space"
+        mock_api.duplicate_space.return_value = (
+            "https://huggingface.co/spaces/testuser/source-space"
+        )
         mock_hf_api_class.return_value = mock_api
 
         result = runner.invoke(app, ["fork", "owner/source-space"])
@@ -59,7 +61,9 @@ def test_fork_passes_private_and_to_id() -> None:
     ):
         mock_whoami.return_value = {"name": "testuser"}
         mock_api = MagicMock()
-        mock_api.duplicate_space.return_value = "https://huggingface.co/spaces/myuser/my-fork"
+        mock_api.duplicate_space.return_value = (
+            "https://huggingface.co/spaces/myuser/my-fork"
+        )
         mock_hf_api_class.return_value = mock_api
 
         result = runner.invoke(
@@ -81,7 +85,9 @@ def test_fork_passes_variables_and_secrets() -> None:
     ):
         mock_whoami.return_value = {"name": "testuser"}
         mock_api = MagicMock()
-        mock_api.duplicate_space.return_value = "https://huggingface.co/spaces/testuser/source-space"
+        mock_api.duplicate_space.return_value = (
+            "https://huggingface.co/spaces/testuser/source-space"
+        )
         mock_hf_api_class.return_value = mock_api
 
         result = runner.invoke(

@@ -656,7 +656,6 @@ def test_push_handles_base_image_not_found_in_dockerfile(tmp_path: Path) -> None
         assert mock_api.upload_folder.called
 
 
-
 def test_push_excludes_files_from_ignore_file(tmp_path: Path) -> None:
     """Test that push excludes files using patterns loaded via --exclude."""
     _create_test_openenv_env(tmp_path)
@@ -711,6 +710,7 @@ excluded_dir/
 
         assert result.exit_code == 0
         assert mock_api.upload_folder.called
+
 
 def test_push_does_not_use_gitignore_as_default_excludes(tmp_path: Path) -> None:
     """Test that .gitignore patterns are not used by default."""
