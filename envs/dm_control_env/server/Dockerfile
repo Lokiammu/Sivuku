@@ -56,7 +56,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY . /app/env
 
 # Set PYTHONPATH so imports work correctly
-ENV PYTHONPATH="/app/env:$PYTHONPATH"
+ENV PYTHONPATH="/app/env"
 
 # Set MuJoCo to use OSMesa for headless rendering
 ENV MUJOCO_GL="osmesa"

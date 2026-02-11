@@ -1,3 +1,16 @@
+---
+title: dm_control Environment Server
+emoji: 🤖
+colorFrom: green
+colorTo: blue
+sdk: docker
+pinned: false
+app_port: 8000
+base_path: /web
+tags:
+  - openenv
+---
+
 # dm_control OpenEnv Environment
 
 A generic OpenEnv environment for [dm_control.suite](https://github.com/google-deepmind/dm_control), providing access to all MuJoCo-based continuous control tasks.
