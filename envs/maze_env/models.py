@@ -10,7 +10,7 @@ Data models for the Maze Environment.
 The maze environment is a simple gridworld with walls, a start cell, and an exit.
 """
 
-from typing import List
+from typing import List, Optional
 
 from pydantic import Field
 
@@ -48,7 +48,7 @@ class MazeObservation(Observation):
 class MazeState(State):
     """State for Maze environment."""
 
-    episode_id: str
+    episode_id: Optional[str] = None
     step_count: int
     done: bool = False
     current_position: List[int] = Field(default_factory=list)

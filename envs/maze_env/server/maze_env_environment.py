@@ -52,7 +52,7 @@ DEFAULT_MAZE = np.array(
 )
 
 
-class MazeEnvironment(Environment):
+class MazeEnvironment(Environment[MazeAction, MazeObservation, MazeState]):
     """
     A maze environment built on a simple gridworld.
 
@@ -97,9 +97,16 @@ class MazeEnvironment(Environment):
         self,
         seed: Optional[int] = None,
         start_cell: Optional[Tuple[int, int]] = None,
+        episode_id: Optional[str] = None,
+        **kwargs: Any,
     ) -> MazeObservation:
         """
         Reset the environment.
+
+        Args:
+            seed: Optional random seed for environment initialization
+            start_cell: Optional starting cell (col, row) for the agent
+            episode_id: Optional episode ID to set for the new episode (unused, kept for interface compatibility)
 
         Returns:
             MazeObservation with initial maze state
@@ -116,13 +123,16 @@ class MazeEnvironment(Environment):
 
     def step(
         self,
-        action: MazeAction
+        action: MazeAction,
+        timeout_s: Optional[float] = None,
+        **kwargs: Any,
     ) -> MazeObservation:
         """
         Execute a step in the environment.
 
         Args:
             action: MazeAction containing the action to take
+            timeout_s: Optional timeout for the step (unused, kept for interface compatibility)
 
         Returns:
             MazeObservation with the result of the action
@@ -145,6 +155,7 @@ class MazeEnvironment(Environment):
 
         return MazeObservation(
             current_position=[int(x) for x in self.env.current_cell],
+            previous_position=[int(x) for x in self.env.previous_cell],
             legal_actions=legal_actions,
             reward=reward,
             done=done,
