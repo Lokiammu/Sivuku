@@ -131,7 +131,9 @@ class EnvClient(ABC, Generic[ActT, ObsT, StateT]):
         self._ws_url = f"{ws_url}/ws"
         self._connect_timeout = connect_timeout_s
         self._message_timeout = message_timeout_s
-        self._max_message_size = int(max_message_size_mb * 1024 * 1024)  # Convert MB to bytes
+        self._max_message_size = int(
+            max_message_size_mb * 1024 * 1024
+        )  # Convert MB to bytes
         self._provider = provider
         self._ws: Optional[ClientConnection] = None
 
