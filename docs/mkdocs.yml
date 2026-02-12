@@ -74,6 +74,7 @@ nav:
     - Quick Start: quickstart.md
     - Auto-Discovery API: auto-discovery.md
     - Building an Environment: environment-builder.md
+    - Customizing the Web UI: customizing-web-ui.md
   - Tutorials:
     - OpenEnv Tutorial: tutorials/openenv-tutorial.md
     - Wordle GRPO with TRL: tutorials/wordle-grpo.md

@@ -18,7 +18,7 @@ import asyncio
 import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import gradio as gr
@@ -389,6 +389,7 @@ def create_web_interface_app(
     env_name: Optional[str] = None,
     max_concurrent_envs: Optional[int] = None,
     concurrency_config: Optional[Any] = None,
+    gradio_builder: Optional[Callable[..., Any]] = None,
 ) -> FastAPI:
     """
     Create a FastAPI application with web interface for the given environment.
@@ -400,6 +401,9 @@ def create_web_interface_app(
         env_name: Optional environment name for README loading
         max_concurrent_envs: Maximum concurrent WebSocket sessions
         concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings
+        gradio_builder: Optional callable (web_manager, action_fields, metadata,
+            is_chat_env, title, quick_start_md) -> gr.Blocks to use instead of the
+            default Gradio UI. Lets envs replace or customize the /web interface.
 
     Returns:
         FastAPI application instance with web interface
@@ -466,7 +470,7 @@ def create_web_interface_app(
     is_chat_env = _is_chat_env(action_cls)
     quick_start_md = get_quick_start_markdown(metadata, action_cls, observation_cls)
 
-    gradio_blocks = build_gradio_app(
+    default_blocks = build_gradio_app(
         web_manager,
         action_fields,
         metadata,
@@ -474,6 +478,22 @@ def create_web_interface_app(
         title=metadata.name,
         quick_start_md=quick_start_md,
     )
+    if gradio_builder is not None:
+        custom_blocks = gradio_builder(
+            web_manager,
+            action_fields,
+            metadata,
+            is_chat_env,
+            metadata.name,
+            quick_start_md,
+        )
+        gradio_blocks = gr.TabbedInterface(
+            [default_blocks, custom_blocks],
+            tab_names=["Playground", "Visualization"],
+            title=metadata.name,
+        )
+    else:
+        gradio_blocks = default_blocks
     app = gr.mount_gradio_app(
         app,
         gradio_blocks,

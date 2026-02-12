@@ -1217,6 +1217,7 @@ def create_app(
     env_name: Optional[str] = None,
     max_concurrent_envs: Optional[int] = None,
     concurrency_config: Optional[ConcurrencyConfig] = None,
+    gradio_builder: Optional[Callable[..., Any]] = None,
 ) -> FastAPI:
     """
     Create a FastAPI application with or without web interface.
@@ -1233,6 +1234,10 @@ def create_app(
                              Mutually exclusive with concurrency_config.
         concurrency_config: Optional ConcurrencyConfig for advanced concurrency settings.
                             Mutually exclusive with max_concurrent_envs.
+        gradio_builder: Optional callable to build a custom Gradio UI at /web.
+            Signature: (web_manager, action_fields, metadata, is_chat_env, title,
+            quick_start_md) -> gr.Blocks. When None, the default Gradio app is used.
+            See docs/customizing-web-ui.md.
 
     Returns:
         FastAPI application instance with or without web interface and README integration
@@ -1256,6 +1261,7 @@ def create_app(
             env_name,
             max_concurrent_envs,
             concurrency_config,
+            gradio_builder=gradio_builder,
         )
     else:
         # Use standard FastAPI app without web interface
