@@ -14,11 +14,17 @@ Mount at /web via gr.mount_gradio_app() from create_web_interface_app().
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List, Optional
 
 import gradio as gr
 
 from .types import EnvironmentMetadata
+
+
+def _escape_md(text: str) -> str:
+    """Escape Markdown special characters in user-controlled content."""
+    return re.sub(r"([\\`*_\{\}\[\]()#+\-.!|~>])", r"\\\1", str(text))
 
 
 def _format_observation(data: Dict[str, Any]) -> str:
@@ -27,14 +33,14 @@ def _format_observation(data: Dict[str, Any]) -> str:
     obs = data.get("observation", {})
     if isinstance(obs, dict):
         if obs.get("prompt"):
-            lines.append(f"**Prompt:**\n\n{obs['prompt']}\n")
+            lines.append(f"**Prompt:**\n\n{_escape_md(obs['prompt'])}\n")
         messages = obs.get("messages", [])
         if messages:
             lines.append("**Messages:**\n")
             for msg in messages:
-                sender = msg.get("sender_id", "?")
-                content = msg.get("content", "")
-                cat = msg.get("category", "")
+                sender = _escape_md(str(msg.get("sender_id", "?")))
+                content = _escape_md(str(msg.get("content", "")))
+                cat = _escape_md(str(msg.get("category", "")))
                 lines.append(f"- `[{cat}]` Player {sender}: {content}")
             lines.append("")
     reward = data.get("reward")

@@ -237,6 +237,8 @@ class EpisodeState(BaseModel):
 class WebInterfaceManager:
     """Manages the web interface for an environment."""
 
+    MAX_ACTION_LOGS = 1000
+
     def __init__(
         self,
         env: Environment,
@@ -369,6 +371,10 @@ class WebInterfaceManager:
         self.episode_state.step_count = state.step_count
         self.episode_state.current_observation = serialized["observation"]
         self.episode_state.action_logs.append(action_log)
+        if len(self.episode_state.action_logs) > self.MAX_ACTION_LOGS:
+            self.episode_state.action_logs = self.episode_state.action_logs[
+                -self.MAX_ACTION_LOGS :
+            ]
         self.episode_state.is_reset = False
 
         # Send state update
@@ -453,9 +459,14 @@ def create_web_interface_app(
         # Check if this is a message-based request (chat environment)
         if "message" in request:
             message = request["message"]
-            # Convert message to action using the environment's message_to_action method
-            action = web_manager.env.message_to_action(message)
-            action_data = {"tokens": action.tokens.tolist()}
+            if hasattr(web_manager.env, "message_to_action"):
+                action = web_manager.env.message_to_action(message)
+                if hasattr(action, "tokens"):
+                    action_data = {"tokens": action.tokens.tolist()}
+                else:
+                    action_data = action.model_dump(exclude={"metadata"})
+            else:
+                action_data = {"message": message}
         else:
             action_data = request.get("action", {})
 
@@ -487,6 +498,11 @@ def create_web_interface_app(
             metadata.name,
             quick_start_md,
         )
+        if not isinstance(custom_blocks, gr.Blocks):
+            raise TypeError(
+                f"gradio_builder must return a gr.Blocks instance, "
+                f"got {type(custom_blocks).__name__}"
+            )
         gradio_blocks = gr.TabbedInterface(
             [default_blocks, custom_blocks],
             tab_names=["Playground", "Visualization"],
