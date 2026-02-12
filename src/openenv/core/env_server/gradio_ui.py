@@ -59,6 +59,7 @@ def build_gradio_app(
     metadata: Optional[EnvironmentMetadata],
     is_chat_env: bool,
     title: str = "OpenEnv Environment",
+    quick_start_md: Optional[str] = None,
 ) -> gr.Blocks:
     """
     Build a Gradio Blocks app for the OpenEnv web interface.
@@ -69,6 +70,7 @@ def build_gradio_app(
         metadata: Environment metadata for README/name.
         is_chat_env: If True, single message textbox; else form from action_fields.
         title: App title.
+        quick_start_md: Optional Quick Start markdown (class names already replaced).
 
     Returns:
         gr.Blocks to mount with gr.mount_gradio_app(app, blocks, path="/web").
@@ -120,6 +122,9 @@ def build_gradio_app(
         gr.Markdown(f"# {env_name}")
         with gr.Row():
             with gr.Column(scale=1, elem_classes="col-left"):
+                if quick_start_md:
+                    with gr.Accordion("Quick Start", open=True):
+                        gr.Markdown(quick_start_md)
                 with gr.Accordion("README", open=False):
                     gr.Markdown(readme_content)
 

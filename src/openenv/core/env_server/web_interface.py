@@ -30,6 +30,80 @@ from .interfaces import Environment
 from .serialization import deserialize_action_with_preprocessing, serialize_observation
 from .types import Action, EnvironmentMetadata, Observation, State
 
+# Quick Start markdown template; placeholders match init suffixes (__ENV_NAME__, __ENV_CLASS_NAME__*).
+DEFAULT_QUICK_START_MARKDOWN = """
+### Connect to this environment
+
+Connect from Python using `__ENV_CLASS_NAME__Env`:
+
+```python
+from __ENV_NAME__ import __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Env
+
+with __ENV_CLASS_NAME__Env.from_env("<SPACE_ID>") as env:
+    result = await env.step(__ENV_CLASS_NAME__Action(message="..."))
+```
+
+Or connect directly to a running server:
+
+```python
+env = __ENV_CLASS_NAME__Env(base_url="http://localhost:8000")
+```
+
+### Contribute to this environment
+
+Submit improvements via pull request on the Hugging Face Hub.
+
+```bash
+openenv fork <SPACE_ID> --repo-id <your-username>/<your-repo-name>
+```
+
+Then make your changes and submit a pull request:
+
+```bash
+cd <forked-repo>
+openenv push <SPACE_ID> --create-pr
+```
+
+For more information, see the [OpenEnv documentation](https://meta-pytorch.org/OpenEnv/).
+"""
+
+
+def get_quick_start_markdown(
+    metadata: Optional[EnvironmentMetadata],
+    action_cls: Type[Action],
+    observation_cls: Type[Observation],
+) -> str:
+    """
+    Build Quick Start markdown with class names replaced from current env (init-style suffixes).
+
+    Uses the same placeholder names as the init template so that __ENV_CLASS_NAME__Env,
+    __ENV_CLASS_NAME__Action, __ENV_CLASS_NAME__Observation and __ENV_NAME__ are
+    replaced with the actual class/package names.
+    """
+    import os
+
+    # Prefix from action class (e.g. EchoAction -> Echo)
+    action_name = getattr(action_cls, "__name__", "Action")
+    if action_name.endswith("Action"):
+        prefix = action_name[: -len("Action")]
+    else:
+        prefix = action_name.replace("Action", "").strip() or "Env"
+
+    env_client_name = f"{prefix}Env"
+    obs_name = getattr(observation_cls, "__name__", "Observation")
+    pkg_name = (metadata.name if metadata else "env").replace(" ", "_").lower()
+
+    space_id = os.environ.get("SPACE_ID", "<hf-username>/<hf-repo-name>")
+
+    content = DEFAULT_QUICK_START_MARKDOWN
+    content = content.replace("__ENV_CLASS_NAME__Env", env_client_name)
+    content = content.replace("__ENV_CLASS_NAME__Action", action_name)
+    content = content.replace("__ENV_CLASS_NAME__Observation", obs_name)
+    content = content.replace("__ENV_CLASS_NAME__", prefix)
+    content = content.replace("__ENV_NAME__", pkg_name)
+    content = content.replace("<SPACE_ID>", space_id)
+    return content.strip()
+
 
 def load_environment_metadata(
     env: Environment, env_name: Optional[str] = None
@@ -390,6 +464,7 @@ def create_web_interface_app(
 
     action_fields = _extract_action_fields(action_cls)
     is_chat_env = _is_chat_env(action_cls)
+    quick_start_md = get_quick_start_markdown(metadata, action_cls, observation_cls)
 
     gradio_blocks = build_gradio_app(
         web_manager,
@@ -397,6 +472,7 @@ def create_web_interface_app(
         metadata,
         is_chat_env,
         title=metadata.name,
+        quick_start_md=quick_start_md,
     )
     app = gr.mount_gradio_app(
         app,
