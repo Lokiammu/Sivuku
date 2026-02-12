@@ -24,7 +24,7 @@ from .._cli_utils import console, validate_env_structure
 app = typer.Typer(help="Push an OpenEnv environment to Hugging Face Spaces")
 
 
-DEFAULT_PUSH_IGNORE_PATTERNS = [".*"]
+DEFAULT_PUSH_IGNORE_PATTERNS = [".*", "__pycache__", "*.pyc"]
 
 
 def _path_matches_pattern(relative_path: Path, pattern: str) -> bool:
@@ -268,10 +268,6 @@ def _prepare_staging_directory(
     # Copy all files from env directory
     copy_ignore = _copytree_ignore_factory(env_dir, ignore_patterns)
     for item in env_dir.iterdir():
-        # Skip hidden files and common ignore patterns
-        if item.name.startswith("."):
-            continue
-
         relative_path = item.relative_to(env_dir)
         if _should_exclude_path(relative_path, ignore_patterns):
             continue
