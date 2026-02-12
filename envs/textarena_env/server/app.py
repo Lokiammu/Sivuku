@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import inspect
+import logging
 import os
 
 from openenv.core.env_server.http_server import create_app
@@ -60,7 +62,9 @@ def create_textarena_environment():
 # Pass the factory function instead of an instance for WebSocket session support.
 # When ENABLE_WEB_INTERFACE=true and openenv-core supports it, the Gradio UI has
 # two tabs: Playground (default) and Custom (Wordle HTML block). See server/gradio_ui.py.
-try:
+_logger = logging.getLogger(__name__)
+_sig = inspect.signature(create_app)
+if "gradio_builder" in _sig.parameters:
     app = create_app(
         create_textarena_environment,
         TextArenaAction,
@@ -68,7 +72,11 @@ try:
         env_name="textarena_env",
         gradio_builder=build_textarena_gradio_app,
     )
-except TypeError:
+else:
+    _logger.warning(
+        "Installed openenv-core does not support gradio_builder; "
+        "custom Gradio tab will not be available."
+    )
     app = create_app(
         create_textarena_environment,
         TextArenaAction,
