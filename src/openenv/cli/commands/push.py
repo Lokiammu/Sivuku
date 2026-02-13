@@ -525,7 +525,6 @@ def push(
         str | None,
         typer.Option(
             "--exclude",
-            "-e",
             help="Optional additional ignore file with newline-separated glob patterns to exclude from Hugging Face uploads",
         ),
     ] = None,
