@@ -59,6 +59,15 @@ def _readme_section(metadata: Optional[EnvironmentMetadata]) -> str:
     return metadata.readme_content
 
 
+def get_gradio_display_title(
+    metadata: Optional[EnvironmentMetadata],
+    fallback: str = "OpenEnv Environment",
+) -> str:
+    """Return the title used for the Gradio app (browser tab and Blocks)."""
+    name = metadata.name if metadata else fallback
+    return f"OpenEnv Agentic Environment: {name}"
+
+
 def build_gradio_app(
     web_manager: Any,
     action_fields: List[Dict[str, Any]],
@@ -75,14 +84,14 @@ def build_gradio_app(
         action_fields: Field dicts from _extract_action_fields(action_cls).
         metadata: Environment metadata for README/name.
         is_chat_env: If True, single message textbox; else form from action_fields.
-        title: App title.
+        title: App title (overridden by metadata.name when present; see get_gradio_display_title).
         quick_start_md: Optional Quick Start markdown (class names already replaced).
 
     Returns:
         gr.Blocks to mount with gr.mount_gradio_app(app, blocks, path="/web").
     """
     readme_content = _readme_section(metadata)
-    env_name = metadata.name if metadata else title
+    display_title = get_gradio_display_title(metadata, fallback=title)
 
     async def reset_env():
         try:
@@ -124,8 +133,7 @@ def build_gradio_app(
         except Exception as e:
             return f"Error: {e}"
 
-    with gr.Blocks(title=title) as demo:
-        gr.Markdown(f"# {env_name}")
+    with gr.Blocks(title=display_title) as demo:
         with gr.Row():
             with gr.Column(scale=1, elem_classes="col-left"):
                 if quick_start_md:

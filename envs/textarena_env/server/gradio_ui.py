@@ -28,8 +28,8 @@ def _wordle_demo_html() -> str:
   max-width: 320px;
   margin: 0 auto;
   padding: 16px;
+  text-align: left;
 ">
-  <h2 style="text-align: center; margin-bottom: 16px; font-size: 1.5rem;">WORDLE</h2>
   <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 8px;">
     <div style="width: 100%; aspect-ratio: 1; border: 2px solid #3a3a3c; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: bold;">C</div>
     <div style="width: 100%; aspect-ratio: 1; border: 2px solid #3a3a3c; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: bold;">R</div>
@@ -73,9 +73,9 @@ def build_textarena_gradio_app(
     In Gradio 6, gr.HTML(value=...) renders HTML; default html_template is "${value}".
     """
     with gr.Blocks(title=f"{title} — Custom") as blocks:
-        gr.Markdown("## Wordle (TextArena)")
+        gr.Markdown(value=f"# Wordle Visualization")
         gr.Markdown(
-            "This tab shows a **Wordle-style** view. Use the **Playground** tab to "
+            value="This tab shows a **Wordle-style** view. Use the **Playground** tab to "
             "Reset and Step with guesses (e.g. `[crane]`, `[stone]`)."
         )
         # Gradio 6: gr.HTML(value=...) renders the string as HTML (html_template default "${value}")

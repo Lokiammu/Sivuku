@@ -25,7 +25,7 @@ import gradio as gr
 from pydantic import BaseModel, ConfigDict, Field
 
 from .gradio_theme import OPENENV_GRADIO_CSS, OPENENV_GRADIO_THEME
-from .gradio_ui import build_gradio_app
+from .gradio_ui import build_gradio_app, get_gradio_display_title
 from .interfaces import Environment
 from .serialization import deserialize_action_with_preprocessing, serialize_observation
 from .types import Action, EnvironmentMetadata, Observation, State
@@ -506,7 +506,7 @@ def create_web_interface_app(
         gradio_blocks = gr.TabbedInterface(
             [default_blocks, custom_blocks],
             tab_names=["Playground", "Visualization"],
-            title=metadata.name,
+            title=get_gradio_display_title(metadata),
         )
     else:
         gradio_blocks = default_blocks

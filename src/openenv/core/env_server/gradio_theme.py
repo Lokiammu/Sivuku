@@ -19,6 +19,14 @@ _MONO_FONTS = (
     "monospace",
 )
 
+_CORE_FONT = (
+    "Lato",
+    "Inter",
+    "Arial",
+    "Helvetica",
+    "sans-serif",
+)
+
 _ZERO_RADIUS = gr.themes.Size(
     xxs="0px",
     xs="0px",
@@ -61,7 +69,7 @@ OPENENV_GRADIO_THEME = gr.themes.Base(
     primary_hue=_GREEN_HUE,
     secondary_hue=_NEUTRAL_HUE,
     neutral_hue=_NEUTRAL_HUE,
-    font=_MONO_FONTS,
+    font=_CORE_FONT,
     font_mono=_MONO_FONTS,
     radius_size=_ZERO_RADIUS,
 ).set(
