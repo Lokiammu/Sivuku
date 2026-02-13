@@ -139,7 +139,12 @@ def _copytree_ignore_factory(env_dir: Path, ignore_patterns: list[str]):
 
         for name in names:
             candidate = current_dir / name
-            relative_path = candidate.relative_to(env_dir)
+            try:
+                relative_path = candidate.relative_to(env_dir)
+            except ValueError:
+                # candidate is not under env_dir (e.g. symlink or
+                # copytree root differs from env_dir); skip filtering.
+                continue
             if _should_exclude_path(relative_path, ignore_patterns):
                 ignored.add(name)
 
