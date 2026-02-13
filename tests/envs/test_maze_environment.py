@@ -1,17 +1,19 @@
 """Unit tests for OpenSpiel environment server."""
 
+import socket
+import asyncio
 import os
 import shutil
-import sys
 import subprocess
-import socket
+import sys
 import time
+
 import requests
 import pytest
-import asyncio
 
 # Add the project root to the path for envs imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 from envs.maze_env.client import MazeEnv
 from envs.maze_env.models import MazeAction
 
@@ -99,7 +101,6 @@ def server():
         print("✅ Server process was already killed")
 
 
-
 def test_health_endpoint(server):
     """Test that the health endpoint works."""
     response = requests.get(f"{server}/health")
@@ -109,6 +110,7 @@ def test_health_endpoint(server):
 
 def test_reset(server):
     """Test that reset() returns a valid observation."""
+
     async def _run():
         async with MazeEnv(base_url=server) as env:
             result = await env.reset()
@@ -119,12 +121,13 @@ def test_reset(server):
             assert hasattr(result.observation, "previous_position")
             assert result.observation.done is False
             await env.close()
-    
+
     asyncio.run(_run())
 
 
 def test_reset_multiple_times(server):
     """Test that reset() can be called multiple times."""
+
     async def _run():
         async with MazeEnv(base_url=server) as env:
             result1 = await env.reset()
@@ -146,6 +149,7 @@ def test_reset_multiple_times(server):
 
 def test_step(server):
     """Test that step() returns a valid result."""
+
     async def _run():
         async with MazeEnv(base_url=server) as env:
             result = await env.reset()
@@ -164,6 +168,7 @@ def test_step(server):
 
 def test_step_multiple_times(server):
     """Test that step() can be called multiple times."""
+
     async def _run():
         async with MazeEnv(base_url=server) as env:
             await env.reset()
@@ -179,12 +184,13 @@ def test_step_multiple_times(server):
             assert result1.observation is not None
             assert result2.observation is not None
             await env.close()
-    
+
     asyncio.run(_run())
 
 
 def test_state_endpoint(server):
     """Test that the state endpoint returns valid state."""
+
     async def _run():
         async with MazeEnv(base_url=server) as env:
             await env.reset()
@@ -202,6 +208,7 @@ def test_state_endpoint(server):
 
 def test_step_count_increments(server):
     """Test that step count increments correctly."""
+
     async def _run():
         async with MazeEnv(base_url=server) as env:
             await env.reset()
@@ -220,12 +227,13 @@ def test_step_count_increments(server):
             state3 = await env.state()
             assert state3.step_count == 2
             await env.close()
-    
+
     asyncio.run(_run())
 
 
 def test_action_with_metadata(server):
     """Test that actions with metadata work."""
+
     async def _run():
         async with MazeEnv(base_url=server) as env:
             await env.reset()
@@ -235,5 +243,5 @@ def test_action_with_metadata(server):
 
             assert result.observation is not None
             await env.close()
-    
+
     asyncio.run(_run())
