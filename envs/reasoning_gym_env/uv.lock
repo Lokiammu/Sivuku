@@ -1813,7 +1813,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "openenv-core", extras = ["core"], specifier = ">=0.2.0" },
+    { name = "openenv-core", extras = ["core"], specifier = ">=0.2.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "reasoning-gym", specifier = ">=0.1.24" },
