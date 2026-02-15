@@ -61,6 +61,7 @@ finally:
 ```
 
 That's it! The `ReasoningGymEnv.from_docker_image()` method handles:
+
 - Starting the Docker container
 - Waiting for the server to be ready
 - Connecting to the environment
@@ -88,6 +89,7 @@ openenv push --namespace my-org --private
 ```
 
 The `openenv push` command will:
+
 1. Validate that the directory is an OpenEnv environment (checks for `openenv.yaml`)
 2. Prepare a custom build for Hugging Face Docker space (enables web interface)
 3. Upload to Hugging Face (ensuring you're logged in)
@@ -126,6 +128,7 @@ After deployment, your space will be available at:
 `https://huggingface.co/spaces/<repo-id>`
 
 The deployed space includes:
+
 - **Web Interface** at `/web` - Interactive UI for exploring the environment
 - **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
 - **Health Check** at `/health` - Container health monitoring
@@ -136,6 +139,7 @@ The deployed space includes:
 ### Episode Structure
 
 Each episode is **single-step**:
+
 1. `reset()` returns a question
 2. `step(answer)` returns score and marks episode as done
 3. `reset()` without params gets next question from same dataset
@@ -143,11 +147,13 @@ Each episode is **single-step**:
 ### Action
 
 **ReasoningGymAction**: Contains the agent's answer
+
 - `answer` (str) - The agent's answer to the current question
 
 ### Observation
 
 **ReasoningGymObservation**: Contains the question or result
+
 - `question` (Optional[str]) - The current question (only in reset)
 - `score` (Optional[float]) - Score for the answer, 0.0 to 1.0 (only after step)
 - `correct_answer` (Optional[str]) - The correct answer (only after step)
@@ -158,6 +164,7 @@ Each episode is **single-step**:
 ### Reward
 
 The reward equals the score returned by the dataset's scoring function:
+
 - Correct answer → score: 1.0
 - Incorrect answer → score: 0.0 to 1.0 (dataset-dependent, may use partial credit)
 
@@ -176,6 +183,7 @@ result = env.reset(
 ```
 
 Available datasets from reasoning_gym library:
+
 - `leg_counting` - Count legs of various objects
 - `reverse_sort` - Sort lists in reverse order
 - `chess_state_eval` - Chess position evaluation
@@ -318,6 +326,7 @@ python3 server/reasoning_gym_environment.py
 ```
 
 This verifies that:
+
 - Environment resets correctly
 - Step executes actions properly
 - Dataset creation and iteration works
