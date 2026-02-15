@@ -84,12 +84,36 @@ class TestReasoningGymEnvironment:
         assert question1 != question2
         assert obs2.question is not None
 
-    def test_reset_without_dataset_raises_error(self):
-        """Test that reset without dataset raises RuntimeError."""
+    def test_reset_without_params_creates_default_dataset(self):
+        """Test that reset without parameters creates default dataset."""
         env = ReasoningGymEnvironment()
 
-        with pytest.raises(RuntimeError, match="No dataset configured"):
-            env.reset()
+        obs = env.reset()
+
+        assert isinstance(obs, ReasoningGymObservation)
+        assert obs.question is not None
+        assert obs.done is False
+        assert env._dataset_name == "leg_counting"
+        assert env._dataset_seed == 42
+        assert env._dataset_size == 1000
+
+    def test_reset_default_can_be_overridden(self):
+        """Test that default dataset can be overridden."""
+        env = ReasoningGymEnvironment()
+
+        # Create default dataset
+        env.reset()
+
+        # Override with explicit params
+        env.reset(
+            dataset_name="leg_counting",
+            dataset_config={"min_animals": 10, "max_animals": 20},
+            seed=99,
+            size=5,
+        )
+
+        assert env._dataset_seed == 99
+        assert env._dataset_size == 5
 
     def test_reset_missing_seed_raises_error(self):
         """Test that reset without seed raises ValueError."""
@@ -212,6 +236,7 @@ class TestReasoningGymEnvironment:
         state = env.state
         assert state.episode_id == "test-episode"
         assert state.step_count == 0
+        assert obs is not None
 
     def test_episode_id_generation(self):
         """Test that episode_id is auto-generated when not provided."""
@@ -227,6 +252,7 @@ class TestReasoningGymEnvironment:
         state = env.state
         assert state.episode_id is not None
         assert len(state.episode_id) > 0
+        assert obs is not None
 
     def test_dataset_metadata_in_observation(self):
         """Test that dataset metadata is included in observation."""

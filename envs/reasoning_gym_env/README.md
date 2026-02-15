@@ -52,6 +52,9 @@ try:
     result = env.reset()  # No params = reuse dataset
     print(f"Next question: {result.observation.question}")
 
+    # Note: First reset() without params creates a default leg_counting dataset
+    # with seed=42 and size=1000 for reproducible, out-of-the-box functionality
+
 finally:
     # Always clean up
     env.close()

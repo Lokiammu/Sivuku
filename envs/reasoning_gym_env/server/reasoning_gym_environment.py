@@ -26,6 +26,11 @@ except ImportError:
     from ..models import ReasoningGymAction, ReasoningGymObservation
 
 
+DEFAULT_DATASET_NAME = "leg_counting"
+DEFAULT_DATASET_SIZE = 1000
+DEFAULT_DATASET_SEED = 42
+
+
 class ReasoningGymEnvironment(Environment):
     """
     Reasoning Gym environment for single-step reasoning tasks.
@@ -86,15 +91,22 @@ class ReasoningGymEnvironment(Environment):
         """
         Reset the environment and get the next question.
 
+        If no parameters are provided and no dataset exists, creates a default 'leg_counting' dataset
+
         Args:
             dataset_name: Name of dataset (e.g., 'leg_counting', 'composite').
-                         If None, use existing dataset.
+                         If None and dataset exists, reuses existing dataset.
+                         If None and no dataset exists, creates default 'leg_counting'.
             dataset_config: For non-composite datasets, config dict with task-specific params.
                           Required if dataset_name is provided and not 'composite'.
             dataset_specs: For composite datasets, list of dicts defining structure.
                           Required if dataset_name is 'composite'.
-            seed: Random seed for dataset generation. Required if dataset_name is provided.
-            size: Number of questions in dataset. Required if dataset_name is provided.
+            seed: Random seed for dataset generation.
+                 Required if dataset_name is provided.
+                 Defaults to 42 when creating default dataset.
+            size: Number of questions in dataset.
+                 Required if dataset_name is provided.
+                 Defaults to 100 when creating default dataset.
             episode_id: Optional episode ID
 
         Returns:
@@ -102,7 +114,6 @@ class ReasoningGymEnvironment(Environment):
 
         Raises:
             ValueError: If parameters are invalid or missing
-            RuntimeError: If no dataset is configured
         """
         # Check if we need to rebuild dataset
         if dataset_name is not None:
@@ -161,11 +172,19 @@ class ReasoningGymEnvironment(Environment):
             self._dataset_config = dataset_config
             self._dataset_specs = dataset_specs
 
-        # Ensure dataset exists
-        if self._dataset is None:
-            raise RuntimeError(
-                "No dataset configured. Call reset() with dataset_name to initialize."
+        elif self._dataset is None:
+            # No dataset exists and none specified - create default
+            self._dataset = reasoning_gym.create_dataset(
+                name=DEFAULT_DATASET_NAME,
+                size=DEFAULT_DATASET_SIZE,
+                seed=DEFAULT_DATASET_SEED,
             )
+            self._dataset_iterator = iter(self._dataset)
+            self._dataset_name = DEFAULT_DATASET_NAME
+            self._dataset_size = DEFAULT_DATASET_SIZE
+            self._dataset_seed = DEFAULT_DATASET_SEED
+            self._dataset_config = {}
+            self._dataset_specs = None
 
         # Get next question from iterator
         try:
