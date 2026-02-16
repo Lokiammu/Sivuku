@@ -356,9 +356,11 @@ def test_push_accepts_dockerfile_at_env_root(tmp_path: Path) -> None:
 
     def _capture_staging(*, folder_path: str, **_: object) -> None:
         staging = Path(folder_path)
-        staged_files.append(sorted(
-            str(p.relative_to(staging)) for p in staging.rglob("*") if p.is_file()
-        ))
+        staged_files.append(
+            sorted(
+                str(p.relative_to(staging)) for p in staging.rglob("*") if p.is_file()
+            )
+        )
 
     with (
         patch("openenv.cli.commands.push.whoami") as mock_whoami,
