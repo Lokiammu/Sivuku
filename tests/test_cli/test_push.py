@@ -352,6 +352,14 @@ def test_push_accepts_dockerfile_at_env_root(tmp_path: Path) -> None:
     root_dockerfile = tmp_path / "Dockerfile"
     (tmp_path / "server" / "Dockerfile").rename(root_dockerfile)
 
+    staged_files: list[list[str]] = []
+
+    def _capture_staging(*, folder_path: str, **_: object) -> None:
+        staging = Path(folder_path)
+        staged_files.append(sorted(
+            str(p.relative_to(staging)) for p in staging.rglob("*") if p.is_file()
+        ))
+
     with (
         patch("openenv.cli.commands.push.whoami") as mock_whoami,
         patch("openenv.cli.commands.push.login") as mock_login,
@@ -360,6 +368,7 @@ def test_push_accepts_dockerfile_at_env_root(tmp_path: Path) -> None:
         mock_whoami.return_value = {"name": "testuser"}
         mock_login.return_value = None
         mock_api = MagicMock()
+        mock_api.upload_folder.side_effect = _capture_staging
         mock_hf_api_class.return_value = mock_api
 
         old_cwd = os.getcwd()
@@ -369,8 +378,13 @@ def test_push_accepts_dockerfile_at_env_root(tmp_path: Path) -> None:
         finally:
             os.chdir(old_cwd)
 
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
         assert mock_api.upload_folder.called
+
+        # Verify the staging directory has Dockerfile at root, not inside server/
+        files = staged_files[0]
+        assert "Dockerfile" in files
+        assert "server/Dockerfile" not in files
 
 
 def test_push_handles_missing_dockerfile(tmp_path: Path) -> None:
