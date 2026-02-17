@@ -8,15 +8,15 @@ A hands-on guide to building, deploying, and scaling RL environments with [OpenE
 
 | Section | Description |
 |---------|-------------|
-| [1. Environments](./walkthrough/01-environments.md) | OpenEnv fundamentals, architecture, and OpenSpiel integration |
-| [2. Deployment](./walkthrough/02-deployment.md) | Local dev, Docker, and HF Spaces deployment |
-| [3. Scaling](./walkthrough/03-scaling.md) | WebSocket scaling and infrastructure benchmarks |
-| [4. Training](./walkthrough/04-training.md) | GRPO training with TRL on Wordle |
+| [1. Environments](./01-environments.md) | OpenEnv fundamentals, architecture, and OpenSpiel integration |
+| [2. Deployment](./02-deployment.md) | Local dev, Docker, and HF Spaces deployment |
+| [3. Scaling](./03-scaling.md) | WebSocket scaling and infrastructure benchmarks |
+| [4. Training](./04-training.md) | GRPO training with TRL on Wordle |
 
 ## File Structure
 
 ```
-walkthrough/
+tutorial/
 ├── 01-environments.md          # OpenEnv fundamentals and architecture
 ├── 02-deployment.md            # Local, Docker, and HF Spaces deployment
 ├── 03-scaling.md               # WebSocket scaling and benchmarks
