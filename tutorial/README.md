@@ -25,7 +25,8 @@ tutorial/
     ├── OpenEnv_Tutorial.ipynb  # Interactive Colab notebook
     ├── wordle.py               # Wordle environment example
     ├── wordle_prompt.txt       # System prompt for Wordle
-    └── repl_with_llm.py        # REPL with LLM example
+    ├── repl_with_llm.py        # REPL with LLM example
+    └── unsloth_2048.ipynb      # Unsloth 2048 environment example
 ```
 
 ## Resources
