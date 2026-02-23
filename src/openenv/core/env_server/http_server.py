@@ -969,7 +969,9 @@ all schema information needed to interact with the environment.
                     elif hasattr(_env, "mcp_server") and _env.mcp_server:
                         # Use server directly
                         tools = []
-                        for tool_name, tool in get_server_tools(_env.mcp_server).items():
+                        for tool_name, tool in get_server_tools(
+                            _env.mcp_server
+                        ).items():
                             tool_dict = {
                                 "name": tool.name,
                                 "description": tool.description or "",
