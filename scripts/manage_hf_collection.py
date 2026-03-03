@@ -80,13 +80,8 @@ DEFAULT_VERSION = load_default_version()
 def setup_api() -> HfApi:
     """Initialize and authenticate the Hugging Face API client."""
     hf_token = os.environ.get("HF_TOKEN")
-    if not hf_token:
-        logger.error("HF_TOKEN environment variable is required")
-        logger.error("Set HF_TOKEN before running this script.")
-        sys.exit(1)
-
     logger.info("Authenticating with Hugging Face...")
-    api = HfApi(token=hf_token)
+    api = HfApi(token=hf_token) if hf_token else HfApi()
 
     try:
         whoami = api.whoami()
@@ -328,10 +323,10 @@ def dedupe_preserve_order(values: Iterable[str]) -> List[str]:
 
 def add_spaces_to_collection(
     api: HfApi,
+    collection_slug: str,
     space_ids: List[str],
-    dry_run: bool = False,
-    collection_slug: str = DEFAULT_COLLECTION_SLUG,
     version: str = DEFAULT_VERSION,
+    dry_run: bool = False,
     note: Optional[str] = None,
 ) -> int:
     """Add spaces to collection, returning count of added/would-add."""
@@ -551,11 +546,11 @@ Examples:
         logger.info("=" * 60)
 
         add_spaces_to_collection(
-            api,
-            new_spaces,
-            dry_run=args.dry_run,
+            api=api,
             collection_slug=collection_slug,
+            space_ids=new_spaces,
             version=args.version,
+            dry_run=args.dry_run,
         )
         logger.info(f"Collection URL: https://huggingface.co/collections/{collection_slug}")
         return
@@ -615,11 +610,11 @@ Examples:
         logger.info("=" * 60)
 
         add_spaces_to_collection(
-            api,
-            new_versioned,
-            dry_run=args.dry_run,
+            api=api,
             collection_slug=versioned_slug,
+            space_ids=new_versioned,
             version=args.version,
+            dry_run=args.dry_run,
             note=f"OpenEnv release {normalize_version(args.version)}",
         )
         logger.info(f"Versioned collection URL: https://huggingface.co/collections/{versioned_slug}")
@@ -654,11 +649,11 @@ Examples:
         logger.info("=" * 60)
 
         add_spaces_to_collection(
-            api,
-            new_global,
-            dry_run=args.dry_run,
+            api=api,
             collection_slug=global_slug,
+            space_ids=new_global,
             version=args.version,
+            dry_run=args.dry_run,
             note=f"OpenEnv tag sync ({args.tag_filter})",
         )
         logger.info(f"Global collection URL: https://huggingface.co/collections/{global_slug}")
