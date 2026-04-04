@@ -1,7 +1,0 @@
-spec_version: 1
-name: reasoning_gym
-type: space
-runtime: fastapi
-app: server.app:app
-port: 8000
-

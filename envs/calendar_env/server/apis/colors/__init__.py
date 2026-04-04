@@ -1,1 +1,0 @@
-"""Colors API module"""
