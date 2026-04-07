@@ -24,10 +24,13 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Make repo root importable when running from /dashboard
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+# Make repo root importable.
+# - Local dev: this file is inside dashboard/, so repo root is parent[1]
+# - HuggingFace Spaces: this file is AT the repo root, so parent[0] is right
+_THIS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _THIS_DIR.parent if (_THIS_DIR / "../envs").resolve().exists() else _THIS_DIR
 for p in (_REPO_ROOT, _REPO_ROOT / "envs", _REPO_ROOT / "src"):
-    if str(p) not in sys.path:
+    if p.exists() and str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
 import gradio as gr
