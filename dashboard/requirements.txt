@@ -1,0 +1,11 @@
+gradio>=4.44
+plotly>=5.22
+pandas>=2.0
+numpy>=1.24
+yfinance>=0.2.40
+torch>=2.1
+openenv-core>=0.2.3
+pydantic>=2.0
+# optional critic backends — safe to install on free Spaces:
+transformers>=4.44
+accelerate>=0.34

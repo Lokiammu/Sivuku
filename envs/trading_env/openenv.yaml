@@ -1,0 +1,14 @@
+spec_version: 1
+name: trading_env
+type: space
+runtime: fastapi
+app: server.app:app
+port: 8000
+description: |
+  Self-evolving trading agent environment. DQN agent trades paper money on
+  historical OHLCV (yfinance). Reward weights are adapted between episodes
+  by a self-evolution critic.
+tags:
+  - trading
+  - reinforcement-learning
+  - self-evolving

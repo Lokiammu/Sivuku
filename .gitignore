@@ -126,6 +126,14 @@ outputs/
 # ignore the log_output
 log_outputs/*
 
+# trading_env runtime artifacts
+.data_cache/
+rubric_config.json
+**/rubric_config.json
+.test_rubric_config.json
+checkpoints/
+*.pt
+
 # .sesskey
 *.sesskey
 
