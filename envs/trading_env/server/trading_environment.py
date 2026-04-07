@@ -16,6 +16,7 @@ from openenv.core.env_server.interfaces import Environment
 
 # These imports work because envs/ is on PYTHONPATH and rubrics/ is at repo root.
 from trading_env.models import MarketObservation, PortfolioState, TradeAction
+from trading_env.tasks import TASKS, TradingTask, get_task
 
 from .market_sim import MarketSimulator, Portfolio
 
@@ -48,6 +49,7 @@ class TradingEnvironment(Environment[TradeAction, MarketObservation, PortfolioSt
         max_steps: int = 500,
         window_size: int = 20,
         cache_dir: str = ".data_cache",
+        task_name: Optional[str] = None,
     ):
         rubric = _make_rubric()
         super().__init__(rubric=rubric)
@@ -59,12 +61,25 @@ class TradingEnvironment(Environment[TradeAction, MarketObservation, PortfolioSt
         self.max_steps = max_steps
         self.window_size = window_size
 
+        # Task selection — if set, the env uses deterministic scenario data
+        # and reports a grader score in episode metadata.
+        self._active_task: Optional[TradingTask] = (
+            get_task(task_name) if task_name else None
+        )
+
+        scenario = self._active_task.scenario if self._active_task else None
+        scenario_seed = self._active_task.seed if self._active_task else None
+        if self._active_task is not None:
+            self.max_steps = self._active_task.max_steps
+
         self.market = MarketSimulator(
             ticker=ticker,
             interval=interval,
             period=period,
             cache_dir=cache_dir,
             window_size=window_size,
+            scenario=scenario,
+            scenario_seed=scenario_seed,
         )
         self.portfolio = Portfolio(initial_cash=initial_cash)
 
@@ -137,8 +152,18 @@ class TradingEnvironment(Environment[TradeAction, MarketObservation, PortfolioSt
         self,
         seed: Optional[int] = None,
         episode_id: Optional[str] = None,
+        task_name: Optional[str] = None,
         **kwargs: Any,
     ) -> MarketObservation:
+        # Allow per-episode task switching. If the caller specifies a task,
+        # swap the market scenario so the next episode is deterministic.
+        if task_name is not None:
+            self._active_task = get_task(task_name)
+            self.max_steps = self._active_task.max_steps
+            self.market.set_scenario(
+                self._active_task.scenario, seed=self._active_task.seed
+            )
+
         self.market.reset(seed=seed)
         self.portfolio = Portfolio(initial_cash=self.initial_cash)
 
@@ -208,6 +233,12 @@ class TradingEnvironment(Environment[TradeAction, MarketObservation, PortfolioSt
             summary = self.portfolio.episode_stats()
         obs.metadata["episode_summary"] = summary
         obs.metadata["trade_history"] = list(self.portfolio.trade_history)
+
+        if self._active_task is not None:
+            task_score = float(self._active_task.grade(summary))
+            obs.metadata["task_name"] = self._active_task.name
+            obs.metadata["task_difficulty"] = self._active_task.difficulty
+            obs.metadata["task_score"] = task_score
 
     @property
     def state(self) -> PortfolioState:

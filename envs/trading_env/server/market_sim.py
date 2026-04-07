@@ -46,6 +46,8 @@ class MarketSimulator:
         period: str = "5y",
         cache_dir: str = ".data_cache",
         window_size: int = DEFAULT_WINDOW,
+        scenario: Optional[str] = None,
+        scenario_seed: Optional[int] = None,
     ) -> None:
         self.ticker = ticker
         self.interval = interval
@@ -54,7 +56,15 @@ class MarketSimulator:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        self._df: pd.DataFrame = self._load_data()
+        # When a scenario is set we always use deterministic synthetic data —
+        # this makes evaluation reproducible across runs and machines.
+        self.scenario = scenario
+        self.scenario_seed = scenario_seed
+
+        if scenario is not None:
+            self._df = self._scenario_data(scenario, seed=scenario_seed or 0)
+        else:
+            self._df = self._load_data()
         self._precompute_indicators()
 
         self._cursor: int = self.window_size   # first valid index
@@ -107,6 +117,48 @@ class MarketSimulator:
         except Exception as e:
             logger.warning("yfinance failed (%s) — using synthetic GBM data", e)
             return self._synthetic_data(n=1500)
+
+    @staticmethod
+    def _scenario_data(
+        scenario: str,
+        seed: int = 0,
+        n: int = 600,
+        start_price: float = 100.0,
+    ) -> pd.DataFrame:
+        """Deterministic synthetic data keyed by (scenario, seed).
+
+        Used by the task/grader system so evaluation is reproducible and
+        doesn't depend on live yfinance responses.
+        """
+        rng = np.random.default_rng(seed)
+        if scenario == "bull":
+            drift, vol = 0.0015, 0.012
+        elif scenario == "bear":
+            drift, vol = -0.0012, 0.014
+        else:  # sideways / default
+            drift, vol = 0.0001, 0.022
+
+        returns = rng.normal(drift, vol, size=n)
+        close = start_price * np.exp(np.cumsum(returns))
+
+        noise = rng.normal(0, vol / 2, size=n) * close
+        high = close + np.abs(noise)
+        low = close - np.abs(noise)
+        open_ = np.roll(close, 1)
+        open_[0] = start_price
+        volume = rng.integers(1_000_000, 5_000_000, size=n).astype(float)
+
+        index = pd.date_range(end=pd.Timestamp.today(), periods=n, freq="D")
+        return pd.DataFrame(
+            {
+                "Open": open_,
+                "High": high,
+                "Low": low,
+                "Close": close,
+                "Volume": volume,
+            },
+            index=index,
+        )
 
     @staticmethod
     def _synthetic_data(n: int = 1500, start_price: float = 100.0) -> pd.DataFrame:
@@ -182,11 +234,24 @@ class MarketSimulator:
     # replay API
     # ------------------------------------------------------------------
 
+    def set_scenario(self, scenario: str, seed: int = 0) -> None:
+        """Swap the underlying dataframe to a new deterministic scenario."""
+        self.scenario = scenario
+        self.scenario_seed = seed
+        self._df = self._scenario_data(scenario, seed=seed)
+        self._precompute_indicators()
+        self._cursor = self.window_size
+
     def reset(self, seed: Optional[int] = None, start_idx: Optional[int] = None) -> int:
         """Start a new episode at a random (or given) index."""
         rng = random.Random(seed)
         min_idx = self.window_size
         max_idx = max(min_idx + 1, len(self._df) - 200)
+        # For deterministic scenarios we always start right after the warmup
+        # so every agent sees the same sequence.
+        if self.scenario is not None:
+            self._cursor = min_idx
+            return self._cursor
         if start_idx is None:
             self._cursor = rng.randint(min_idx, max_idx)
         else:
