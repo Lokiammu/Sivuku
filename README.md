@@ -68,37 +68,31 @@ export HF_TOKEN=hf_xxx   # or API_KEY
 python inference.py
 ```
 
-If the LLM is unreachable the script falls back to a rule-based policy so
-baseline scores are always produced. Output format is machine-readable:
+When no API key is set the script uses a deterministic rule-based policy —
+output is identical across runs. Output format:
 
 ```
-[START] {"task": "...", "model": "..."}
-[STEP]  {"task": "...", "step": i, "action": "buy|sell|hold", "reward": x, "pv": y}
-[END]   {"task": "...", "score": s, "summary": {...}}
-[FINAL] {"mean_score": ..., "per_task": {...}}
+[START] {"env": "trading_env", "task": "...", "model": "...", "seed": N}
+[STEP]  {"env": "trading_env", "task": "...", "step": i, "action": {...}, "reward": x, "done": false, "error": null}
+[END]   {"env": "trading_env", "task": "...", "score": s, "success": true/false, "rewards": [...], "summary": {...}, "error": null}
 ```
 
-### Baseline scores (rule-based fallback, seed 17/42/99)
+### Baseline scores (rule-based, deterministic seeds 17/42/99)
 
-| Task | Score |
-|---|---|
-| trend_following | ~0.36 |
-| volatility_control | ~0.15 |
-| bear_market_survival | ~0.00 |
-| **mean** | **~0.17** |
-
-Expected to improve meaningfully once a real 2B-parameter LLM is wired in
-and the self-evolution critic has run several episodes.
+| Task | Score | Success (≥0.5) |
+|---|---|---|
+| trend_following | 0.361 | no |
+| volatility_control | 0.150 | no |
+| bear_market_survival | 0.000 | no |
 
 ## Dev setup
 
 ```bash
-# install deps for the trading env
-cd envs/trading_env
+# install deps (env is at repo root)
 uv lock
 uv sync
 
-# run the FastAPI + WebSocket server (used by the client & dashboard)
+# run the FastAPI + WebSocket server
 uv run server
 # or:
 python -m server.app
@@ -107,10 +101,11 @@ python -m server.app
 ## Verifying the environment
 
 ```bash
-python -m openenv.cli validate envs/trading_env
+# from repo root — no path argument needed
+python -m openenv.cli validate .
 ```
 
-Should print `[OK] trading: Ready for multi-mode deployment`.
+Should print `[OK] : Ready for multi-mode deployment`.
 
 ## HuggingFace Spaces dashboard
 
