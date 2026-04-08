@@ -247,7 +247,7 @@ class TradingEnvironment(Environment[TradeAction, MarketObservation, PortfolioSt
         obs.metadata["trade_history"] = list(self.portfolio.trade_history)
 
         if self._active_task is not None:
-            task_score = float(self._active_task.grade(summary))
+            task_score = round(float(self._active_task.grade(summary)), 4)
             obs.metadata["task_name"] = self._active_task.name
             obs.metadata["task_difficulty"] = self._active_task.difficulty
         else:

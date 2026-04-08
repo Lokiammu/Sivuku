@@ -46,6 +46,7 @@ class TradingEnv(EnvClient[TradeAction, MarketObservation, PortfolioState]):
             step_num=obs_data.get("step_num", 0),
             trade_info=obs_data.get("trade_info", ""),
             error=obs_data.get("error"),
+            task_score=obs_data.get("task_score"),
             metadata=obs_data.get("metadata", {}),
         )
         return StepResult(

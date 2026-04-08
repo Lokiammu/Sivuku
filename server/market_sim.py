@@ -490,12 +490,10 @@ class Portfolio:
 
         total_return = float(cum[-1] - 1.0)
 
-        # win rate over completed round-trip trades
+        # win rate: fraction of steps where portfolio value increased
         executed = [t for t in self.trade_history if t.get("action") in ("buy", "sell")]
-        win_rate = 0.0
-        if executed:
-            wins = sum(1 for r in arr if r > 0)
-            win_rate = float(wins / max(1, n))
+        wins = int(np.sum(arr > 0))
+        win_rate = float(wins / max(1, n))
 
         return {
             "total_return": total_return,
