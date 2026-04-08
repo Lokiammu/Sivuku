@@ -116,8 +116,8 @@ outputs/
 # Generated requirements files from pyproject.toml
 **/server/requirements.txt.generated
 
-# UV root lock file (env lock files should be committed)
-/uv.lock
+# uv.lock must be tracked — the OpenEnv Phase-1 validator requires it at
+# repo root for multi-mode deployment. Do not ignore.
 .uv/
 
 *.backup*/
