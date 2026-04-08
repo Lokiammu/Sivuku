@@ -1,38 +1,30 @@
 # Self-Evolving Trading Agent — OpenEnv HTTP server
-# Env is at repo root (flattened structure). openenv validate passes from root.
-ARG BASE_IMAGE=python:3.11-slim
-FROM ${BASE_IMAGE} AS builder
+# Flat structure — openenv validate passes from repo root.
+FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install system deps + curl for HEALTHCHECK
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git curl build-essential && \
+    apt-get install -y --no-install-recommends curl build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    mv /root/.local/bin/uv /usr/local/bin/uv && \
-    mv /root/.local/bin/uvx /usr/local/bin/uvx
+# Install Python dependencies directly with pip (no uv/lockfile needed)
+RUN pip install --no-cache-dir \
+    "openenv-core>=0.2.3" \
+    "fastapi>=0.110" \
+    "uvicorn[standard]>=0.27" \
+    "yfinance>=0.2.40" \
+    "pandas>=2.0" \
+    "numpy>=1.24" \
+    "pydantic>=2.0" \
+    "openai>=1.0"
 
-# Copy the flat env at repo root
-COPY pyproject.toml uv.lock ./
+# Copy application code
 COPY models.py tasks.py client.py openenv.yaml ./
 COPY server/ ./server/
 COPY rubrics/ ./rubrics/
 COPY agents/ ./agents/
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-install-project
-
-# ── final stage ─────────────────────────────────────────────────────────────
-FROM ${BASE_IMAGE}
-
-# Install curl in final stage for HEALTHCHECK
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-COPY --from=builder /app /app
 
 ENV PYTHONPATH="/app:$PYTHONPATH"
 ENV TRADING_TICKER=AAPL
@@ -47,4 +39,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-CMD ["sh", "-c", "/app/.venv/bin/python -m server.app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "python -m server.app --host 0.0.0.0 --port ${PORT}"]
