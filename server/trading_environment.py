@@ -258,7 +258,10 @@ class TradingEnvironment(Environment[TradeAction, MarketObservation, PortfolioSt
             dd_score = max(0.0, min(1.0, (0.20 - max_dd) / 0.20))
             task_score = round(0.7 * ret_score + 0.3 * dd_score, 4)
 
+        # Store in metadata (backwards compat) AND as a top-level obs field
+        # so serialize_observation includes it in the HTTP/WS response body.
         obs.metadata["task_score"] = task_score
+        obs.task_score = task_score
 
     @property
     def state(self) -> PortfolioState:

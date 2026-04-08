@@ -246,6 +246,7 @@ class TradingEnvironment(Environment[TradeAction, MarketObservation, PortfolioSt
             task_score = round(0.7 * ret_score + 0.3 * dd_score, 4)
 
         obs.metadata["task_score"] = task_score
+        obs.task_score = task_score
 
     @property
     def state(self) -> PortfolioState:

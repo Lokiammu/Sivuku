@@ -155,7 +155,8 @@ def serialize_observation(observation: Observation) -> Dict[str, Any]:
         exclude={
             "reward",
             "done",
-        }  # metadata is intentionally kept so task_score and episode info are visible
+            "metadata",
+        }
     )
 
     # Extract reward and done directly from the observation

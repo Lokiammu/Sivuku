@@ -44,6 +44,9 @@ class MarketObservation(Observation):
     trade_info: str = ""
     error: Optional[str] = None
 
+    # hackathon grader score in [0, 1] — set on episode completion
+    task_score: Optional[float] = None
+
 
 class PortfolioState(State):
     """Full internal state (WebSocket training infrastructure only)."""
