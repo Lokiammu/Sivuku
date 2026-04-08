@@ -16,7 +16,6 @@ RUN pip install --no-cache-dir \
     "fastapi>=0.110" \
     "uvicorn[standard]>=0.27" \
     "pydantic>=2.0" \
-    "fastmcp>=0.1" \
     "websockets>=13.0" \
     "httpx>=0.24" \
     "yfinance>=0.2.40" \

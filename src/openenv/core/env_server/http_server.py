@@ -38,7 +38,11 @@ from fastapi import (
 from pydantic import ValidationError
 
 from .interfaces import Environment
-from .mcp_environment import get_server_tools
+try:
+    from .mcp_environment import get_server_tools
+except (ModuleNotFoundError, ImportError):
+    def get_server_tools(env):  # type: ignore[misc]
+        return {}
 from .mcp_types import (
     JsonRpcErrorCode,
     JsonRpcRequest,
