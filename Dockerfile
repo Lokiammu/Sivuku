@@ -5,14 +5,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps + curl for HEALTHCHECK
+# System deps: curl only (for HEALTHCHECK) — no build-essential needed, all wheels are pre-built
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl build-essential && \
+    apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Install only the packages our server actually needs at runtime.
-# Deliberately excludes: gradio, torch, anthropic (unused in server path).
-RUN pip install --no-cache-dir \
+# --prefer-binary: always pick pre-built wheels, never compile from source.
+# Deliberately excludes: gradio, torch, anthropic, typer, rich (unused in server path).
+RUN pip install --no-cache-dir --prefer-binary \
     "fastapi>=0.110" \
     "uvicorn[standard]>=0.27" \
     "pydantic>=2.0" \
@@ -22,9 +23,7 @@ RUN pip install --no-cache-dir \
     "pandas>=2.0" \
     "numpy>=1.24" \
     "openai>=1.0" \
-    "pyyaml" \
-    "rich" \
-    "typer"
+    "pyyaml"
 
 # Copy patched local openenv — avoids full openenv-core PyPI package
 # (which pulls gradio + heavy ML deps we don't need)
