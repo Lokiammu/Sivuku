@@ -27,8 +27,15 @@ from .market_sim import MarketSimulator, Portfolio
 
 logger = logging.getLogger(__name__)
 
-# rubric_config.json lives at repo root so the dashboard + critic can all see it
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+# rubric_config.json lives at repo root.
+# Flat layout:  .../server/trading_environment.py → parents[1] = repo root
+# Nested layout: .../envs/trading_env/server/trading_environment.py → parents[3]
+_THIS_SERVER = Path(__file__).resolve().parent
+_REPO_ROOT = (
+    _THIS_SERVER.parent          # flat: server/ is directly under root
+    if (_THIS_SERVER.parent / "openenv.yaml").exists()
+    else _THIS_SERVER.parents[3] # nested: envs/trading_env/server/
+)
 _DEFAULT_CONFIG_PATH = _REPO_ROOT / "rubric_config.json"
 
 
