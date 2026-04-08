@@ -5,10 +5,21 @@ runtime: fastapi
 app: server.app:app
 port: 8000
 description: |
-  Self-evolving trading agent environment. DQN agent trades paper money on
-  historical OHLCV (yfinance). Reward weights are adapted between episodes
-  by a self-evolution critic.
+  Self-evolving paper-trading environment. A DQN agent trades a single
+  asset on historical OHLCV data. Between episodes, a critic rewrites
+  the reward-function weights — this is the self-evolution loop.
 tags:
   - trading
   - reinforcement-learning
   - self-evolving
+  - openenv
+tasks:
+  - name: trend_following
+    difficulty: easy
+    description: "Bull market. Reach +5% total return while keeping max drawdown <=15%."
+  - name: volatility_control
+    difficulty: medium
+    description: "Choppy sideways market. Produce Sharpe >=1.0 and max drawdown <=10%."
+  - name: bear_market_survival
+    difficulty: hard
+    description: "Declining market. Lose <=2% (positive is excellent), max drawdown <=20%."

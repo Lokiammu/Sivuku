@@ -4,8 +4,8 @@ Hackathon-required entry point. Runs the three graded tasks against an
 in-process TradingEnvironment and reports per-task scores.
 
 Uses an OpenAI-compatible chat endpoint (configurable via env vars) with a
-~2B-parameter LLM as the decision model. Defaults to rule-based policy when
-no API key is set, making the baseline fully deterministic.
+~2B-parameter LLM as the decision model. Defaults to deterministic rule-based
+policy when no API key is set.
 
 Environment variables
 ---------------------
@@ -13,11 +13,11 @@ API_BASE_URL   (default: https://router.huggingface.co/v1)
 MODEL_NAME     (default: Qwen/Qwen2.5-1.5B-Instruct)
 API_KEY / HF_TOKEN  — API key for the inference endpoint
 
-Output format (one line per event, machine-parseable)
-------------------------------------------------------
-[START] {"env": "trading_env", "task": "...", "model": "...", "seed": N}
-[STEP]  {"env": "trading_env", "task": "...", "step": i, "action": {...}, "reward": x, "done": false, "error": null}
-[END]   {"env": "trading_env", "task": "...", "score": s, "success": true/false, "rewards": [...], "summary": {...}, "error": null}
+Output format (exact hackathon spec)
+-------------------------------------
+[START] task=<name> env=trading_env model=<name>
+[STEP] step=<n> action=<verb>(<size>) reward=<x.xx> done=<true|false> error=<msg|null>
+[END] success=<true|false> steps=<n> score=<x.xx> rewards=<r1,r2,...>
 """
 
 from __future__ import annotations
@@ -29,7 +29,6 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Make repo root importable when running from anywhere.
 _ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(_ROOT))
 
@@ -43,8 +42,33 @@ logger = logging.getLogger("inference")
 ENV_NAME = "trading_env"
 DEFAULT_API_BASE = "https://router.huggingface.co/v1"
 DEFAULT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
-# Score at or above this threshold → success=true
 SUCCESS_THRESHOLD = 0.5
+
+# ---------------------------------------------------------------------------
+# output helpers — key=value format, NOT JSON
+# ---------------------------------------------------------------------------
+
+def _out(line: str) -> None:
+    sys.stdout.write(line + "\n")
+    sys.stdout.flush()
+
+def _start(task: str, model: str) -> None:
+    _out(f"[START] task={task} env={ENV_NAME} model={model}")
+
+def _step(step: int, action: str, size: float, reward: float,
+          done: bool, error: Optional[str]) -> None:
+    err = error if error else "null"
+    _out(
+        f"[STEP] step={step} action={action}({size:.2f}) "
+        f"reward={reward:.2f} done={str(done).lower()} error={err}"
+    )
+
+def _end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    _out(
+        f"[END] success={str(success).lower()} steps={steps} "
+        f"score={score:.2f} rewards={rewards_str}"
+    )
 
 # ---------------------------------------------------------------------------
 # LLM policy
@@ -64,8 +88,10 @@ def _obs_to_prompt(obs: Any, task: str, step: int) -> str:
         f"rsi={float(getattr(obs,'rsi',50)):.1f} "
         f"macd={float(getattr(obs,'macd',0)):.4f} "
         f"regime={int(getattr(obs,'regime',0))} "
+        f"(0=sideways 1=bull 2=bear) "
         f"cash_ratio={float(getattr(obs,'cash_ratio',1)):.2f} "
-        f"position={float(getattr(obs,'position_ratio',0)):.2f}"
+        f"position={float(getattr(obs,'position_ratio',0)):.2f} "
+        f"unrealized_pnl={float(getattr(obs,'unrealized_pnl',0)):.4f}"
     )
 
 
@@ -130,7 +156,7 @@ def _parse_llm(text: str) -> Dict[str, Any]:
 
 
 def _rule_based(obs: Any) -> Dict[str, Any]:
-    """Deterministic mean-reversion policy (no randomness, reproducible)."""
+    """Deterministic mean-reversion policy — no randomness, fully reproducible."""
     rsi = float(getattr(obs, "rsi", 50.0))
     pos = float(getattr(obs, "position_ratio", 0.0))
     regime = int(getattr(obs, "regime", 0))
@@ -138,53 +164,40 @@ def _rule_based(obs: Any) -> Dict[str, Any]:
         return {"action": "buy", "size": 0.5}
     if rsi > 70 and pos > 0.1:
         return {"action": "sell", "size": 0.5}
-    if regime == 2 and pos > 0.3:
+    if regime == 2 and pos > 0.3:   # bear — reduce exposure
         return {"action": "sell", "size": 0.5}
-    if regime == 1 and pos < 0.3:
+    if regime == 1 and pos < 0.3:   # bull — add exposure
         return {"action": "buy", "size": 0.5}
     return {"action": "hold", "size": 0.0}
 
 
 # ---------------------------------------------------------------------------
-# helpers
+# task runner
 # ---------------------------------------------------------------------------
 
 _ACTION_MAP = {"hold": 0, "buy": 1, "sell": 2}
 
 
-def _emit(tag: str, payload: Dict[str, Any]) -> None:
-    sys.stdout.write(f"[{tag}] {json.dumps(payload, default=float)}\n")
-    sys.stdout.flush()
-
-
 def _run_task(task_name: str, policy: LLMPolicy) -> Dict[str, Any]:
     task = TASKS[task_name]
     env = TradingEnvironment(task_name=task_name)
-    # Use the task's fixed seed for reproducibility
     obs = env.reset(task_name=task_name, seed=task.seed)
 
     model_label = policy.model if policy.active else "rule-based"
-    _emit("START", {
-        "env": ENV_NAME,
-        "task": task_name,
-        "difficulty": task.difficulty,
-        "model": model_label,
-        "seed": task.seed,
-        "max_steps": env.max_steps,
-    })
+    _start(task_name, model_label)
 
     rewards: List[float] = []
     step = 0
     done = False
     last_obs = obs
-    error: Optional[str] = None
+    task_error: Optional[str] = None
 
     while not done and step < env.max_steps:
         decision = policy.decide(obs, task_name, step)
-        action = TradeAction(
-            action_type=_ACTION_MAP.get(decision["action"], 0),
-            size=float(decision["size"]),
-        )
+        action_verb = decision["action"]
+        size = float(decision["size"])
+        action = TradeAction(action_type=_ACTION_MAP.get(action_verb, 0), size=size)
+
         try:
             obs = env.step(action)
             reward = float(getattr(obs, "reward", 0.0) or 0.0)
@@ -194,18 +207,10 @@ def _run_task(task_name: str, policy: LLMPolicy) -> Dict[str, Any]:
             reward = 0.0
             done = True
             step_error = str(exc)
-            error = step_error
+            task_error = step_error
 
         rewards.append(reward)
-        _emit("STEP", {
-            "env": ENV_NAME,
-            "task": task_name,
-            "step": step,
-            "action": {"action_type": action.action_type, "size": action.size},
-            "reward": reward,
-            "done": done,
-            "error": step_error,
-        })
+        _step(step, action_verb, size, reward, done, step_error)
 
         last_obs = obs
         step += 1
@@ -217,20 +222,7 @@ def _run_task(task_name: str, policy: LLMPolicy) -> Dict[str, Any]:
     task_score = float(task_score)
     success = task_score >= SUCCESS_THRESHOLD
 
-    _emit("END", {
-        "env": ENV_NAME,
-        "task": task_name,
-        "score": task_score,
-        "success": success,
-        "rewards": rewards,
-        "summary": {k: float(summary.get(k, 0.0)) for k in (
-            "total_return", "sharpe", "sortino", "max_drawdown", "volatility"
-        )},
-        "num_trades": int(summary.get("num_trades", 0)),
-        "steps": step,
-        "error": error,
-    })
-
+    _end(success, step, task_score, rewards)
     return {"task": task_name, "score": task_score, "success": success}
 
 
@@ -246,7 +238,6 @@ def main(task_names: Optional[List[str]] = None) -> int:
             logger.warning("skipping unknown task: %s", name)
             continue
         _run_task(name, policy)
-
     return 0
 
 
