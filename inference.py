@@ -44,6 +44,9 @@ DEFAULT_API_BASE = "https://router.huggingface.co/v1"
 DEFAULT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 SUCCESS_THRESHOLD = 0.5
 
+# Optional: used by from_docker_image() when pulling a local image instead of HF Space
+LOCAL_IMAGE_NAME = os.environ.get("LOCAL_IMAGE_NAME")
+
 # ---------------------------------------------------------------------------
 # output helpers — key=value format, NOT JSON
 # ---------------------------------------------------------------------------
@@ -117,7 +120,7 @@ class LLMPolicy:
 
     def decide(self, obs: Any, task: str, step: int) -> Dict[str, Any]:
         if not self.active:
-            return _rule_based(obs)
+            return _rule_based(obs, task)
         try:
             resp = self._client.chat.completions.create(
                 model=self.model,
@@ -137,7 +140,7 @@ class LLMPolicy:
             if self._failures >= 3:
                 self._disabled = True
             logger.warning("LLM failed (%s); rule-based fallback", e)
-            return _rule_based(obs)
+            return _rule_based(obs, task)
 
 
 def _parse_llm(text: str) -> Dict[str, Any]:
@@ -155,18 +158,43 @@ def _parse_llm(text: str) -> Dict[str, Any]:
     return {"action": "hold", "size": 0.0}
 
 
-def _rule_based(obs: Any) -> Dict[str, Any]:
-    """Deterministic mean-reversion policy — no randomness, fully reproducible."""
+def _rule_based(obs: Any, task: str = "") -> Dict[str, Any]:
+    """Deterministic task-aware policy — no randomness, fully reproducible."""
     rsi = float(getattr(obs, "rsi", 50.0))
     pos = float(getattr(obs, "position_ratio", 0.0))
     regime = int(getattr(obs, "regime", 0))
+    step = int(getattr(obs, "step_num", 0))
+
+    # ── Bear market: capital preservation — stay in cash ─────────────────
+    if task == "bear_market_survival":
+        if pos > 0.02:
+            return {"action": "sell", "size": 1.0}   # liquidate everything
+        return {"action": "hold", "size": 0.0}
+
+    # ── Bull trend: buy early and ride ───────────────────────────────────
+    if task == "trend_following":
+        if pos < 0.75 and (step < 40 or rsi < 50):
+            return {"action": "buy", "size": 0.5}
+        if rsi > 82 and pos > 0.3:                   # severe overbought → trim
+            return {"action": "sell", "size": 0.25}
+        return {"action": "hold", "size": 0.0}
+
+    # ── Volatility control: active mean-reversion ────────────────────────
+    if task == "volatility_control":
+        if rsi < 35 and pos < 0.75:
+            return {"action": "buy", "size": 0.5}
+        if rsi > 65 and pos > 0.1:
+            return {"action": "sell", "size": 0.5}
+        return {"action": "hold", "size": 0.0}
+
+    # ── Default generic policy ────────────────────────────────────────────
     if rsi < 30 and pos < 0.7:
         return {"action": "buy", "size": 0.5}
     if rsi > 70 and pos > 0.1:
         return {"action": "sell", "size": 0.5}
-    if regime == 2 and pos > 0.3:   # bear — reduce exposure
-        return {"action": "sell", "size": 0.5}
-    if regime == 1 and pos < 0.3:   # bull — add exposure
+    if regime == 2 and pos > 0.1:   # bear — exit entirely
+        return {"action": "sell", "size": 1.0}
+    if regime == 1 and pos < 0.5:   # bull — add exposure
         return {"action": "buy", "size": 0.5}
     return {"action": "hold", "size": 0.0}
 

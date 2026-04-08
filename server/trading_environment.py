@@ -250,7 +250,15 @@ class TradingEnvironment(Environment[TradeAction, MarketObservation, PortfolioSt
             task_score = float(self._active_task.grade(summary))
             obs.metadata["task_name"] = self._active_task.name
             obs.metadata["task_difficulty"] = self._active_task.difficulty
-            obs.metadata["task_score"] = task_score
+        else:
+            # Fallback grader: score on total_return clamped to [0, 1]
+            total_return = float(summary.get("total_return", 0.0))
+            max_dd = float(summary.get("max_drawdown", 1.0))
+            ret_score = max(0.0, min(1.0, (total_return + 0.10) / 0.10))
+            dd_score = max(0.0, min(1.0, (0.20 - max_dd) / 0.20))
+            task_score = round(0.7 * ret_score + 0.3 * dd_score, 4)
+
+        obs.metadata["task_score"] = task_score
 
     @property
     def state(self) -> PortfolioState:
