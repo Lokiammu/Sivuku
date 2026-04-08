@@ -21,7 +21,7 @@ COPY rubrics/ ./rubrics/
 COPY agents/ ./agents/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-editable
+    uv sync --no-install-project
 
 # ── final stage ─────────────────────────────────────────────────────────────
 FROM ${BASE_IMAGE}
