@@ -1,0 +1,65 @@
+# Biggest win: don't send 162MB of git history to the Docker daemon
+.git
+.gitignore
+.gitattributes
+
+# Python caches
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+**/*.egg-info
+
+# Virtualenvs / envs
+.venv
+venv
+env
+.env
+.env.*
+
+# Build artifacts we don't need in the image
+build
+dist
+*.whl
+uv.lock
+
+# Old nested env layout — server uses root-level copies (models.py, tasks.py, server/)
+envs/
+
+# Dashboard / docs / media — never imported by the server
+dashboard/
+docs/
+examples/
+assets/
+*.mov
+*.mp4
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.pdf
+
+# src/openenv trims: server only uses src/openenv/core
+src/openenv/cli/
+src/openenv/auto/
+src/openenv_core/
+src/openenv_core.egg-info/
+
+# Data cache — regenerated at runtime
+.data_cache/
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Misc
+README.md
+AGENTS.md
+LICENSE

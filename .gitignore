@@ -90,8 +90,7 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Docker
-/.dockerignore
+# (.dockerignore is tracked — needed by HF Spaces build)
 
 # Claude Code - exclude personal/temporary files, allow shared workflow files
 .claude/settings.local.json

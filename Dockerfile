@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # Self-Evolving Trading Agent — OpenEnv HTTP server
 # Uses local src/openenv/ to avoid heavy gradio/torch dependency chain
 # that comes with pip installing openenv-core from PyPI.
@@ -5,15 +6,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps: curl only (for HEALTHCHECK) — no build-essential needed, all wheels are pre-built
+# System deps: curl only (for HEALTHCHECK) — no build-essential, all wheels are pre-built
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Install only the packages our server actually needs at runtime.
+# Install only the packages the server actually needs at runtime.
 # --prefer-binary: always pick pre-built wheels, never compile from source.
-# Deliberately excludes: gradio, torch, anthropic, typer, rich (unused in server path).
-RUN pip install --no-cache-dir --prefer-binary \
+# BuildKit cache mount keeps the pip download cache across builds so we don't
+# re-download pandas/numpy/etc. every time a line in the Dockerfile changes.
+# Excluded (unused in server path): gradio, torch, anthropic, openai, typer, rich, fastmcp.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefer-binary \
     "fastapi>=0.110" \
     "uvicorn[standard]>=0.27" \
     "pydantic>=2.0" \
@@ -22,7 +26,6 @@ RUN pip install --no-cache-dir --prefer-binary \
     "yfinance>=0.2.40" \
     "pandas>=2.0" \
     "numpy>=1.24" \
-    "openai>=1.0" \
     "pyyaml"
 
 # Copy patched local openenv — avoids full openenv-core PyPI package
