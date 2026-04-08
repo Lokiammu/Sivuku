@@ -1,3 +1,13 @@
+---
+title: Self-Evolving Trading Agent
+emoji: 📈
+colorFrom: green
+colorTo: blue
+sdk: docker
+pinned: false
+license: bsd-3-clause
+---
+
 # Self-Evolving Trading Agent
 
 An **OpenEnv** environment where a DQN trading agent paper-trades historical
@@ -8,11 +18,10 @@ care about.
 
 Built for the OpenEnv Hackathon submission.
 
-- **Environment:** `envs/trading_env/` — single-asset paper trading
+- **Environment:** `server/trading_environment.py` — single-asset paper trading
 - **Rubric:** `rubrics/trading_rubric.py` — adaptive reward function, JSON-persisted weights
 - **Agent baseline:** `agents/dqn_trader.py` — vanilla DQN
-- **Self-evolution critic:** `agents/evolution_critic.py` — rule-based / transformers / OpenAI backends
-- **Dashboard:** `dashboard/gradio_app.py` — HuggingFace Spaces UI
+- **Self-evolution critic:** `agents/evolution_critic.py` — rule-based / LLM backends
 - **Inference entry point:** `inference.py` — runs the three graded tasks
 
 ## Action space
@@ -38,7 +47,7 @@ Built for the OpenEnv Hackathon submission.
 
 ## Tasks (hackathon-graded)
 
-Three deterministic tasks are defined in [envs/trading_env/tasks.py](envs/trading_env/tasks.py).
+Three deterministic tasks are defined in [tasks.py](tasks.py).
 Each task uses a seeded synthetic scenario so grading is reproducible across runs.
 
 | Task | Difficulty | Scenario | Grader target |
@@ -51,8 +60,6 @@ Each grader returns a score in `[0, 1]` attached to the last observation as
 `metadata["task_score"]`.
 
 ## Running the baseline
-
-The hackathon expects a single `inference.py` that produces per-task scores.
 
 ```bash
 # default: Qwen/Qwen2.5-1.5B-Instruct via HuggingFace Inference Router
@@ -72,23 +79,15 @@ When no API key is set the script uses a deterministic rule-based policy —
 output is identical across runs. Output format:
 
 ```
-[START] {"env": "trading_env", "task": "...", "model": "...", "seed": N}
-[STEP]  {"env": "trading_env", "task": "...", "step": i, "action": {...}, "reward": x, "done": false, "error": null}
-[END]   {"env": "trading_env", "task": "...", "score": s, "success": true/false, "rewards": [...], "summary": {...}, "error": null}
+[START] task=<name> env=trading_env model=<name>
+[STEP]  step=<n> action=<verb>(<size>) reward=<x.xx> done=<true|false> error=<null>
+[END]   success=<true|false> steps=<n> score=<x.xx> rewards=<r1,r2,...>
 ```
-
-### Baseline scores (rule-based, deterministic seeds 17/42/99)
-
-| Task | Score | Success (≥0.5) |
-|---|---|---|
-| trend_following | 0.361 | no |
-| volatility_control | 0.150 | no |
-| bear_market_survival | 0.000 | no |
 
 ## Dev setup
 
 ```bash
-# install deps (env is at repo root)
+# install deps
 uv lock
 uv sync
 
@@ -98,25 +97,16 @@ uv run server
 python -m server.app
 ```
 
-## Verifying the environment
+## API endpoints
 
-```bash
-# from repo root — no path argument needed
-python -m openenv.cli validate .
-```
-
-Should print `[OK] : Ready for multi-mode deployment`.
-
-## HuggingFace Spaces dashboard
-
-The `dashboard/` directory is a self-contained Gradio Space that trains the
-DQN agent in a background thread and shows:
-
-- live price chart with buy/sell markers
-- portfolio equity curve ($10,000 paper money)
-- per-episode reward + total return
-- live reward-function weights (updated by the critic each episode)
-- the critic's natural-language reasoning for each weight change
+| Endpoint | Method | Description |
+|---|---|---|
+| `/health` | GET | Health check |
+| `/reset` | POST | Start new episode |
+| `/step` | POST | Send action, get observation |
+| `/state` | GET | Current portfolio state |
+| `/schema` | GET | Action / observation schemas |
+| `/docs` | GET | Interactive API docs (Swagger) |
 
 ## Architecture
 

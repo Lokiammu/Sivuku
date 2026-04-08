@@ -134,6 +134,11 @@ rubric_config.json
 checkpoints/
 *.pt
 
+# Removed from repo — ignore if recreated locally
+dashboard/
+AGENTS.md
+__init_env.py
+
 # .sesskey
 *.sesskey
 

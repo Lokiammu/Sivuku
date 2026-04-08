@@ -19,6 +19,8 @@ COPY models.py tasks.py client.py openenv.yaml ./
 COPY server/ ./server/
 COPY rubrics/ ./rubrics/
 COPY agents/ ./agents/
+# Copy patched local openenv so serialization fixes override the PyPI package
+COPY src/ ./src/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-editable
@@ -34,7 +36,8 @@ RUN apt-get update && \
 WORKDIR /app
 COPY --from=builder /app /app
 
-ENV PYTHONPATH="/app:$PYTHONPATH"
+# src/ first so our patched openenv overrides the pip-installed openenv-core
+ENV PYTHONPATH="/app/src:/app:$PYTHONPATH"
 ENV TRADING_TICKER=AAPL
 ENV TRADING_INTERVAL=1d
 ENV TRADING_PERIOD=5y
